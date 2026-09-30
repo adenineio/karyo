@@ -1,0 +1,20 @@
+{
+  "name": "code",
+  "description": "Source code with a light syntax tint (keywords, strings, comments), line numbers and lit focus lines.",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": ["code"],
+    "additionalProperties": false,
+    "properties": {
+      "code": { "type": "string" },
+      "lang": { "type": "string", "default": "ts", "description": "py | go | ts (js and others tint like ts)" },
+      "focus": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "description": "line numbers to light (as numbered, i.e. counting from start)" },
+      "start": { "type": "integer", "minimum": 1, "default": 1, "description": "number of the first line" },
+      "title": { "type": "string", "description": "file name or caption in the header" }
+    }
+  },
+  "size": { "w": 520 },
+  "motion": ["appear", "emphasize"],
+  "example": { "lang": "py", "title": "grow.py", "code": "def grow(p, r, n):\n    return p * (1 + r) ** n", "focus": [2] }
+}

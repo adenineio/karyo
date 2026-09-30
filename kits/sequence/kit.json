@@ -1,0 +1,18 @@
+{
+  "$schema": "../../spec/karyo-kit.schema.json",
+  "karyo": "kit/1",
+  "name": "sequence",
+  "description": "A plate type for any model with recorded flows: each flow as a sequence diagram, one lane per node it touched and one message per recorded call, in order.",
+  "version": "1.0.0",
+  "kinds": [],
+  "plates": [
+    {
+      "id": "sequence",
+      "title": "Sequence",
+      "description": "One recorded flow as lanes and messages: who called whom, in what order, for how long, and which calls failed.",
+      "view": "sequence",
+      "from": "flow",
+      "options": { "durations": true, "group": true, "fold": "auto" }
+    }
+  ]
+}

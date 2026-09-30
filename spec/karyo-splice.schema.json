@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://karyo.dev/schema/karyo-splice-1.json",
+  "title": "Karyo splice",
+  "description": "A named what-if over a Karyo model: proposed changes (add, connect, disconnect, remove, rename, move, replace) drawn in place on a plate. Lives at <project>/karyo/splices/<id>.splice.json. Semantics: docs/MODEL.md, Splices. validateSplice (src/model/splice.ts) checks this shape and what it means.",
+  "type": "object",
+  "required": ["karyo", "id", "title", "base", "created", "updated", "ops"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "karyo": { "const": "splice/1" },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.-]*$", "description": "The file name stem: <id>.splice.json" },
+    "title": { "type": "string", "minLength": 1 },
+    "note": { "type": "string", "description": "Optional prose" },
+    "base": {
+      "type": "object",
+      "required": ["model", "commit"],
+      "additionalProperties": false,
+      "properties": {
+        "model": { "type": "string", "minLength": 1, "description": "The model file the splice was made against (repo-relative)" },
+        "commit": { "type": ["string", "null"], "description": "The commit it was made at; null when unknown or uncommitted" },
+        "scene": { "type": "string", "description": "The scene (plate) it was drawn on" }
+      }
+    },
+    "view": { "description": "The plate state to reopen at: opaque JSON owned by the UI" },
+    "created": { "type": "string", "format": "date-time" },
+    "updated": { "type": "string", "format": "date-time" },
+    "ops": { "type": "array", "items": { "$ref": "#/$defs/op" }, "description": "Applied in order; later ops may name nodes earlier ops add" }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.:/-]*$" },
+    "ref": { "type": "string", "minLength": 1, "description": "A node: its id (preferred) or its label" },
+    "nodeKind": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "not": { "const": "module" }, "description": "service, function, store, queue, external, actor, or a kit's node kind (docs/KITS.md)" },
+    "edgeKind": { "enum": ["calls", "reads", "writes", "publishes", "subscribes"] },
+    "node": {
+      "type": "object",
+      "required": ["label"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id", "description": "splice.<slug>; derived from the label when omitted" },
+        "label": { "type": "string", "minLength": 1 },
+        "kind": { "$ref": "#/$defs/nodeKind" },
+        "category": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "group": { "type": "string", "description": "Default: the group of the node it is placed next to" },
+        "summary": { "type": "string" }
+      }
+    },
+    "op": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["op", "node"],
+          "additionalProperties": false,
+          "properties": {
+            "op": { "const": "add" },
+            "node": { "$ref": "#/$defs/node" },
+            "between": { "type": "array", "items": { "$ref": "#/$defs/ref" }, "minItems": 2, "maxItems": 2, "description": "[a, b]: a → b (or b → a) becomes a → new → b" },
+            "before": { "$ref": "#/$defs/ref", "description": "X with one caller c (or none): c → X becomes c → new → X. X with several callers: just new → X (a step that also calls X)" },
+            "after": { "$ref": "#/$defs/ref", "description": "X with one outgoing relationship X → d (or none): X → new → d (just X → new). X fanning out to several: just X → new (a step X also calls)" },
+            "attach": {
+              "type": "object",
+              "required": ["to"],
+              "additionalProperties": false,
+              "properties": { "to": { "$ref": "#/$defs/ref" }, "dir": { "enum": ["out", "in"], "default": "out" }, "kind": { "$ref": "#/$defs/edgeKind", "default": "calls" } }
+            }
+          },
+          "not": { "anyOf": [
+            { "required": ["between", "before"] }, { "required": ["between", "after"] }, { "required": ["between", "attach"] },
+            { "required": ["before", "after"] }, { "required": ["before", "attach"] }, { "required": ["after", "attach"] }
+          ] }
+        },
+        {
+          "type": "object",
+          "required": ["op", "from", "to"],
+          "additionalProperties": false,
+          "properties": { "op": { "const": "connect" }, "from": { "$ref": "#/$defs/ref" }, "to": { "$ref": "#/$defs/ref" }, "kind": { "$ref": "#/$defs/edgeKind", "default": "calls" }, "label": { "type": "string" } }
+        },
+        {
+          "type": "object",
+          "required": ["op", "from", "to"],
+          "additionalProperties": false,
+          "properties": { "op": { "const": "disconnect" }, "from": { "$ref": "#/$defs/ref" }, "to": { "$ref": "#/$defs/ref" } }
+        },
+        {
+          "type": "object",
+          "required": ["op", "node"],
+          "additionalProperties": false,
+          "properties": { "op": { "const": "remove" }, "node": { "$ref": "#/$defs/ref" } }
+        },
+        {
+          "type": "object",
+          "required": ["op", "node", "label"],
+          "additionalProperties": false,
+          "properties": { "op": { "const": "rename" }, "node": { "$ref": "#/$defs/ref" }, "label": { "type": "string", "minLength": 1 } }
+        },
+        {
+          "type": "object",
+          "required": ["op", "node", "group"],
+          "additionalProperties": false,
+          "properties": { "op": { "const": "move" }, "node": { "$ref": "#/$defs/ref" }, "group": { "type": "string", "minLength": 1 } }
+        },
+        {
+          "type": "object",
+          "required": ["op", "node", "with"],
+          "additionalProperties": false,
+          "description": "Swap X for Y: Y takes over every relationship of X, in and out; X stays as a removed ghost, its relationships as rerouted ghosts. Later references to X (in this splice, or in splices combined after it) follow to Y.",
+          "properties": {
+            "op": { "const": "replace" },
+            "node": { "$ref": "#/$defs/ref", "description": "X, the node replaced" },
+            "with": { "oneOf": [{ "$ref": "#/$defs/node" }, { "$ref": "#/$defs/ref" }], "description": "Y: a new node (kind, category and group default to X's), or a node that exists" }
+          }
+        }
+      ]
+    }
+  }
+}

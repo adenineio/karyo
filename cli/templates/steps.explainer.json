@@ -1,0 +1,22 @@
+{
+  "karyo": "explainer/1",
+  "id": "steps",
+  "title": "Steps",
+  "summary": "Three stages, one at a time, then the whole picture.",
+  "layout": { "kind": "flow", "direction": "right", "gap": 64 },
+  "elements": [
+    { "id": "input", "type": "card", "props": { "kicker": "1", "title": "Input", "body": "What goes in." } },
+    { "id": "process", "type": "card", "props": { "kicker": "2", "title": "Process", "body": "What happens to it." } },
+    { "id": "output", "type": "card", "props": { "kicker": "3", "title": "Output", "body": "What comes out." } }
+  ],
+  "links": [
+    { "id": "in-proc", "from": "input", "to": "process" },
+    { "id": "proc-out", "from": "process", "to": "output" }
+  ],
+  "steps": [
+    { "title": "It starts with an input", "text": "Say what the input is and why it matters.", "show": ["input"] },
+    { "title": "Something happens to it", "text": "One idea per step: the change, not the whole system.", "add": ["process"], "emphasize": ["process"], "dim": "others" },
+    { "title": "And an output comes out", "text": "Name the result.", "add": ["output"], "emphasize": ["output"], "dim": "others" },
+    { "title": "The whole picture", "text": "The last step is the rest state: everything, nothing dimmed.", "show": "*" }
+  ]
+}

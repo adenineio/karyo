@@ -1,0 +1,64 @@
+{
+  "name": "bar",
+  "description": "A labelled horizontal bar: value against max. It grows when it appears, and glides (counting) when a step sets a new value.",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": [
+      "value"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "label": {
+        "type": "string"
+      },
+      "value": {
+        "type": "number"
+      },
+      "max": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "default": 100
+      },
+      "unit": {
+        "type": "string"
+      },
+      "prefix": {
+        "type": "string"
+      },
+      "decimals": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 6
+      },
+      "tone": {
+        "enum": [
+          "accent",
+          "muted",
+          "warn",
+          "ok"
+        ],
+        "default": "accent"
+      },
+      "grouping": {
+        "type": "boolean",
+        "default": true,
+        "description": "thousands separators from 1,000 up (turn off for years)"
+      }
+    }
+  },
+  "size": {
+    "w": 360
+  },
+  "motion": [
+    "appear",
+    "emphasize",
+    "count"
+  ],
+  "example": {
+    "label": "Interest earned",
+    "value": 629,
+    "max": 1000,
+    "prefix": "$"
+  }
+}

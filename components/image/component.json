@@ -1,0 +1,19 @@
+{
+  "name": "image",
+  "description": "A picture with alt text and an optional caption. src: a data: URI or a path relative to the spec (inlined when bundled).",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": ["src", "alt"],
+    "additionalProperties": false,
+    "properties": {
+      "src": { "type": "string", "minLength": 1, "description": "data: URI, or a path relative to the spec file" },
+      "alt": { "type": "string" },
+      "caption": { "type": "string" },
+      "frame": { "type": "boolean", "default": true, "description": "draw the card frame around it" }
+    }
+  },
+  "size": { "w": 360 },
+  "motion": ["appear", "emphasize"],
+  "example": { "src": "diagram.png", "alt": "A diagram", "caption": "Figure 1" }
+}

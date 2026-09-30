@@ -1,0 +1,24 @@
+#!/bin/sh
+# karyo: the Karyo CLI (cli/karyo.ts, a bun script). The plugin keeps it off PATH (a top-level bin/ would stop
+# claude.ai and Cowork installing the plugin), so its skills call it by path: "${CLAUDE_PLUGIN_ROOT}/cli/karyo" ….
+# `karyo --help` lists commands.
+self="$0"
+while [ -L "$self" ]; do # follow symlinks to this file, so a link on PATH still finds cli/karyo.ts
+  link=$(readlink "$self")
+  case "$link" in /*) self="$link" ;; *) self="$(dirname "$self")/$link" ;; esac
+done
+here=$(cd "$(dirname "$self")" && pwd -P)
+
+bun=$(command -v bun 2>/dev/null)
+for c in "$HOME/.bun/bin/bun" /opt/homebrew/bin/bun /usr/local/bin/bun; do
+  [ -n "$bun" ] && break
+  [ -x "$c" ] && bun="$c"
+done
+if [ -z "$bun" ]; then
+  echo "karyo: needs bun, which isn't installed. Install it with:" >&2
+  echo "  curl -fsSL https://bun.sh/install | bash      (https://bun.sh)" >&2
+  exit 127
+fi
+# Not the working directory's bunfig.toml or .env: karyo runs inside projects you may have just cloned, and bun would
+# otherwise load their preload scripts and environment (NODE_OPTIONS, KARYO_HOME …) into Karyo (docs/KITS.md).
+exec "$bun" --no-env-file --config=/dev/null "$here/karyo.ts" "$@"

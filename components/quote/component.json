@@ -1,0 +1,17 @@
+{
+  "name": "quote",
+  "description": "A pull quote with an optional attribution.",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": ["text"],
+    "additionalProperties": false,
+    "properties": {
+      "text": { "type": "string", "minLength": 1 },
+      "cite": { "type": "string" }
+    }
+  },
+  "size": { "w": 420 },
+  "motion": ["appear", "emphasize"],
+  "example": { "text": "Compound interest is the eighth wonder of the world.", "cite": "attributed, doubtfully, to Einstein" }
+}

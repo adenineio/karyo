@@ -1,0 +1,5 @@
+.box { margin: 0; display: grid; gap: 8px; }
+.framed { padding: 10px; }
+img { display: block; width: 100%; height: auto; border-radius: min(var(--pl-radius), 6px); }
+figcaption { font-size: 13px; line-height: 1.35; color: var(--pl-muted); }
+:host(.is-lit) .framed { border-color: var(--pl-accent); }

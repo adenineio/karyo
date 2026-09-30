@@ -1,0 +1,20 @@
+{
+  "$schema": "../../spec/karyo-kit.schema.json",
+  "karyo": "kit/1",
+  "name": "radial",
+  "description": "A plate type drawn by the kit's own code (the JavaScript escape hatch): any model's groups as an inner ring and their nodes as an outer ring, coloured by category.",
+  "version": "1.0.0",
+  "kinds": [],
+  "plates": [
+    {
+      "id": "radial",
+      "title": "Radial",
+      "description": "The model's groups as a ring, each group's nodes around it, coloured by category: hover to light a group or a node, click to pin one.",
+      "view": "script",
+      "from": "model",
+      "script": "plates/radial.js",
+      "deterministic": true,
+      "size": { "w": 960, "h": 600 }
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Explainer · Karyo</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect x=%222%22 y=%222%22 width=%2212%22 height=%2212%22 rx=%223%22 fill=%22%23888%22/%3E%3C/svg%3E">
+<style>
+  :root { --page-bg: #eceef1; --page-fg: #14171c; --page-muted: #5a6371; --page-rule: #d4d9df; color-scheme: light; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --page-bg: #0a0c10; --page-fg: #e7eaee; --page-muted: #8c96a4; --page-rule: #232932; color-scheme: dark; } }
+  :root[data-theme="dark"] { --page-bg: #0a0c10; --page-fg: #e7eaee; --page-muted: #8c96a4; --page-rule: #232932; color-scheme: dark; }
+  :root[data-plate-theme^="adenine"] { --page-bg: #070c0e; --page-fg: #e3eeeb; --page-muted: #8a9d9a; --page-rule: #1a2527; color-scheme: dark; }
+  body { margin: 0; background: var(--page-bg); color: var(--page-fg); font: 14px/1.5 ui-sans-serif, system-ui, sans-serif; }
+  main { max-width: 1320px; margin: 0 auto; padding: 24px 16px 48px; display: grid; gap: 16px; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  #status { margin: 0; color: var(--page-muted); font-size: 13px; }
+  #status.err { color: #d9480f; white-space: pre-wrap; }
+  #issues { font-size: 13px; border: 1px solid var(--page-rule); border-radius: 8px; padding: 8px 12px; }
+  #issues li.error { color: #d9480f; }
+  #issues em { color: var(--page-muted); }
+  html.export body { background: #000; }
+  html.export main { padding: 0; max-width: none; gap: 0; }
+  html.export .top, html.export #issues { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <div class="top"><p id="status">Loading…</p><div id="theme-slot"></div></div>
+  <details id="issues" hidden></details>
+  <div id="plate"></div>
+</main>
+<script type="module" src="/src/explainer/host.ts"></script>
+</body>
+</html>

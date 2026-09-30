@@ -1,0 +1,6 @@
+.box { height: 100%; margin: 0; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.art { color: var(--pl-accent); }
+.art svg, img { display: block; width: 100%; height: auto; }
+img { border-radius: min(var(--pl-radius), 6px); }
+figcaption { font-size: 13px; line-height: 1.35; color: var(--pl-muted); }
+:host(.is-lit) .box { border-color: var(--pl-accent); }

@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://karyo.dev/spec/karyo-explainer.schema.json",
+  "title": "Karyo explainer",
+  "description": "An explainer for any topic: elements (instances of components) laid out on a board, links between them, and steps that change what is shown, lit, dimmed, linked and framed. See docs/EXPLAINERS.md.",
+  "type": "object",
+  "required": ["karyo", "id", "title", "elements"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "karyo": { "const": "explainer/1", "description": "Format version." },
+    "id": { "$ref": "#/$defs/id", "description": "Stable id (file names, anchors)." },
+    "title": { "type": "string", "minLength": 1 },
+    "summary": { "type": "string", "description": "One line under the title (markdown-lite inline)." },
+    "size": {
+      "type": "object", "required": ["w", "h"], "additionalProperties": false,
+      "description": "Logical stage size in px (default 1600×900). The plate scales to fit its container.",
+      "properties": { "w": { "type": "integer", "minimum": 640, "maximum": 3840 }, "h": { "type": "integer", "minimum": 360, "maximum": 2160 } }
+    },
+    "narration": { "enum": ["side", "bottom", "none"], "description": "Where each step's prose goes (default side)." },
+    "timeline": { "type": "boolean", "description": "A strip of stations, one per step (default: true when there is more than one step)." },
+    "uses": { "type": "array", "items": { "$ref": "#/$defs/name" }, "uniqueItems": true, "description": "Custom (non built-in) components this explainer needs." },
+    "elements": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/element" } },
+    "layout": { "$ref": "#/$defs/layout" },
+    "groups": { "type": "array", "items": { "$ref": "#/$defs/group" } },
+    "links": { "type": "array", "items": { "$ref": "#/$defs/link" } },
+    "steps": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/step" } },
+    "categories": { "type": "array", "items": { "$ref": "#/$defs/category" }, "description": "Legend categories. Colour follows the order (1st → --pl-cat-1 … 8th); past the eighth they share \"other\". An element names one with \"category\"." },
+    "tags": { "type": "array", "items": { "$ref": "#/$defs/tag" }, "description": "Legend tags: named sets of elements. An element lists its tags in \"tags\"." },
+    "legend": { "type": "boolean", "description": "Show the legend strip under the board (default: when any category or tag exists). Hover an entry to light its elements, click to pin it." }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.:-]*$", "description": "letters, digits, _ . : - (not starting with . : -)" },
+    "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "description": "a component name: lowercase letters, digits and -" },
+    "ids": { "type": "array", "items": { "$ref": "#/$defs/id" } },
+    "rect": {
+      "type": "object", "required": ["x", "y", "w", "h"], "additionalProperties": false,
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "w": { "type": "number", "exclusiveMinimum": 0 }, "h": { "type": "number", "exclusiveMinimum": 0 } }
+    },
+    "element": {
+      "type": "object", "required": ["id", "type"], "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "$ref": "#/$defs/name", "description": "Component name." },
+        "props": { "type": "object", "description": "Validated against the component's props schema." },
+        "at": {
+          "type": "object", "additionalProperties": false,
+          "description": "x/y: board position for the free layout; w/h: size (every layout).",
+          "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "w": { "type": "number", "minimum": 24, "maximum": 3840 }, "h": { "type": "number", "minimum": 16, "maximum": 2160 } }
+        },
+        "group": { "$ref": "#/$defs/id" },
+        "label": { "type": "string" },
+        "category": { "$ref": "#/$defs/id", "description": "A category id from \"categories\"." },
+        "tags": { "$ref": "#/$defs/ids", "description": "Tag ids from \"tags\"." }
+      }
+    },
+    "category": {
+      "type": "object", "required": ["id"], "additionalProperties": false,
+      "properties": { "id": { "$ref": "#/$defs/id" }, "label": { "type": "string", "description": "Shown in the legend (default: the id)." } }
+    },
+    "tag": {
+      "type": "object", "required": ["id"], "additionalProperties": false,
+      "properties": { "id": { "$ref": "#/$defs/id" }, "label": { "type": "string", "description": "Shown in the legend (default: the id)." }, "description": { "type": "string", "description": "The legend entry's tooltip." } }
+    },
+    "layout": {
+      "type": "object", "required": ["kind"], "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["flow", "grid", "graph", "free", "stack"] },
+        "columns": { "type": "integer", "minimum": 1, "maximum": 24 },
+        "gap": { "type": "number", "minimum": 0, "maximum": 400 },
+        "direction": { "enum": ["right", "down"] },
+        "scope": { "enum": ["all", "visible"], "description": "Lay out every element (stable positions; default) or only the visible ones (relayout glides as elements come and go)." }
+      }
+    },
+    "group": {
+      "type": "object", "required": ["id"], "additionalProperties": false,
+      "properties": { "id": { "$ref": "#/$defs/id" }, "label": { "type": "string" } }
+    },
+    "link": {
+      "type": "object", "required": ["id", "from", "to"], "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "from": { "$ref": "#/$defs/id" },
+        "to": { "$ref": "#/$defs/id" },
+        "label": { "type": "string" },
+        "style": { "enum": ["solid", "dashed", "accent", "warn"] }
+      }
+    },
+    "step": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "title": { "type": "string" },
+        "text": { "type": "string", "description": "Markdown-lite prose." },
+        "show": { "anyOf": [{ "const": "*", "description": "\"*\"" }, { "$ref": "#/$defs/ids", "description": "an array of element ids" }] },
+        "add": { "$ref": "#/$defs/ids" },
+        "hide": { "$ref": "#/$defs/ids" },
+        "emphasize": { "$ref": "#/$defs/ids" },
+        "dim": { "anyOf": [{ "const": "others", "description": "\"others\"" }, { "$ref": "#/$defs/ids", "description": "an array of element ids" }] },
+        "connect": { "type": "array", "items": { "type": "string", "pattern": "^\\S+$" }, "description": "Link ids or ad-hoc \"a->b\"." },
+        "focus": { "anyOf": [{ "$ref": "#/$defs/id", "description": "an element or group id" }, { "$ref": "#/$defs/rect", "description": "a board rect {x, y, w, h}" }] },
+        "set": { "type": "object", "additionalProperties": { "type": "object" }, "description": "{ elementId: { prop: value } }, cumulative." },
+        "layout": { "$ref": "#/$defs/layout" }
+      }
+    }
+  }
+}

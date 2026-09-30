@@ -1,0 +1,14 @@
+{
+  "karyo": 1,
+  "project": "probe-project",
+  "nodes": [
+    { "id": "app.web", "kind": "service", "label": "Web app", "group": "front", "category": "edge", "sources": ["declared"] },
+    { "id": "app.api", "kind": "service", "label": "API", "group": "back", "category": "core", "sources": ["declared"] },
+    { "id": "app.db", "kind": "store", "label": "Database", "group": "back", "category": "store", "sources": ["declared"] }
+  ],
+  "edges": [
+    { "from": "app.web", "to": "app.api", "kind": "calls", "sources": ["declared"] },
+    { "from": "app.api", "to": "app.db", "kind": "reads", "sources": ["declared"] }
+  ],
+  "flows": []
+}

@@ -1,0 +1,12 @@
+{
+  "karyo": "explainer/1",
+  "id": "blank",
+  "title": "Blank",
+  "summary": "One line on what this explains.",
+  "elements": [
+    { "id": "idea", "type": "card", "props": { "title": "The idea", "body": "Replace this card with the first thing to show." } }
+  ],
+  "steps": [
+    { "title": "Start here", "text": "One or two sentences on what this step shows." }
+  ]
+}

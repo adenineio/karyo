@@ -1,0 +1,18 @@
+{
+  "name": "text",
+  "description": "Free prose on the board (no card): markdown-lite, three sizes.",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": ["md"],
+    "additionalProperties": false,
+    "properties": {
+      "md": { "type": "string", "description": "markdown-lite" },
+      "size": { "enum": ["sm", "md", "lg", "xl"], "default": "md" },
+      "align": { "enum": ["left", "center", "right"], "default": "left" }
+    }
+  },
+  "size": { "w": 360 },
+  "motion": ["appear"],
+  "example": { "md": "Money that **earns money** grows faster every year.", "size": "lg" }
+}

@@ -1,0 +1,9 @@
+.box { height: 100%; display: flex; flex-direction: column; gap: 8px; padding: 16px 18px; }
+.head { display: flex; align-items: center; gap: 10px; }
+.icon { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: min(var(--pl-radius), 8px); background: color-mix(in srgb, var(--pl-accent) 12%, transparent); color: var(--pl-accent); font-size: 17px; line-height: 1; }
+.pl-title { font-size: 20px; }
+.body { font-size: 15px; line-height: 1.45; color: var(--pl-fg); }
+.body p { margin: 0 0 6px; }
+.body p:last-child { margin-bottom: 0; }
+:host(.is-lit) .box { border-color: var(--pl-accent); }
+:host(.is-lit) .pl-title { color: var(--pl-accent); }

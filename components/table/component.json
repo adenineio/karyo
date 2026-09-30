@@ -1,0 +1,18 @@
+{
+  "name": "table",
+  "description": "A small table: header row and rows of text or numbers.",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": ["rows"],
+    "additionalProperties": false,
+    "properties": {
+      "columns": { "type": "array", "items": { "type": "string" } },
+      "rows": { "type": "array", "items": { "type": "array", "items": { "type": ["string", "number"] } } },
+      "caption": { "type": "string" }
+    }
+  },
+  "size": { "w": 420 },
+  "motion": ["appear", "emphasize"],
+  "example": { "columns": ["Year", "Balance"], "rows": [[0, "$1,000"], [1, "$1,050"], [2, "$1,102.50"]] }
+}

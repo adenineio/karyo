@@ -1,0 +1,19 @@
+{
+  "name": "card",
+  "description": "A titled card: optional kicker above, optional icon, markdown-lite body.",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": ["title"],
+    "additionalProperties": false,
+    "properties": {
+      "title": { "type": "string", "minLength": 1 },
+      "body": { "type": "string", "description": "markdown-lite" },
+      "kicker": { "type": "string", "description": "small label above the title" },
+      "icon": { "type": "string", "maxLength": 4, "description": "a glyph or emoji" }
+    }
+  },
+  "size": { "w": 280 },
+  "motion": ["appear", "emphasize"],
+  "example": { "kicker": "Step 1", "title": "Principal", "body": "The money you start with." }
+}

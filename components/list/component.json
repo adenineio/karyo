@@ -1,0 +1,19 @@
+{
+  "name": "list",
+  "description": "A bulleted or numbered list (items are markdown-lite), with an optional title.",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": ["items"],
+    "additionalProperties": false,
+    "properties": {
+      "items": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+      "ordered": { "type": "boolean", "default": false },
+      "title": { "type": "string" },
+      "frame": { "type": "boolean", "default": true, "description": "draw it on a card" }
+    }
+  },
+  "size": { "w": 320 },
+  "motion": ["appear", "emphasize"],
+  "example": { "title": "You need", "items": ["a **principal**", "a **rate**", "**time**"] }
+}

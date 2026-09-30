@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Project · Karyo</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect x=%222%22 y=%222%22 width=%2212%22 height=%2212%22 rx=%223%22 fill=%22%23888%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..900&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root { --page-bg: #eceef1; --page-fg: #14171c; --page-muted: #5a6371; --page-rule: #d4d9df; --page-card: #f7f8fa; --page-accent: #3552d6; color-scheme: light; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --page-bg: #0a0c10; --page-fg: #e7eaee; --page-muted: #8c96a4; --page-rule: #232932; --page-card: #11151b; --page-accent: #7d95ff; color-scheme: dark; } }
+  :root[data-theme="dark"] { --page-bg: #0a0c10; --page-fg: #e7eaee; --page-muted: #8c96a4; --page-rule: #232932; --page-card: #11151b; --page-accent: #7d95ff; color-scheme: dark; }
+  :root[data-plate-theme^="adenine"] { --page-bg: #070c0e; --page-fg: #e3eeeb; --page-muted: #8a9d9a; --page-rule: #1a2527; --page-card: #0e1618; --page-accent: #68d2d9; color-scheme: dark; }
+  body { margin: 0; background: var(--page-bg); color: var(--page-fg); font: 14px/1.5 ui-sans-serif, system-ui, sans-serif; }
+  main { max-width: 1320px; margin: 0 auto; padding: 24px 16px 48px; display: grid; gap: 20px; }
+  header.page { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 12px 24px; }
+  header.page h1 { margin: 0; font: 800 28px/1.1 "Archivo", system-ui, sans-serif; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+  .eyebrow { margin: 0 0 4px; color: var(--page-muted); font: 500 12px/1.3 "IBM Plex Mono", ui-monospace, monospace; overflow-wrap: anywhere; }
+  nav.items { display: flex; flex-wrap: wrap; gap: 8px; }
+  nav.items a { display: grid; gap: 2px; min-width: 0; max-width: 100%; padding: 8px 12px; border: 1px solid var(--page-rule); border-radius: 8px; background: var(--page-card); color: var(--page-fg); text-decoration: none; }
+  nav.items a[aria-current="true"] { border-color: var(--page-accent); box-shadow: inset 0 0 0 1px var(--page-accent); }
+  nav.items .k { color: var(--page-muted); font: 500 11px/1.2 "IBM Plex Mono", ui-monospace, monospace; text-transform: uppercase; letter-spacing: 0.04em; }
+  nav.items .t { font-weight: 600; overflow-wrap: anywhere; }
+  nav.items .m { color: var(--page-muted); font-size: 12px; overflow-wrap: anywhere; }
+  #status { margin: 0; color: var(--page-muted); }
+  #status.err { color: #d9480f; white-space: pre-wrap; }
+  .empty { border: 1px dashed var(--page-rule); border-radius: 10px; padding: 16px 20px; max-width: 72ch; }
+  .empty h2 { margin: 0 0 8px; font: 700 18px/1.2 "Archivo", system-ui, sans-serif; }
+  .empty code, .empty pre { font: 13px/1.5 "IBM Plex Mono", ui-monospace, monospace; }
+  .empty pre { margin: 8px 0; padding: 10px 12px; background: var(--page-card); border-radius: 6px; overflow-x: auto; }
+  #plate { min-width: 0; }
+  footer { color: var(--page-muted); font-size: 12px; }
+  footer code { font: 12px "IBM Plex Mono", ui-monospace, monospace; overflow-wrap: anywhere; }
+</style>
+</head>
+<body>
+<main>
+  <header class="page">
+    <div>
+      <p class="eyebrow" id="where">Karyo project view</p>
+      <h1 id="title">Loading…</h1>
+    </div>
+    <div id="theme-slot"></div>
+  </header>
+  <nav class="items" id="items" aria-label="What this project has"></nav>
+  <p id="status"></p>
+  <div id="plate"></div>
+  <footer id="foot"></footer>
+</main>
+<script type="module" src="/src/project/main.ts"></script>
+</body>
+</html>

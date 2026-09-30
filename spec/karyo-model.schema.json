@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://karyo.dev/schema/karyo-model-1.json",
+  "title": "Karyo model",
+  "description": "A language-neutral description of how a codebase fits together: declared, extracted and observed nodes, edges and traced flows. Fragments from several producers merge by node id.",
+  "type": "object",
+  "required": ["karyo", "nodes"],
+  "properties": {
+    "karyo": { "const": 1 },
+    "project": { "type": "string" },
+    "producers": { "type": "array", "items": { "$ref": "#/$defs/producer" } },
+    "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+    "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
+    "flows": { "type": "array", "items": { "$ref": "#/$defs/flow" } },
+    "groups": { "type": "array", "items": { "$ref": "#/$defs/group" }, "description": "Named groups (a node names its own in group): labels and nesting, from a curation file (docs/MODEL.md, Curation)" },
+    "coverage": { "type": "array", "items": { "$ref": "#/$defs/coverage" }, "description": "Recordings that watched every call inside some scopes (docs/MODEL.md, Coverage): what lets nodes and relationships say they were not exercised" },
+    "checks": { "type": "array", "items": { "$ref": "#/$defs/check" } },
+    "tours": { "type": "array", "items": { "$ref": "#/$defs/tour" }, "description": "Authored tours resolved at build time against the code and the recorded flows (docs/MODEL.md, Tours)" }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.:/-]*$" },
+    "source": { "enum": ["declared", "extracted", "observed", "proposed"], "description": "proposed: only a splice says so (docs/MODEL.md, Splices); never written by a producer" },
+    "sources": { "type": "array", "items": { "$ref": "#/$defs/source" }, "uniqueItems": true },
+    "producer": {
+      "type": "object",
+      "required": ["name", "lang"],
+      "properties": { "name": { "type": "string" }, "lang": { "type": "string" }, "version": { "type": "string" }, "at": { "type": "string", "format": "date-time" } }
+    },
+    "ref": {
+      "type": "object",
+      "required": ["file"],
+      "properties": { "file": { "type": "string" }, "line": { "type": "integer", "minimum": 1 }, "symbol": { "type": "string" } }
+    },
+    "node": {
+      "type": "object",
+      "required": ["id", "kind"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "description": "service, function, type (a class, struct, record or interface), store, queue, external, actor, module, or a kit's node kind (docs/KITS.md): any other lowercase word, drawn with the kit's card (the default card when no kit adds it)" },
+        "fields": { "type": "object", "description": "A kit kind's own data (docs/KITS.md), checked against the kind's fields schema; its card and details sections read it" },
+        "label": { "type": "string" },
+        "summary": { "type": "string" },
+        "group": { "type": "string" },
+        "parent": { "$ref": "#/$defs/id", "description": "The node this one is part of (a method's type, a step's process)" },
+        "fold": { "type": "boolean", "description": "Views draw it folded into its parent: its relationships and recorded calls roll up onto the parent (docs/MODEL.md, Fold). Automatic mode folds methods; a curation file changes it" },
+        "exercised": { "type": "boolean", "description": "Set only when a recording watched this node's code in full (a coverage scope): whether it ran. false: not exercised by the recorded runs. Equals whether sources has observed" },
+        "category": { "type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.:/-]*$", "description": "One declared word (e.g. tool, store, stage) views can color or filter by. Merge keeps the richest declaration's; a different one is a category-conflict warning" },
+        "tags": { "type": "array", "items": { "type": "string" }, "uniqueItems": true, "description": "Declared free-form labels (e.g. hot-path). Merge takes the union" },
+        "module": { "type": "string" },
+        "lang": { "type": "string" },
+        "ref": { "$ref": "#/$defs/ref" },
+        "code": { "$ref": "#/$defs/code" },
+        "sources": { "$ref": "#/$defs/sources" }
+      }
+    },
+    "code": {
+      "type": "object",
+      "description": "A declaration's source, captured from the code (decorators or doc comment included): lines start..end of file, verbatim, at most 80 lines",
+      "required": ["file", "start", "end", "lang", "text"],
+      "properties": {
+        "file": { "type": "string" },
+        "start": { "type": "integer", "minimum": 1 },
+        "end": { "type": "integer", "minimum": 1 },
+        "lang": { "type": "string" },
+        "text": { "type": "string" },
+        "truncated": { "type": "boolean", "description": "The declaration is longer than 80 lines; end is the last line kept" }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "required": ["from", "to", "kind"],
+      "properties": {
+        "from": { "$ref": "#/$defs/id" },
+        "to": { "$ref": "#/$defs/id" },
+        "kind": { "enum": ["calls", "reads", "writes", "publishes", "subscribes", "imports"], "description": "The relationship's kind; with several (kinds), the first of them" },
+        "kinds": { "type": "array", "items": { "enum": ["calls", "reads", "writes", "publishes", "subscribes"] }, "minItems": 2, "uniqueItems": true, "description": "Every kind the pair carries, in canonical order (calls, reads, writes, publishes, subscribes), when there are several. A merged model has at most one non-import edge per ordered pair (docs/MODEL.md, Identity); a model that repeats a pair is read as one edge" },
+        "label": { "type": "string" },
+        "count": { "type": "integer", "minimum": 0, "description": "Recorded calls attributed to this relationship" },
+        "exercised": { "type": "boolean", "description": "Relationships only, set when a recording watched both ends in full: whether the call was seen. false: not exercised by the recorded runs" },
+        "sources": { "$ref": "#/$defs/sources" }
+      }
+    },
+    "span": {
+      "type": "object",
+      "required": ["id", "node", "start"],
+      "properties": {
+        "id": { "type": "string" },
+        "parent": { "type": ["string", "null"] },
+        "node": { "$ref": "#/$defs/id" },
+        "label": { "type": "string" },
+        "start": { "type": "integer", "description": "Unix time, nanoseconds" },
+        "end": { "type": "integer" },
+        "status": { "enum": ["ok", "error"] },
+        "lang": { "type": "string" },
+        "flow": { "type": "string", "description": "Flow name, set on the span that started the flow" },
+        "attrs": { "type": "object" }
+      }
+    },
+    "flow": {
+      "type": "object",
+      "required": ["id", "trace", "spans"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "trace": { "type": "string" },
+        "entry": { "$ref": "#/$defs/id" },
+        "spans": { "type": "array", "items": { "$ref": "#/$defs/span" } }
+      }
+    },
+    "tour": {
+      "type": "object",
+      "required": ["id", "title", "steps"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "summary": { "type": "string" },
+        "flow": { "type": "string", "description": "The recorded flow the steps take their timings from" },
+        "steps": { "type": "array", "items": { "$ref": "#/$defs/tourStep" } }
+      }
+    },
+    "tourStep": {
+      "type": "object",
+      "required": ["id", "title", "show", "source"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "group": { "type": "string", "description": "Consecutive steps sharing a group are drawn as one bracketed group" },
+        "text": { "type": "string", "description": "Markdown-lite prose: paragraphs, `code`, **bold**" },
+        "node": { "$ref": "#/$defs/id" },
+        "show": { "type": "array", "items": { "$ref": "#/$defs/id" }, "description": "Nodes of the step's diagram" },
+        "code": {
+          "allOf": [{ "$ref": "#/$defs/code" }],
+          "required": ["focus"],
+          "properties": {
+            "focus": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "description": "Absolute line numbers to highlight" },
+            "symbol": { "type": "string" }
+          }
+        },
+        "timing": {
+          "type": "object",
+          "required": ["ms", "label", "status", "spans"],
+          "properties": {
+            "ms": { "type": "number", "description": "Sum of the matched spans' durations" },
+            "label": { "type": "string" },
+            "status": { "enum": ["ok", "error"] },
+            "spans": { "type": "integer", "minimum": 1 },
+            "attrs": { "type": "object" }
+          }
+        },
+        "source": { "enum": ["authored", "expanded"] }
+      }
+    },
+    "group": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "parent": { "type": "string", "description": "The group this one sits in" },
+        "summary": { "type": "string" }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "required": ["scope"],
+      "properties": {
+        "scope": { "type": "array", "items": { "type": "string" }, "description": "Module, package or node id prefixes (dotted) whose every call the recording watched" },
+        "by": { "type": "string", "description": "What recorded it (e.g. karyo-py monitor)" },
+        "sample": { "type": "number", "exclusiveMinimum": 0, "maximum": 1, "description": "Only this share of flows was recorded" }
+      }
+    },
+    "check": {
+      "type": "object",
+      "required": ["level", "code", "message"],
+      "properties": {
+        "level": { "enum": ["error", "warn", "info"], "description": "error: an identity conflict or a broken engine invariant (builds and checks fail); warn: code and docs disagree; info: worth knowing" },
+        "code": { "type": "string" },
+        "message": { "type": "string" },
+        "subject": { "type": "string" }
+      }
+    }
+  }
+}

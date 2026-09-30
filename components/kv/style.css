@@ -1,0 +1,6 @@
+.box { height: 100%; display: flex; flex-direction: column; gap: 8px; padding: 14px 18px; }
+dl { margin: 0; display: grid; gap: 6px; }
+.row { display: flex; justify-content: space-between; gap: 16px; font-size: 14.5px; line-height: 1.35; }
+dt { color: var(--pl-muted); }
+dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+:host(.is-lit) .box { border-color: var(--pl-accent); }

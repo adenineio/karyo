@@ -1,0 +1,16 @@
+{
+  "name": "chip",
+  "description": "A small pill: a tag, a state, a value. Sized to its text.",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": ["text"],
+    "additionalProperties": false,
+    "properties": {
+      "text": { "type": "string", "minLength": 1 },
+      "tone": { "enum": ["plain", "accent", "warn", "ok"], "default": "plain" }
+    }
+  },
+  "motion": ["appear", "emphasize"],
+  "example": { "text": "5% / year", "tone": "accent" }
+}
