@@ -670,6 +670,7 @@ class Scope:
         self.nonlocals: set[str] = set()
         self.receiver: Optional[str] = None
         self.hidden: list[set] = []          # comprehension / lambda names in effect
+        self._resolving: set[str] = set()    # names whose value is being worked out (`x = x.copy()` leans on itself)
         self.d: Optional[Def] = mod.by_ast.get(id(fn)) if fn is not None else None
         if fn is not None:
             self._collect(fn)
@@ -753,21 +754,32 @@ class Scope:
             return self.parent.lookup(name) if self.parent else None
         bs = self.local.get(name)
         if bs is not None:
-            anns = [b for b in bs if b[0] == "ann"]
-            if anns and all(b[0] != "recv" for b in bs):     # a declared type governs every assignment
-                vs = {self._val(b) for b in anns}
-                return vs.pop() if len(vs) == 1 else None
-            vals = []
-            for b in bs:
-                v = self._val(b)
-                if v is None:
-                    return None
-                if v not in vals:
-                    vals.append(v)
-            return vals[0] if len(vals) == 1 else None
+            # a binding that reads the name it binds (`font = font.model_copy()`, or two names leaning on each
+            # other) can't be settled from the code: unknown, never a loop
+            if name in self._resolving:
+                return None
+            self._resolving.add(name)
+            try:
+                return self._local_value(bs)
+            finally:
+                self._resolving.discard(name)
         if self.parent is not None:
             return self.parent.lookup(name)
         return self.p.global_value(self.mod, name)
+
+    def _local_value(self, bs: list):
+        anns = [b for b in bs if b[0] == "ann"]
+        if anns and all(b[0] != "recv" for b in bs):     # a declared type governs every assignment
+            vs = {self._val(b) for b in anns}
+            return vs.pop() if len(vs) == 1 else None
+        vals = []
+        for b in bs:
+            v = self._val(b)
+            if v is None:
+                return None
+            if v not in vals:
+                vals.append(v)
+        return vals[0] if len(vals) == 1 else None
 
     def _val(self, b):
         k = b[0]

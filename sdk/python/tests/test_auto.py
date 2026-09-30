@@ -276,3 +276,46 @@ def test_ids_that_differ_only_in_case_are_kept_apart(tmp_path: Path):
     ids = {n["id"] for n in frag["nodes"] if n["kind"] != "module"}
     assert ids == {"p.m.Chunk", "p.m:chunk"}
     assert _calls(frag) == {("p.m:chunk", "p.m.Chunk")}
+
+
+REBIND = '''\
+class Font:
+    def model_copy(self, **kw):
+        return self
+
+    def render(self):
+        return 1
+
+
+class Style:
+    def __init__(self):
+        self.font = Font()
+
+    def rebound(self):
+        font = self.font                   # resolves: Font
+        font = font.model_copy()           # a name rebound from itself
+        return font.render()
+
+    def cycle(self):
+        a = Font()
+        b = a
+        a = b.model_copy()                 # two names that lean on each other
+        b = a
+        return b.render()
+
+    def augmented(self):
+        f = Font()
+        f = f.model_copy().model_copy()
+        return f.render()
+'''
+
+
+def test_a_name_rebound_from_itself_does_not_recurse(tmp_path: Path):
+    """`x = y; x = x.method()` makes x's value depend on x (and two names can lean on each other): the scan
+    reads such a name as unknown instead of recursing, and so draws no call it can't prove."""
+    _write(tmp_path, {"rb/__init__.py": "", "rb/style.py": REBIND})
+    frag = _scan(tmp_path, "rb")
+    ids = {n["id"] for n in frag["nodes"]}
+    assert {"rb.style.Font", "rb.style.Style"} <= ids
+    calls = _calls(frag)
+    assert ("rb.style.Style", "rb.style.Font") in calls          # __init__ builds a Font: still resolved

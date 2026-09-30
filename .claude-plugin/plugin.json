@@ -1,7 +1,7 @@
 {
   "name": "karyo",
   "displayName": "Karyo",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Visual docs where the code describes itself: a local web view of your project's Karyo model and explainers (Bench, theater, Splice), the karyo CLI, the karyo-explain and docket skills, the Karyo MCP server, and Jarvis voice mode.",
   "author": {
     "name": "adenineio",

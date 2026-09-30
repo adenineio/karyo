@@ -2,6 +2,10 @@
 
 The `karyo` Claude Code plugin (`.claude-plugin/plugin.json`). Newest first.
 
+## 0.2.1
+
+- **Automatic scan:** a local name assigned from itself (`font = font.model_copy()`, or two names that read each other) is treated as unknown instead of looping, so the scan no longer stops with a recursion error on such code.
+
 ## 0.2.0
 
 The `karyo` plugin in the `adenine` marketplace: `claude plugin marketplace add adenineio/adenine`, then `claude plugin install karyo@adenine`. Install details: [docs/PACKAGING.md](docs/PACKAGING.md).
