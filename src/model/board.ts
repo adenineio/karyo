@@ -8,8 +8,8 @@
 // a tag from them. Positions come in layers: the viewer's own (localStorage) over the team's
 // committed arrangement (karyo.layout.json) over the auto layout. Reset restores positions, never
 // content (tags survive).
-import { Scene, Morph, draggable, ease, clamp, pickPath, wire as wirePath, zoomKeys, type Frame, type Fx, type SceneClass, type Stage, type Vals, type Path, type DockChange, type KeyHelp, type KeyHelpList, DOCK_ICON } from '../engine';
-import { checksFor, pairKey, foldView, isImport, type Model, type MNode, type Wire, type MCheck, type NodeKind, type EdgeKind } from './model';
+import { Scene, Morph, draggable, ease, clamp, pickPath, pickFit, wire as wirePath, zoomKeys, type Frame, type Fx, type SceneClass, type Stage, type Vals, type Path, type DockChange, type KeyHelp, type KeyHelpList, DOCK_ICON } from '../engine';
+import { checksFor, pairKey, foldView, isImport, hasRuns, type Model, type MNode, type Wire, type MCheck, type NodeKind, type EdgeKind } from './model';
 import { groupLabel } from './curation';
 import { layout, cardHTML, cardKits, boxOf, cssId, esc, legendHTML, MAP_CSS, CARD_W, CARD_H, SIDE, TOP, type Layout, type CardKits } from './scenes';
 import { kitsFor, type KitSet } from '../kits/registry';
@@ -17,12 +17,13 @@ import { boardRoute, railRoute, type Rect } from './board-route';
 import { arrange, type Arrangement, type ArrangeOpts } from './arrange';
 import { callsByPair, wireInfo, wireCardHTML, placeCard, WIRE_CSS, WIRE_CARD_W, NOT_A_WIRE, type WireInfo, type RecordedCall } from './wire-info';
 import { emptySplice, spliceOp, applySplice, SPLICE_DIR, type Splice, type SpliceOp, type SpliceMarks, type SplicePlace } from './splice';
-import { SpliceSession, listSplices, loadSplice, deleteSplice, SPLICE_CSS, type SpliceView, type SpliceEntry } from './board-splice';
+import { SpliceSession, listSplices, loadSplice, deleteSplice, viewTarget, SPLICE_CSS, type SpliceView, type SpliceEntry, type SpliceViewState } from './board-splice';
 import { spliceStack, SPLICE_STACK_VIEW, type SpliceLayer, type SpliceStack } from './splice-stack';
 import { stackView, type StackState } from './stack';
 import { StackHost, STACK_HOST_CSS } from './board-stack';
 import { modelLegend, litMembers, pinnedMembers, resolveEntry, LegendStrip, LEGEND_CSS, type LegendEntry } from './legend';
 import { outlineTags, highlightEntry, HIGHLIGHT, inspectorOff, type PlateOutline, type SectionInfo, type DetailsView, type InspectorView } from './outline';
+import { hierarchy, levelView, planLevel, repOf, clampRect, startView, aggregateInfo, groupCardInner, stubInner, isGroupItem, GPRE, GCARD, OUTSIDE, GROUPS_CSS, bbox, type Hier, type LevelView, type LevelItem, type R } from './board-groups';
 
 export interface TeamTag { id: string; name: string; members: string[] }
 /** A committed author arrangement (a karyo.layout.json beside the model). A `bins` key (same shape) is also accepted and read as tags. */
@@ -56,6 +57,9 @@ export interface BoardOpts {
   stackExamples?: Splice[];
   /** The kits it draws node kinds with (docs/KITS.md); default: the model's (`kitsFor`). */
   kits?: KitSet;
+  /** What it starts on (docs/ENGINE.md "Group navigation"): `groups` (one card per group, entered level by level),
+   *  `cards` (every card), or `auto` (the default: the model's `start`, else groups when the board is big). */
+  start?: 'auto' | 'groups' | 'cards';
 }
 /** A named part of a card's details. Items inside it (`data-item="<name>"`) are what it counts, reports as
  *  visible or not, and scrolls to. */
@@ -79,8 +83,18 @@ export interface BoardApi {
   focusTag(tagId: string | null): void;
   /** Close the open panel. */
   close(): void;
-  /** Drill into a group (its cards fill the board, the rest fold into the rail); null steps out. */
+  /** Drill into a group: in the groups view, enter it (its own scene slides in; null goes up a level); in the cards
+   *  view, its cards fill the board and the rest fold into the rail (null steps out). */
   drill(groupId: string | null): void;
+  /** Group navigation (docs/ENGINE.md "Group navigation"): enter a group's own scene (null: the overview of the
+   *  top-level groups), switching to the groups view if needed. False for an unknown group. */
+  enter(groupId: string | null): boolean;
+  /** Up a level (to the enclosing group, then the overview). False at the top or in the cards view. */
+  up(): boolean;
+  /** Switch between the groups view and every card; false when the board has no groups to show. */
+  groupView(view: 'groups' | 'cards'): boolean;
+  /** Where group navigation is: the view, the group entered and its path, what the level shows. */
+  level(): BoardLevel;
   /** Light exactly these cards (an ad-hoc pin, replacing the others); null or [] removes it. */
   highlight(nodeIds: string[] | null): void;
   /** Escape: unwind the innermost thing (a pinned wire card, the panel, the pins, the drill, the picked cards). False when there was nothing. */
@@ -142,6 +156,23 @@ export interface BoardApi {
    *  either splice. */
   spliceStackSame(ref?: number | string, same?: boolean): { ok: boolean; view?: SpliceStackView; error?: string };
 }
+/** Where group navigation is (docs/ENGINE.md "Group navigation"). */
+export interface BoardLevel {
+  /** `groups`: one card per group, entered level by level; `cards`: every card. `available` false: the board has no groups to show. */
+  view: 'groups' | 'cards';
+  available: boolean;
+  /** The group entered (null: the overview of the top-level groups, or the cards view). */
+  at: string | null;
+  /** Labels from the top down, the overview first ("All groups", "App", "Data"). */
+  path: string[];
+  /** In a splice: the group entered is one the splice proposes. */
+  proposed?: boolean;
+  /** On this level: its group cards (`proposed`: a splice proposes it), its cards, and the stubs at its edges (inlets call
+   *  in, outlets are called). */
+  groups: { id: string; label: string; proposed?: boolean }[];
+  cards: string[];
+  stubs: { id: string; label: string; side: 'in' | 'out'; group: string | null }[];
+}
 /** A stack of splices as a page (or Jarvis) reads it. Slices are 1-based, as the tabs number them. */
 export interface SpliceStackView {
   /** On screen (false: you are on the board, editing one of its slices; Esc goes back to it). */
@@ -186,15 +217,26 @@ export interface BoardState {
    *  (0-based) and the tab under the pointer; `shown` false while you edit one of its slices on the board. setState takes
    *  the ids from `spliceExamples`. */
   stack?: { splices: string[]; combine?: string[]; cur?: number; tab?: number | null; shown?: boolean; conflict?: number | null; same?: string[] } | null;
+  /** Group navigation (docs/ENGINE.md "Group navigation"): the view (`groups` or every card) and, in groups, the group
+   *  entered (null: the overview). Absent on a board with no groups to show; setState without them keeps the start view,
+   *  going to the open card's group when one is open. */
+  nav?: 'groups' | 'cards';
+  at?: string | null;
 }
 
 type XY = { x: number; y: number };
+/** An arrangement fitted to a space (`fit`): the drill rail's columns, where the content starts, the legend's room. */
+type Fitted = ReturnType<typeof arrange> & { cols: number; top: number; foot: number; w: number; h: number };
 interface Viewer { positions: Record<string, XY>; tags: TeamTag[] }
 interface CardV { x: number; y: number; sx: number; sy: number; o: number; d: number }
 
 const DUR = 0.55;
 const LEG_H = 150, CHIP_W = 200, CHIP_H = 28, CHIP_GAP = 6, PANEL_W = 380, PANEL_GAP = 14;
-const MAIN_X = SIDE + CHIP_W + 56;          // where a drilled-in group starts, right of the rail
+const RAIL_GAP = 12;
+/** Where a drilled-in group starts, right of the rail (its columns of chips). */
+const mainX = (cols: number) => SIDE + cols * CHIP_W + (cols - 1) * RAIL_GAP + 56;
+/** The header's depth: the chrome floor draws it k times deeper, and a fitted board leaves the content that much lower. */
+const HEAD_D = TOP;
 const SEC_MIN_W = 540, SEC_MAX_W = 880, SEC_PAD = 16, SEC_TOP = 76;   // the section view: an inspector docked to one side of the plate
 const DIM_OPEN = 0.72, DIM_PIN = 0.25, DIM_HOVER = 0.35, DIM_LEGEND = 0.22, DIM_WIRE = 0.55;
 
@@ -206,6 +248,8 @@ const itemsIn = (html: string) => [...html.matchAll(/data-item="([^"]*)"/g)].map
 const cssAttr = (s: string) => s.replace(/["\\]/g, '\\$&');
 const blank = (): BoardState => ({ open: null, section: null, drill: null, pins: [], picked: [], cursor: null, hover: null, wire: null, wireAt: null, wirePin: null });
 const uniq = <T,>(xs: T[]) => [...new Set(xs)];
+/** A box as a memo key: exact (a number's string is that number, so equal keys are equal boxes). */
+const rectKey = (r: { x: number; y: number; w: number; h: number }) => `${r.x},${r.y},${r.w},${r.h}`;
 
 export function boardScene(model: Model, o: BoardOpts): SceneClass {
   // Each mounted board gets its own closure over the model it draws: a splice (docs/ENGINE.md "Splice") re-derives
@@ -217,6 +261,30 @@ export function boardScene(model: Model, o: BoardOpts): SceneClass {
   Object.setPrototypeOf(Board, First);
   Board.prototype = First.prototype;
   return Board as unknown as SceneClass;
+}
+
+/** Where a wire's count badge sits (its box, stage px): at the middle of the wire unless that covers a card, a group's
+ *  label or another badge, else the nearest place along the wire that is clear (the least covered when none is). `len`:
+ *  the count's digits (the badge is 10.5 px monospace, 6 px padding and a border a side). */
+export function badgeAt(p: Path, len: number, avoid: Rect[], badges: Rect[], W: number, H: number): Rect {
+  // (a badge on a lane between rows of cards just meets their edges: up to 0.75 px is touching, not covering; two badges
+  // keep 4 px apart)
+  const w = 14 + 6.4 * len, h = 18.5;
+  const boxAt = (t: number) => { const m = p.at(t); return { x: m.x - 3 - 3.4 * len, y: m.y - 9, w, h }; };
+  const over = (b: Rect, r: Rect, M: number) => Math.max(0, Math.min(b.x + w + M, r.x + r.w) - Math.max(b.x - M, r.x)) * Math.max(0, Math.min(b.y + h + M, r.y + r.h) - Math.max(b.y - M, r.y));
+  const cover = (b: Rect) => {
+    let a = Math.max(0, -b.x) * h + Math.max(0, b.x + w - W) * h + Math.max(0, -b.y) * w + Math.max(0, b.y + h - H) * w;
+    for (const r of avoid) a += over(b, r, -0.75);
+    for (const r of badges) a += over(b, r, 4);
+    return a;
+  };
+  let best = boxAt(0.5), bc = cover(best);
+  for (const t of [0.42, 0.58, 0.34, 0.66, 0.26, 0.74, 0.18, 0.82, 0.12, 0.88]) {
+    if (bc === 0) break;
+    const b = boxAt(t), c = cover(b);
+    if (c < bc) { best = b; bc = c; }
+  }
+  return best;
 }
 
 function boardClass(baseModel: Model, o: BoardOpts) {
@@ -231,26 +299,47 @@ function boardClass(baseModel: Model, o: BoardOpts) {
   let kx!: CardKits;
   let L!: Layout, byId!: Map<string, MNode>, gOf!: Map<string, string>, groups!: Layout['groups'], members!: Map<string, string[]>, groupRank!: Map<string, number>;
   let wires!: Wire[], nbrs!: Map<string, Set<string>>, nodeChecks!: Map<string, MCheck[]>, calls!: Map<string, RecordedCall[]>, wireByKey!: Map<string, Wire>;
-  let arrangeOpts!: ArrangeOpts, DEFAULT!: ReturnType<typeof arrange>, ML!: ReturnType<typeof modelLegend>;
+  let arrangeOpts!: (cols: number, k: number) => ArrangeOpts, DEFAULT!: ReturnType<typeof arrange>, ML!: ReturnType<typeof modelLegend>;
+  /** How many cards the drill rail may hold (every card outside the smallest group). */
+  let maxRail = 0;
+  // Group navigation (docs/ENGINE.md "Group navigation", board-groups.ts): every card of the model (`Lc`, what the cards
+  // view draws) and, in the groups view, the level drawn (`LV`: group cards, cards, stubs). In the cards view L is Lc and
+  // the real maps are the drawn ones.
+  let Lc!: Layout, realById!: Map<string, MNode>, realWires!: Wire[], realWireByKey!: Map<string, Wire>, realNbrs!: Map<string, Set<string>>, realCalls!: Map<string, RecordedCall[]>;
+  let hier!: Hier;
+  let LV: LevelView | null = null;
+  let view: 'groups' | 'cards' = 'cards';
+  let at: string | null = null;
   /** In a splice: what each node and relationship is (proposed, removed …), and the labels before a rename. */
   let marks: SpliceMarks | null = null;
   /** What each card folds (docs/MODEL.md "Fold"): the nodes drawn as part of it, e.g. a type's methods. */
   let parts = new Map<string, MNode[]>();
   /** Static analysis contributed relationships (automatic mode): the words say "in the code", not "declared". */
   let statics = false;
+  /** The model holds a recorded run (model.ts `hasRuns`): without one, wires are solid and nothing says "not seen". */
+  let runs = true;
   const wasLabel = new Map<string, string>(), wasGroup = new Map<string, string>();
   const infoMemo = new Map<string, WireInfo>();
-  const label = (id: string) => byId.get(id)?.label ?? id;
+  const label = (id: string) => byId.get(id)?.label ?? realById.get(id)?.label ?? id;
+  /** A real card's group (drawn or not). */
+  const gOfAny = (id: string) => gOf.get(id) ?? hier.leaf(id);
   /** A card's slot in the auto layout (its column: the map router's layer). Cards sit wherever the morph puts them. */
   const slot = (id: string) => L.pos.get(id)!;
   const nodeMark = (id: string) => marks?.nodes[id] ?? null;
-  const wireMark = (key: string) => marks?.edges[key] ?? null;
+  /** In a splice: a proposed group's placeholder card (it stands for the group until a card is proposed into it). */
+  const isPh = (id: string) => !!marks?.placeholders?.[id];
+  /** In a splice: a group it proposes. */
+  const isPropGroup = (g: string | null | undefined) => !!g && marks?.groups?.[g] === 'proposed';
+  const wireMark = (key: string) => LV?.marks.get(key) ?? marks?.edges[key] ?? null;
+  /** A group card or a stub on the current level (null: a card, or the cards view). */
+  const itemOf = (id: string): LevelItem | null => { const it = LV?.items.get(id); return it && it.role !== 'node' ? it : null; };
   const infoOf = (key: string) => {
     let i = infoMemo.get(key);
     if (!i) {
-      i = wireInfo(wireByKey.get(key)!, calls.get(key) ?? [], { label, node: (id) => byId.get(id), statics });
+      const under = LV?.under.get(key);
+      i = under ? aggregateInfo(wireByKey.get(key)!, under, calls.get(key) ?? [], label, { runs }) : wireInfo(wireByKey.get(key)!, calls.get(key) ?? [], { label, node: (id) => byId.get(id), statics, runs });
       const m = wireMark(key);
-      if (m === 'proposed') i = { ...i, verdictText: 'proposed · not in code yet', at: null, where: null };
+      if (m === 'proposed') i = { ...i, verdictText: 'proposed · not in code yet', at: null, where: under ? i.where : null };
       else if (m) i = { ...i, verdictText: m === 'rerouted' ? 'rerouted in this splice (the proposal replaces this path)' : 'removed in this splice' };
       infoMemo.set(key, i);
     }
@@ -263,46 +352,78 @@ function boardClass(baseModel: Model, o: BoardOpts) {
     const m = kits.decorate(fv.model);
     parts = fv.parts;
     statics = m.edges.some((e) => !isImport(e) && e.sources.includes('extracted'));
+    runs = hasRuns(m);
     model = m; marks = mk;
-    L = layout(m, undefined, 0, 480, kits);
+    Lc = layout(m, undefined, 0, 480, kits);
     kx = cardKits(m, kits);
-    byId = new Map(L.nodes.map((n) => [n.id, n]));
+    realById = new Map(Lc.nodes.map((n) => [n.id, n]));
+    realWires = Lc.wires;
+    realWireByKey = new Map(realWires.map((w) => [w.key, w]));
+    realNbrs = new Map<string, Set<string>>(Lc.nodes.map((n) => [n.id, new Set<string>()]));
+    for (const w of realWires) { realNbrs.get(w.from)!.add(w.to); realNbrs.get(w.to)!.add(w.from); }
+    nodeChecks = new Map(Lc.nodes.map((n) => [n.id, checksFor(m, n.id)]));
+    // what each wire means (wire-info.ts): the recorded calls along it, by the relationship they were counted on
+    realCalls = callsByPair(m);
+    // (a group that goes, e.g. a proposed one when the splice is left: back to the closest group still there)
+    const was = at !== null && hier ? hier.chain(at) : [];
+    // a group a splice proposes has its card (and its own scene) even before a card is proposed into it
+    hier = hierarchy(Lc.nodes, m.groups, mk ? Object.entries(mk.groups ?? {}).filter(([, v]) => v === 'proposed').map(([g]) => g) : []);
+    if (at !== null && !hier.all.has(at)) at = was.find((g) => hier.all.has(g)) ?? null;
+    if (!hier.available) { view = 'cards'; at = null; }
+    wasLabel.clear(); wasGroup.clear();
+    if (mk) for (const n of baseModel.nodes) {
+      const now = realById.get(n.id);
+      if (now && mk.nodes[n.id] === 'renamed' && (n.label ?? n.id) !== (now.label ?? now.id)) wasLabel.set(n.id, n.label ?? n.id);
+      if (now && mk.nodes[n.id] === 'moved') wasGroup.set(n.id, n.kind === 'actor' ? 'outside' : n.group ?? 'other');
+    }
+    // what the model says: categories, declared tags, tags derived at view time (over every card: the same colours on every level)
+    const gc = new Map(Lc.nodes.map((n) => [n.id, n.kind === 'actor' ? '·outside' : n.group ?? 'other']));
+    ML = modelLegend({
+      // (a proposed group's placeholder is no card: it counts in no entry)
+      nodes: Lc.nodes.filter((n) => !mk?.placeholders?.[n.id]), wires: realWires, groups: Lc.groups.map((g) => g.id), groupOf: (id) => gc.get(id)!, groupName: gName, statics, runs,
+      // cards that ran, but fold parts that never did: a partial run must never read as a complete one
+      partly: new Set(Lc.nodes.filter((n) => n.exercised && (parts.get(n.id) ?? []).some((p) => p.exercised === false)).map((n) => n.id)),
+      kindEntry: (k) => (kits.kind(k) ? { name: kits.plural(k), glyph: kits.glyph(k) } : null),
+      warned: new Set(Lc.nodes.filter((n) => nodeChecks.get(n.id)!.some((c) => c.level === 'warn')).map((n) => n.id)),
+    });
+    deriveLevel();
+  }
+  /** What the current level draws: every card (the cards view), or one level of the groups view. */
+  function deriveLevel() {
+    LV = view === 'groups' ? levelView({ Lc, hier, at, kits, marks }) : null;
+    L = LV ? LV.L : Lc;
+    byId = LV ? new Map(L.nodes.map((n) => [n.id, n])) : realById;
     gOf = new Map(L.nodes.map((n) => [n.id, n.kind === 'actor' ? '·outside' : n.group ?? 'other']));
     groups = L.groups;
     members = new Map(groups.map((g) => [g.id, L.nodes.filter((n) => gOf.get(n.id) === g.id).map((n) => n.id)]));
     groupRank = new Map(groups.map((g, i) => [g.id, i]));
-    // one wire per caller→callee pair (model.ts wiresOf): its kinds, sources, count and verdict
+    // one wire per caller→callee pair (model.ts wiresOf): its kinds, sources, count and verdict; a group's, one per pair of items
     wires = L.wires;
-    nbrs = new Map<string, Set<string>>(L.nodes.map((n) => [n.id, new Set<string>()]));
-    for (const w of wires) { nbrs.get(w.from)!.add(w.to); nbrs.get(w.to)!.add(w.from); }
-    nodeChecks = new Map(L.nodes.map((n) => [n.id, checksFor(m, n.id)]));
-    // what each wire means (wire-info.ts): the recorded calls along it, by the relationship they were counted on
-    calls = callsByPair(m);
-    wireByKey = new Map(wires.map((w) => [w.key, w]));
+    if (LV) {
+      nbrs = new Map<string, Set<string>>(L.nodes.map((n) => [n.id, new Set<string>()]));
+      for (const w of wires) { nbrs.get(w.from)!.add(w.to); nbrs.get(w.to)!.add(w.from); }
+      wireByKey = new Map(wires.map((w) => [w.key, w]));
+      calls = new Map(realCalls);
+      for (const [k, ws] of LV.under) calls.set(k, ws.flatMap((w) => realCalls.get(w.key) ?? []));
+    } else { nbrs = realNbrs; wireByKey = realWireByKey; calls = realCalls; }
     infoMemo.clear();
-    wasLabel.clear(); wasGroup.clear();
-    if (mk) for (const n of baseModel.nodes) {
-      const now = byId.get(n.id);
-      if (now && mk.nodes[n.id] === 'renamed' && (n.label ?? n.id) !== (now.label ?? now.id)) wasLabel.set(n.id, n.label ?? n.id);
-      if (now && mk.nodes[n.id] === 'moved') wasGroup.set(n.id, n.kind === 'actor' ? 'outside' : n.group ?? 'other');
-    }
     // stage: the auto layout, room for a drilled group beside the rail, the rail itself, the legend
-    const maxRail = Math.max(0, ...groups.map((g) => L.nodes.length - members.get(g.id)!.length));
-    const maxGW = Math.max(0, ...groups.map((g) => g.w)), maxGH = Math.max(0, ...groups.map((g) => g.h));
-    // the plate around the arranged content (arrange.ts): the legend docks along the bottom, below the body
-    const minW = Math.max(960, MAIN_X + maxGW + SIDE), minBodyH = Math.max(480 - 40, TOP + maxRail * (CHIP_H + CHIP_GAP) + 24, TOP + maxGH + 24);
-    arrangeOpts = { wires: L.wires, padRight: SIDE - 14, padBottom: 24 + LEG_H, minW, minH: minBodyH + LEG_H };
-    DEFAULT = arrange(L, null, arrangeOpts);
-    // what the model says: categories, declared tags, tags derived at view time
-    ML = modelLegend({
-      nodes: L.nodes, wires, groups: groups.map((g) => g.id), groupOf: (id) => gOf.get(id)!, groupName: gName, statics,
-      // cards that ran, but fold parts that never did: a partial run must never read as a complete one
-      partly: new Set(L.nodes.filter((n) => n.exercised && (parts.get(n.id) ?? []).some((p) => p.exercised === false)).map((n) => n.id)),
-      kindEntry: (k) => (kits.kind(k) ? { name: kits.plural(k), glyph: kits.glyph(k) } : null),
-      warned: new Set(L.nodes.filter((n) => nodeChecks.get(n.id)!.some((c) => c.level === 'warn')).map((n) => n.id)),
-    });
+    maxRail = LV ? 0 : Math.max(0, ...groups.map((g) => L.nodes.length - members.get(g.id)!.length));
+    const maxGW = LV ? 0 : Math.max(0, ...groups.map((g) => g.w)), maxGH = Math.max(0, ...groups.map((g) => g.h));
+    // the plate around the arranged content (arrange.ts): the legend docks along the bottom, below the body. Fitted to a
+    // space (docs/ENGINE.md "Theater"), the rail may wrap into columns, and the legend (and header) take k times their
+    // room when the chrome floor draws them k times larger
+    arrangeOpts = (cols, k) => {
+      const minW = Math.max(960, mainX(cols) + maxGW + SIDE), minBodyH = Math.max(480 - 40, TOP + Math.ceil(maxRail / cols) * (CHIP_H + CHIP_GAP) + 24, TOP + maxGH + 24);
+      return { wires: L.wires, padRight: SIDE - 14, padBottom: 24 + LEG_H * k, minW, minH: minBodyH + LEG_H * k };
+    };
+    DEFAULT = arrange(L, null, arrangeOpts(1, 1));
   }
   derive(baseModel, null);
+  // where it starts: the plate's option, the model's `start`, else the groups when the board is big
+  const START = startView(o.start, baseModel, hier, Lc.nodes.length);
+  const START_AT: string | null = null;
+  if (START === 'groups') { view = 'groups'; at = START_AT; deriveLevel(); }
   const SK = `karyo:board:${o.key}`;
   const isTag = (t: unknown): t is TeamTag => !!t && typeof (t as TeamTag).id === 'string' && typeof (t as TeamTag).name === 'string' && Array.isArray((t as TeamTag).members);
   const loadViewer = (): Viewer => {
@@ -444,6 +565,7 @@ function boardClass(baseModel: Model, o: BoardOpts) {
     ${WIRE_CSS}
     ${SPLICE_CSS}
     ${STACK_HOST_CSS}
+    ${GROUPS_CSS}
     ${kits.css()}
     ${o.css ?? ''}
   `;
@@ -470,9 +592,20 @@ function boardClass(baseModel: Model, o: BoardOpts) {
     private arr: Arrangement = DEFAULT.a;
     private W = DEFAULT.W;
     private H = DEFAULT.H;
-    private get bodyH() { return this.H - LEG_H; }
-    private fitMemo = new Map<string, ReturnType<typeof arrange>>();
+    private get bodyH() { return this.H - this.fitted.foot; }
+    private fitMemo = new Map<string, Fitted>();
+    /** How the board is fitted to its space: the rail's columns, how far down the content starts, the legend's room. */
+    private fitted: Fitted = { ...DEFAULT, cols: 1, top: TOP, foot: LEG_H, w: DEFAULT.W, h: DEFAULT.H };
     private st: BoardState = blank();
+    // ---- group navigation (docs/ENGINE.md "Group navigation")
+    /** Where items that left with the last change of level are going (they fade there). */
+    private levelGone = new Map<string, Vals>();
+    /** The last level's wires, drawn fading while the change of level runs. */
+    private prevWires: Wire[] = [];
+    /** The count badges on wires that stand for several relationships, by wire key. */
+    private wnEl = new Map<string, HTMLElement>();
+    private scopedMemo: { src: LegendEntry[]; lv: LevelView | null; out: LegendEntry[] } | null = null;
+    private viewBtns: { groups: HTMLButtonElement; cards: HTMLButtonElement } | null = null;
     private viewer: Viewer = loadViewer();
     private hover: string | null = null;
     private drag: { id: string; start: XY; cur: XY } | null = null;
@@ -488,6 +621,12 @@ function boardClass(baseModel: Model, o: BoardOpts) {
     private legend!: LegendStrip;
     /** The wires as last drawn (hit testing: which wire is under the pointer). */
     private wirePaths = new Map<string, Path>();
+    /** Each wire's route as last drawn, with the inputs it was routed from (`routeKey`). A route is a pure function of
+     *  them, so while they are unchanged (at rest, a hover, zoom and pan) it is reused instead of routed again. */
+    private routeMemo = new Map<string, { k: string; p: Path }>();
+    /** The cards' boxes free routing kept out from behind last frame, and a number that changes whenever they do. */
+    private obstacleSig = '';
+    private obstacleGen = 0;
     private wireCardFor = '';
     private entryList: LegendEntry[] = [];
     /** The ad-hoc entry `highlight()` pins (not drawn in the legend strip). */
@@ -509,7 +648,7 @@ function boardClass(baseModel: Model, o: BoardOpts) {
     /** The space the plate was last laid out for (null: the page). */
     private space: { w: number; h: number } | null = null;
     /** Placing a node from the palette: the next click says where it goes. */
-    private placing: { label: string; kind: NodeKind; category?: string } | null = null;
+    private placing: { label: string; kind: NodeKind; category?: string; group?: boolean } | null = null;
     /** Dragging from a card's handle to another card: a proposed relationship. */
     private linking: { from: string; at: XY; over: string | null } | null = null;
     private renaming: string | null = null;
@@ -531,7 +670,7 @@ function boardClass(baseModel: Model, o: BoardOpts) {
     private stash = new Map<string, SpliceSession>();
     /** How many splices are saved next to the model (null: not asked yet): the Stack buttons need one. */
     private savedCount: number | null = null;
-    private spEl!: { title: HTMLElement; sub: HTMLElement; warn: HTMLElement; msg: HTMLElement; name: HTMLInputElement; ask: HTMLElement; q: HTMLElement; yes: HTMLButtonElement; acts: HTMLElement; save: HTMLButtonElement; stack: HTMLButtonElement; add: HTMLButtonElement; pal: HTMLFormElement; rename: HTMLInputElement; btn: HTMLButtonElement | null; list: HTMLButtonElement | null; pop: HTMLElement | null };
+    private spEl!: { title: HTMLElement; sub: HTMLElement; warn: HTMLElement; msg: HTMLElement; name: HTMLInputElement; ask: HTMLElement; q: HTMLElement; yes: HTMLButtonElement; acts: HTMLElement; save: HTMLButtonElement; stack: HTMLButtonElement; add: HTMLButtonElement; gadd: HTMLButtonElement; pal: HTMLFormElement; rename: HTMLInputElement; btn: HTMLButtonElement | null; list: HTMLButtonElement | null; pop: HTMLElement | null };
 
     // ------------------------------------------------------------------ layers & tags
     private saveViewer() { try { localStorage.setItem(SK, JSON.stringify(this.viewer)); } catch { /* not persisted */ } }
@@ -540,8 +679,13 @@ function boardClass(baseModel: Model, o: BoardOpts) {
     /** A card's size (a kit kind's own, docs/KITS.md). */
     private box(id: string) { return boxOf(L, id); }
     private clampCard(p: XY, body = true, b: { w: number; h: number } = { w: CARD_W, h: CARD_H }): XY { return { x: clamp(p.x, 8, this.W - b.w - 8), y: clamp(p.y, 8, (body ? this.bodyH : this.H) - b.h - 8) }; }
+    /** Where a card's position is kept: its id in the cards view; per level in the groups view (a level is its own scene). */
+    private posKey(id: string) { return LV ? `@${at ?? ''}|${id}` : id; }
     /** Where a card rests when nothing is drilled: viewer → team → auto. */
-    private pos(id: string): XY { return this.sp?.positions[id] ?? this.viewer.positions[id] ?? team.positions[id] ?? this.home(id); }
+    private pos(id: string): XY {
+      if (LV) { const k = this.posKey(id); return this.sp?.positions[k] ?? this.viewer.positions[k] ?? this.home(id); }
+      return this.sp?.positions[id] ?? this.viewer.positions[id] ?? team.positions[id] ?? this.home(id);
+    }
     private folded(id: string) { return this.st.drill !== null && gOf.get(id) !== this.st.drill; }
     /** Where a (not folded) card rests in the current view. */
     private placed(id: string): XY {
@@ -550,7 +694,7 @@ function boardClass(baseModel: Model, o: BoardOpts) {
     }
     private computeDrillOff(g: string): XY {
       const ps = members.get(g)!.map((id) => this.pos(id));
-      return { x: MAIN_X + 14 - Math.min(...ps.map((p) => p.x)), y: TOP + 22 - Math.min(...ps.map((p) => p.y)) };
+      return { x: mainX(this.fitted.cols) + 14 - Math.min(...ps.map((p) => p.x)), y: this.fitted.top + 22 - Math.min(...ps.map((p) => p.y)) };
     }
     /** Your tags, minus any the team file already carries (after "Save as team layout"). */
     private mine() { return this.viewer.tags.filter((t) => !team.tags.some((x) => x.id === t.id)); }
@@ -565,12 +709,27 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       this.st.pins = this.st.pins.filter((p) => this.entries().some((e) => e.id === p));
       if (this.st.hover && !this.entryList.some((e) => e.id === this.st.hover)) this.st.hover = null;
     }
-    private entries() { return this.spot ? [...this.entryList, this.spot] : this.entryList; }
-    private entry(id: string | null | undefined) { return id ? this.entryList.find((e) => e.id === id) : undefined; }
+    private entries() { const es = this.spot ? [...this.entryList, this.spot] : this.entryList; return LV ? this.scoped(es) : es; }
+    private entry(id: string | null | undefined) { return id ? (LV ? this.scoped(this.entryList) : this.entryList).find((e) => e.id === id) : undefined; }
+    /** The groups view: each entry's cards inside the level, lighting what draws them (a card, or the group card it is
+     *  in); its count says how many cards. Entries with nothing on the level go (your and the team's tags stay). */
+    private scoped(es: LegendEntry[]): LegendEntry[] {
+      const memo = this.scopedMemo;
+      if (memo && memo.src === es && memo.lv === LV) return memo.out;
+      const lv = LV!, inside = new Set(hier.under(at));
+      const out = es.flatMap((e): LegendEntry[] => {
+        const real = e.members.filter((id) => inside.has(id));
+        if (!real.length && e.kind !== 'team' && e.kind !== 'mine' && e.id !== HIGHLIGHT) return [];
+        return [{ ...e, members: uniq(real.map((id) => lv.rep.get(id) ?? id).filter((id) => byId.has(id))), count: e.count ?? real.length }];
+      });
+      this.scopedMemo = { src: es, lv: LV, out };
+      return out;
+    }
     private renderLegend() {
       this.rebuildEntries();
-      const cats = this.entryList.filter((e) => e.kind === 'category');
-      this.legend.render(cats, this.entryList.filter((e) => e.kind !== 'category'));
+      const list = LV ? this.scoped(this.entryList) : this.entryList;
+      const cats = list.filter((e) => e.kind === 'category');
+      this.legend.render(cats, list.filter((e) => e.kind !== 'category'));
       this.panelBuilt = null;
     }
 
@@ -584,9 +743,11 @@ function boardClass(baseModel: Model, o: BoardOpts) {
         const d = pinned ? (pinned.has(n.id) ? 1 : DIM_PIN) : near ? (near.has(n.id) ? 1 : DIM_OPEN) : 1;
         const ri = rail.get(n.id);
         if (ri !== undefined) {
-          const cy = TOP + ri * (CHIP_H + CHIP_GAP), b = this.box(n.id);
-          m.set(`c:${n.id}`, { x: SIDE + CHIP_W / 2 - b.w / 2, y: cy + CHIP_H / 2 - b.h / 2, sx: CHIP_W / b.w, sy: CHIP_H / b.h, o: 0, d });
-          m.set(`h:${n.id}`, { x: SIDE, y: cy, o: 1, d });
+          // the rail: one column on the page; fitted to a wide window, as many as keep it within the body
+          const rows = Math.ceil(Math.max(1, maxRail) / this.fitted.cols), col = Math.floor(ri / rows);
+          const cx = SIDE + col * (CHIP_W + RAIL_GAP), cy = this.fitted.top + (ri % rows) * (CHIP_H + CHIP_GAP), b = this.box(n.id);
+          m.set(`c:${n.id}`, { x: cx + CHIP_W / 2 - b.w / 2, y: cy + CHIP_H / 2 - b.h / 2, sx: CHIP_W / b.w, sy: CHIP_H / b.h, o: 0, d });
+          m.set(`h:${n.id}`, { x: cx, y: cy, o: 1, d });
         } else {
           const p = this.placed(n.id), b = this.box(n.id);
           m.set(`c:${n.id}`, { x: p.x, y: p.y, sx: 1, sy: 1, o: 1, d });
@@ -599,7 +760,7 @@ function boardClass(baseModel: Model, o: BoardOpts) {
     private goneTargets(m: Map<string, Vals>) {
       for (const id of this.cardDom) {
         if (byId.has(id)) continue;
-        const t = this.morph.target(`c:${id}`);
+        const t = this.levelGone.get(id) ?? this.morph.target(`c:${id}`);
         if (t) m.set(`c:${id}`, { ...t, o: 0 });
       }
       return m;
@@ -611,16 +772,23 @@ function boardClass(baseModel: Model, o: BoardOpts) {
 
     // ------------------------------------------------------------------ actions
     private open(id: string) {
-      if (!byId.has(id)) return;
+      if (itemOf(id)) { this.enterItem(id); return; }
+      if (!byId.has(id)) { if (realById.has(id)) this.reveal(id); return; }
       if (this.st.open === id) return this.close();
       if (this.st.open) this.pm.snap(new Map([['p', { o: 0 }]]));   // the old panel folds away at once; the new one unfolds from its card
       this.st.open = id; this.st.section = null; this.panelFor = id; this.st.cursor = id;
       this.go();
     }
     close() { if (!this.st.open) return; this.st.open = null; this.st.section = null; this.go(); }
-    drill(groupId: string | null) { this.drillTo(groupId); }
+    drill(groupId: string | null) {
+      if (!LV) { this.drillTo(groupId); return; }
+      if (groupId === null) { this.up(); return; }
+      this.enter(groupId);
+    }
     highlight(nodeIds: string[] | null) {
-      const ids = uniq((nodeIds ?? []).filter((id) => byId.has(id)));
+      const ids = uniq((nodeIds ?? []).filter((id) => realById.has(id)));
+      // the groups view: go to the level that holds them all (one group's cards: inside it)
+      if (LV && ids.length) { const lv = this.levelFor(ids); if (lv !== at) this.navTo('groups', lv); }
       const had = this.st.pins.includes(HIGHLIGHT);
       this.spot = ids.length ? highlightEntry(ids) : null;
       if (!ids.length && !had) return;
@@ -630,14 +798,19 @@ function boardClass(baseModel: Model, o: BoardOpts) {
     describe(): PlateOutline {
       return {
         kind: 'board', title: BoardScene.title,
-        nodes: L.nodes.map((n) => ({ id: n.id, label: label(n.id), group: gOf.get(n.id) ?? null, category: n.category ?? null, tags: [...(n.tags ?? [])], ...(nodeMark(n.id) ? { mark: nodeMark(n.id)! } : {}) })),
-        groups: groups.map((g) => ({ id: g.id, label: gName(g.id) })),
+        // the groups view: every card of the model (Jarvis finds a card in another group and goes there) and every group
+        // (a proposed group's placeholder is its empty state, not a card)
+        nodes: Lc.nodes.filter((n) => !isPh(n.id)).map((n) => ({ id: n.id, label: label(n.id), group: gOfAny(n.id) ?? null, category: n.category ?? null, tags: [...(n.tags ?? [])], ...(nodeMark(n.id) ? { mark: nodeMark(n.id)! } : {}) })),
+        groups: (LV ? [...hier.all].sort().map((g) => ({ id: g, label: hier.path(g).join(' / ') })) : groups.map((g) => ({ id: g.id, label: gName(g.id) }))).map((g) => (isPropGroup(g.id) ? { ...g, mark: 'proposed' } : g)),
         tags: outlineTags(this.entries()),
         steps: [],
       };
     }
     reveal(nodeId: string) {
-      if (!byId.has(nodeId)) return;
+      if (itemOf(nodeId) && isGroupItem(nodeId)) { this.enterItem(nodeId); return; }
+      if (!realById.has(nodeId)) return;
+      // the groups view: a card on another level (or a stub here) is opened where it is drawn as itself
+      if (LV && LV.items.get(nodeId)?.role !== 'node') this.navTo('groups', hier.levelOf(nodeId));
       if (this.folded(nodeId)) this.st.drill = null;
       if (this.st.open === nodeId && !this.st.section) { this.go(); return; }
       if (this.st.open) this.pm.snap(new Map([['p', { o: 0 }]]));
@@ -672,8 +845,143 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       if (this.st.cursor && this.folded(this.st.cursor)) this.st.cursor = null;
       this.go();
     }
+    // ------------------------------------------------------------------ group navigation (docs/ENGINE.md "Group navigation")
+    enter(groupId: string | null): boolean {
+      if (!hier.available) return false;
+      if (groupId === null) { this.navTo('groups', null); return true; }
+      const g = hier.all.has(groupId) ? groupId : isGroupItem(groupId) && hier.all.has(groupId.slice(GPRE.length)) ? groupId.slice(GPRE.length) : null;
+      if (g === null) return false;
+      this.navTo('groups', g);
+      return true;
+    }
+    up(): boolean {
+      if (!LV || at === null) return false;
+      this.navTo('groups', hier.parent(at));
+      return true;
+    }
+    groupView(v: 'groups' | 'cards'): boolean {
+      if (!hier.available) return false;
+      if (v === view) return true;
+      // to the groups: the level of the open card, else the overview
+      const o = this.st.open;
+      this.navTo(v, v === 'groups' && o ? hier.levelOf(o) : null);
+      return true;
+    }
+    level(): BoardLevel {
+      const path = view === 'groups' ? ['All groups', ...hier.path(at)] : [];
+      const its = LV ? [...LV.items.values()] : [];
+      return {
+        view, available: hier.available, at: LV ? at : null, path, ...(LV && isPropGroup(at) ? { proposed: true } : {}),
+        groups: its.filter((it) => it.role === 'group').map((it) => ({ id: it.ref, label: hier.label(it.ref), ...(isPropGroup(it.ref) ? { proposed: true } : {}) })),
+        cards: (LV ? its.filter((it) => it.role === 'node').map((it) => it.id) : L.nodes.map((n) => n.id)).filter((id) => !isPh(id)),
+        stubs: its.filter((it) => it.role.startsWith('stub')).map((it) => ({ id: it.id, label: label(it.id), side: it.side!, group: it.role === 'stub-group' ? it.ref : null })),
+      };
+    }
+    /** A click (or Enter) on a group card goes into it; on a stub, across to what it stands for. */
+    private enterItem(id: string) {
+      const it = itemOf(id);
+      if (!it) return;
+      if (it.role === 'stub-node') { this.navTo('groups', hier.levelOf(it.ref)); this.st.cursor = it.ref; this.stage.redraw(); return; }
+      this.navTo('groups', it.ref);
+    }
+    /** The level that holds every one of these cards as itself, or the closest one above them. */
+    private levelFor(ids: string[]): string | null {
+      const chains = ids.map((id) => { const l = hier.levelOf(id); return l === null ? [] : hier.chain(l); });
+      return chains[0]!.find((g) => chains.every((c) => c.includes(g))) ?? null;
+    }
+    /** What a drawn item stands for: its real cards. */
+    private membersOf(id: string): string[] { return LV?.items.get(id)?.members ?? [id]; }
+    /** Change level (or view) as a move of the camera, from what is on screen: see `planLevel`. `play` false: set it up
+     *  without starting the transition (setState: the caller renders t); `snap`: land at once. */
+    private navTo(v: 'groups' | 'cards', a: string | null, o: { play?: boolean; snap?: boolean } = {}) {
+      if (v === 'cards') a = null;
+      if (a !== null && !hier.all.has(a)) return;
+      if (v === view && a === at) return;
+      if (!hier.available && v === 'groups') return;
+      // what is on screen now, in client px (the plate may change size: the new level is laid out on its own)
+      const Z0 = this.stage.zoom || 1, o0 = this.stage.toStage(0, 0), ox0 = -o0.x * Z0, oy0 = -o0.y * Z0;
+      const before = new Map<string, { r: R; o: number; members: string[]; box: { w: number; h: number } }>();
+      for (const id of this.cardDom) {
+        if (!byId.has(id)) continue;
+        const val = this.morph.value(`c:${id}`) as unknown as CardV | undefined;
+        if (!val || val.o < 0.02) continue;
+        const b = this.box(id), w = b.w * val.sx, h = b.h * val.sy;
+        before.set(id, { r: { x: ox0 + (val.x + b.w / 2 - w / 2) * Z0, y: oy0 + (val.y + b.h / 2 - h / 2) * Z0, w: w * Z0, h: h * Z0 }, o: val.o, members: this.membersOf(id), box: b });
+      }
+      const oldLV = LV, oldAt = at, oldView = view, oldWires = wires;
+      view = v; at = a;
+      deriveLevel();
+      this.fitMemo.clear();
+      // the new level fitted like any other (the window's shape, the chrome floor's room)
+      const r = this.fitFor(this.space, this.chromeK);
+      this.arr = r.a; this.W = r.W; this.H = r.H; this.fitted = r;
+      this.levelGone.clear();
+      this.syncCards();
+      this.fixState();
+      this.renderLegend();
+      this.panelBuilt = null; this.dockBuilt = null; this.wireCardFor = '';
+      // the new level at rest first (a refit draws a frame); what is on screen was measured above
+      this.morph.snap(this.targets()); this.pm.snap(this.ptargets());
+      if (this.stage.view.zoomed) this.stage.view.reset();
+      this.stage.refit(this.space);
+      if (o.snap) { this.prevWires = []; this.snapAll(); this.stage.redraw(); return; }
+      // client px → the new level's stage px
+      const s1 = (this.stage.viewport.clientWidth || this.stage.W) / this.stage.W, Zs = this.stage.zoom || 1, o1 = this.stage.toStage(0, 0);
+      const ox1 = -o1.x * Zs, oy1 = -o1.y * Zs;
+      const toNew = (q: R): R => ({ x: (q.x - ox1) / s1, y: (q.y - oy1) / s1, w: q.w / s1, h: q.h / s1 });
+      const tg = this.targets();
+      const after = new Map<string, { r: R; members: string[] }>();
+      for (const n of L.nodes) { const t = tg.get(`c:${n.id}`)!, b = this.box(n.id); after.set(n.id, { r: { x: t.x!, y: t.y!, w: b.w, h: b.h }, members: this.membersOf(n.id) }); }
+      const bef = new Map([...before].map(([id, x]) => [id, { r: toNew(x.r), o: x.o, members: x.members }]));
+      // the camera: entering a group, its card becomes the new scene; going up, the scene becomes its card; across, the stub
+      const inner = (lv: LevelView | null, m: Map<string, { r: R }>) => bbox([...m].filter(([id]) => { const it = lv?.items.get(id); return !it || !it.role.startsWith('stub'); }).map(([, x]) => x.r));
+      const repIn = (lv: LevelView | null, g: string) => { const m = hier.under(g)[0]; return m === undefined ? undefined : lv ? lv.rep.get(m) : m; };
+      let focus: { from: R; to: R } | null = null;
+      if (oldView === 'groups' && v === 'groups' && oldAt !== a) {
+        const deeper = a !== null && (oldAt === null || hier.chain(a).includes(oldAt));
+        const higher = oldAt !== null && (a === null || hier.chain(oldAt).includes(a));
+        if (deeper || (!higher && a !== null)) { const fid = repIn(oldLV, a!), from = fid ? bef.get(fid)?.r : undefined, to = inner(LV, after); if (from && to) focus = { from, to }; }
+        if (!focus && oldAt !== null) { const tid = repIn(LV, oldAt), to = tid ? after.get(tid)?.r : undefined, from = inner(oldLV, bef); if (from && to) focus = { from, to }; }
+      }
+      const bounds = { x: 8, y: 8, w: this.W - 16, h: this.bodyH - 16 };
+      const plan = planLevel({ before: bef, after, focus, bounds });
+      const vals = (q: R, b: { w: number; h: number }, op: number, d: number): Vals => ({ x: q.x + q.w / 2 - b.w / 2, y: q.y + q.h / 2 - b.h / 2, sx: q.w / b.w, sy: q.h / b.h, o: op, d });
+      const now = new Map<string, Vals>();
+      for (const n of L.nodes) {
+        const t = tg.get(`c:${n.id}`)!, st = plan.start.get(n.id)!;
+        now.set(`c:${n.id}`, vals(st.r, this.box(n.id), st.o, t.d!));
+        now.set(`h:${n.id}`, { ...tg.get(`h:${n.id}`)!, o: 0 });
+      }
+      for (const [id, q] of plan.gone) {
+        // (from inside the new stage: a smaller plate may not reach where it was)
+        const b = before.get(id)!.box, x = bef.get(id)!;
+        now.set(`c:${id}`, vals(clampRect(x.r, bounds), b, x.o, 1));
+        this.levelGone.set(id, vals(q, b, 0, 1));
+      }
+      this.morph.snap(now);
+      const keys = new Set(wires.map((w) => w.key));
+      this.prevWires = oldWires.filter((w) => !keys.has(w.key));
+      this.morph.retarget(this.targets()); this.pm.retarget(this.ptargets());
+      if (o.play !== false) this.stage.transition();
+    }
+    /** A group card's content: its cards and subgroups, categories, a few members, and the wires into and out of it. */
+    private groupData(it: LevelItem) {
+      const ms = it.members.filter((id) => realById.has(id) && !isPh(id));
+      const cats = new Map<string, { slot: number; name: string; n: number }>();
+      for (const id of ms) { const c = realById.get(id)!.category; if (!c) continue; const e = cats.get(c) ?? cats.set(c, { slot: ML.slotOf.get(id) ?? 0, name: c, n: 0 }).get(c)!; e.n++; }
+      const deg = (id: string) => realNbrs.get(id)?.size ?? 0;
+      const headline = [...ms].filter((id) => nodeMark(id) !== 'removed').sort((x, y) => deg(y) - deg(x) || label(x).localeCompare(label(y))).slice(0, 3).map(label);
+      const n = (w: Wire) => LV?.under.get(w.key)?.length ?? 1;
+      const io = (ws: Wire[], end: (w: Wire) => string) => ws.map((w) => [label(end(w)), n(w)] as [string, number]).sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]));
+      return {
+        label: hier.label(it.ref), cards: ms.length, groups: hier.children(it.ref).length,
+        cats: [...cats.values()].sort((x, y) => y.n - x.n || x.name.localeCompare(y.name)), headline,
+        ins: io(wires.filter((w) => w.to === it.id), (w) => w.from), outs: io(wires.filter((w) => w.from === it.id), (w) => w.to),
+        proposed: ms.filter((id) => nodeMark(id) === 'proposed').length, proposedGroup: isPropGroup(it.ref),
+      };
+    }
     private togglePick(id: string) {
-      if (!this.stage.inBench) return;
+      if (!this.stage.inBench || itemOf(id)) return;
       const c = this.st.picked;
       this.st.picked = c.includes(id) ? c.filter((x) => x !== id) : [...c, id];
       this.stage.redraw();
@@ -706,7 +1014,7 @@ function boardClass(baseModel: Model, o: BoardOpts) {
     }
     private async saveTeam(btn: HTMLButtonElement) {
       const positions: Record<string, XY> = {};
-      for (const n of L.nodes) { const p = this.viewer.positions[n.id] ?? team.positions[n.id]; if (p) positions[n.id] = { x: Math.round(p.x), y: Math.round(p.y) }; }
+      for (const n of Lc.nodes) { const p = this.viewer.positions[n.id] ?? team.positions[n.id]; if (p) positions[n.id] = { x: Math.round(p.x), y: Math.round(p.y) }; }
       const tags: TeamTag[] = [
         ...team.tags.map((t) => ({ id: t.id, name: t.name, members: [...t.members] })),
         ...this.mine().map((t) => ({ id: t.id, name: t.name, members: [...t.members] })),
@@ -740,15 +1048,16 @@ function boardClass(baseModel: Model, o: BoardOpts) {
     setBench(on: boolean) {
       if (!on) { this.st.picked = []; if (this.drag || this.gdrag) { this.drag = null; this.gdrag = null; this.snapAll(); } }
     }
-    /** Theater relayout (docs/ENGINE.md "Theater"): bands arranged for the window's aspect; null = the page's default.
+    /** Theater relayout (docs/ENGINE.md "Theater"): bands arranged for the window's aspect, and the drill rail wrapped
+     *  into the columns that use it best (`pickFit`); null = the page's default. With `chrome` (the chrome floor draws
+     *  chrome that much larger) the legend and the header get that much more room, so they cover no card at fit.
      *  The arrangement is where cards rest; the viewer's own positions still win, and Reset returns to it. */
-    fit(space: { w: number; h: number } | null) {
+    fit(space: { w: number; h: number } | null, o?: { chrome?: number }) {
       this.space = space ? { w: space.w, h: space.h } : null;
-      const k = space ? `${Math.round(space.w)}x${Math.round(space.h)}` : 'page';
-      let r = this.fitMemo.get(k);
-      if (!r) { r = space ? arrange(L, space, arrangeOpts) : DEFAULT; this.fitMemo.set(k, r); }
-      if (r.a.key !== this.arr.key || r.W !== this.W || r.H !== this.H) {
-        this.arr = r.a; this.W = r.W; this.H = r.H;
+      this.chromeK = Math.max(1, Math.round((o?.chrome ?? 1) * 100) / 100);
+      const r = this.fitFor(this.space, this.chromeK);
+      if (r.a.key !== this.arr.key || r.W !== this.W || r.H !== this.H || r.cols !== this.fitted.cols || r.top !== this.fitted.top) {
+        this.arr = r.a; this.W = r.W; this.H = r.H; this.fitted = r;
         this.drag = null; this.gdrag = null;
         if (this.st.drill) this.drillOff = this.computeDrillOff(this.st.drill);
         this.snapAll();
@@ -756,23 +1065,43 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       this.host?.refit(this.W, this.H);
       return { w: this.W, h: this.H };
     }
+    private chromeK = 1;
+    private fitFor(space: { w: number; h: number } | null, k: number): Fitted {
+      const key = `${space ? `${Math.round(space.w)}x${Math.round(space.h)}` : 'page'}@${k}`;
+      let r = this.fitMemo.get(key);
+      if (r) return r;
+      const top = Math.round(HEAD_D * (k - 1));
+      const make = (cols: number): Fitted => {
+        const x = !space && cols === 1 && k === 1 ? DEFAULT : arrange(L, space, arrangeOpts(cols, k));
+        // the content starts `top` lower: below the header the floor draws deeper
+        const a = top ? { ...x.a, pos: new Map([...x.a.pos].map(([id, p]) => [id, { ...p, y: p.y + top }])), bottom: x.a.bottom + top } : x.a;
+        return { a, W: x.W, H: x.H + top, cols, top: TOP + top, foot: LEG_H * k, w: x.W, h: x.H + top };
+      };
+      // the rail in 1 … 4 columns (each one fewer row than the last), on the page in one
+      const cands = [make(1)];
+      if (space) for (let c = 2; c <= 4 && Math.ceil(maxRail / c) < Math.ceil(maxRail / (c - 1)); c++) cands.push(make(c));
+      r = space ? pickFit(space, cands) : cands[0]!;
+      this.fitMemo.set(key, r);
+      return r;
+    }
 
     // ------------------------------------------------------------------ build
     build(dom: HTMLElement) {
       const langs = [...new Set((model.producers ?? []).map((p) => p.lang))].join(' + ');
       const kinds = NODE_KINDS.map((k) => `<option value="${k}">${k}</option>`).join('');
       dom.innerHTML = `<style>${MAP_CSS}${CSS}</style>
-        <header class="mm-head" data-pl-chrome><div class="pl-label">Structure board${langs ? ` · from ${esc(langs)} code` : ''}</div><h1 class="pl-title">${esc(o.title ?? `How ${model.project ?? 'the project'} fits together`)}</h1></header>
-        <div class="bd-toolbar" data-pl-chrome><button type="button" class="bd-btn sp-add" data-sp="palette" hidden title="Propose a new node (n): name it, then click where it goes">+ node</button><button type="button" class="bd-btn" data-reset title="Put every card back where the team layout (or the auto layout) has it. Tags are kept.">Reset layout</button>${DEV_SAVE ? `<button type="button" class="bd-btn" data-save title="Write positions and tags to ${esc(o.layoutFile!)} (dev server only)">Save as team layout</button>` : ''}</div>
+        <header class="mm-head" data-pl-chrome><div class="pl-label">Structure board${langs ? ` · from ${esc(langs)} code` : ''}</div><h1 class="pl-title">${esc(o.title ?? `How ${model.project ?? 'the project'} fits together`)}</h1>${hier.available ? '<nav class="bd-crumbs" aria-label="Group levels" hidden></nav>' : ''}</header>
+        <div class="bd-toolbar" data-pl-chrome><button type="button" class="bd-btn sp-add" data-sp="palette" hidden title="Propose a new node (n): name it, then click where it goes">+ node</button><button type="button" class="bd-btn sp-add" data-sp="gpalette" hidden title="Propose a new group: name it, then click where it goes (empty space: here · a group card: inside it · a card: an outlet of it)">+ group</button><button type="button" class="bd-btn" data-reset title="Put every card back where the team layout (or the auto layout) has it. Tags are kept.">Reset layout</button>${DEV_SAVE ? `<button type="button" class="bd-btn" data-save title="Write positions and tags to ${esc(o.layoutFile!)} (dev server only)">Save as team layout</button>` : ''}</div>
         <form class="pl-card sp-pal" data-pl-chrome="bare" style="right:${SIDE}px" hidden aria-label="Propose a node">
           <div class="pl-label sp-pal-h">propose a node</div>
-          <input type="hidden" name="replaces">
+          <input type="hidden" name="replaces"><input type="hidden" name="mode">
           <label>label <input name="label" required autocomplete="off" placeholder="e.g. Cache"></label>
-          <label>kind <select name="kind">${kinds}</select></label>
-          <label>category <input name="category" autocomplete="off" list="sp-cats" placeholder="optional"></label>
+          <label class="sp-nodeonly">kind <select name="kind">${kinds}</select></label>
+          <label class="sp-nodeonly">category <input name="category" autocomplete="off" list="sp-cats" placeholder="optional"></label>
           <datalist id="sp-cats"></datalist>
           <div class="sp-row"><button type="button" class="bd-btn" data-sp="palclose">Cancel</button><button type="submit" class="bd-btn is-ok">Place it</button></div>
-          <p class="sp-hint">then click a wire to put it between its two cards · ⇧-click a card: before it · ⌥-click: after it · click a card: it calls the new one · click empty space: drop it there · to swap a card for a new one, select it and press r</p>
+          <p class="sp-hint sp-nodeonly">then click a wire to put it between its two cards · ⇧-click a card: before it · ⌥-click: after it · click a card: it calls the new one · click empty space: drop it there · to swap a card for a new one, select it and press r</p>
+          <p class="sp-hint sp-grouponly">then click where it goes: empty space: a group here · a group card: a group inside it · a card: an outlet of that card (it calls the new group)</p>
         </form>
         <div class="pl-card bd-panel" id="bd-panel" role="dialog" aria-label="Details"></div>
         <div class="pl-card wh-card" id="wh-card" role="status" aria-live="polite"></div>
@@ -799,6 +1128,7 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       });
       foot.prepend(this.legend.el);
       this.buildSpliceChrome(dom);
+      this.buildViewToggle();
       this.syncCards();
       this.renderLegend();
       // wires: hover shows what one means, a click pins that card (docs/ENGINE.md "Wire hover")
@@ -822,6 +1152,20 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       this.snapAll();
     }
 
+    /** "Groups / All cards" in the plate's actions row (docs/ENGINE.md "Group navigation"), where the board has groups. */
+    private buildViewToggle() {
+      if (!hier.available) return;
+      const wrap = document.createElement('span');
+      wrap.className = 'bd-viewtg';
+      wrap.setAttribute('role', 'group'); wrap.setAttribute('aria-label', 'View');
+      const mk = (v: 'groups' | 'cards', text: string, title: string) => {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'plate-btn'; b.textContent = text; b.title = title;
+        b.addEventListener('click', () => { this.groupView(v); this.stage.viewport.focus({ preventScroll: true }); });
+        wrap.append(b); return b;
+      };
+      const groupsB = mk('groups', 'Groups', 'One card per group: click one to go into it (g)'), cards = mk('cards', 'All cards', 'Every card on one board (g)');
+      if (this.stage.addAction(wrap)) this.viewBtns = { groups: groupsB, cards };
+    }
     // ------------------------------------------------------------------ cards' DOM (a splice adds cards, and takes them away again)
     private cardEl(id: string) { return this.stage.dom.querySelector<HTMLElement>(`#${cssId(id)}`); }
     /** Every group and card of the drawn model has DOM (a card, its rail chip, its group's frame), filled for what it is
@@ -842,16 +1186,36 @@ function boardClass(baseModel: Model, o: BoardOpts) {
         }
         this.fillCard(n);
       }
+      // the groups view: a count badge on each wire that stands for several relationships
+      if (LV) for (const k of LV.under.keys()) if (!this.wnEl.has(k)) { const e = document.createElement('span'); e.className = 'bd-wn'; e.setAttribute('aria-hidden', 'true'); dom.insertBefore(e, at); this.wnEl.set(k, e); }
       const cats = this.stage.dom.querySelector('#sp-cats');
       if (cats) cats.innerHTML = ML.categories.filter((e) => e.id !== 'cat:·other').map((e) => `<option value="${esc(e.name)}">`).join('');
     }
     /** A card's content for what it is now: its label, category edge, check badges and, in a splice, what the splice does to it. */
     private fillCard(n: MNode) {
       const card = this.cardEl(n.id)!, chip = this.stage.dom.querySelector<HTMLElement>(`#h-${cssId(n.id)}`)!;
-      const mk = nodeMark(n.id);
-      const sig = JSON.stringify([n.label, n.kind, n.group, n.category, mk, wasLabel.get(n.id), wasGroup.get(n.id), ML.slotOf.get(n.id), nodeChecks.get(n.id)!.length, n.exercised]);
+      const it = itemOf(n.id);
+      if (it) { this.fillItem(card, chip, n, it); return; }
+      const mk = nodeMark(n.id), ph = isPh(n.id);
+      const sig = JSON.stringify([n.label, n.kind, n.group, n.category, mk, ph, wasLabel.get(n.id), wasGroup.get(n.id), ML.slotOf.get(n.id), nodeChecks.get(n.id)!.length, n.exercised]);
       if (card.dataset.sig === sig) return;
       card.dataset.sig = sig;
+      // back from a group card or a stub (the groups view): the card's own look and size
+      if (card.classList.contains('bd-gcard') || card.classList.contains('bd-stub')) { card.classList.remove('bd-gcard', 'bd-stub'); card.style.width = ''; card.style.height = ''; }
+      card.classList.toggle('sp-ph', ph);
+      if (ph) {
+        // a proposed group's empty state: no cards yet, and how to add one (its relationships wait on it)
+        const gl = hier.label(n.group ?? '');
+        card.innerHTML = `<div class="mm-top"><span class="mm-name">No cards yet</span><span class="sp-badge proposed">proposed</span></div><div class="sp-empty">say “add a card called …” or press n</div>`;
+        card.title = `${gl}: a proposed group with no cards yet`;
+        for (const c of ['is-ext', 'is-actor', 'is-idle', 'sp-removed', 'sp-renamed', 'sp-moved']) card.classList.remove(c);
+        card.classList.add('sp-proposed');
+        card.setAttribute('aria-label', `${gl}: a proposed group with no cards yet`);
+        delete card.dataset.cat;
+        const nm = chip.querySelector('.nm')!, g = chip.querySelector('.g')!;
+        nm.textContent = `${gl} (empty)`; g.textContent = gName(gOf.get(n.id)!); chip.title = gl;
+        return;
+      }
       const t = document.createElement('template');
       t.innerHTML = cardHTML(n, kx);
       const fresh = t.content.firstElementChild as HTMLElement;
@@ -892,6 +1256,30 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       const nm = chip.querySelector('.nm')!, g = chip.querySelector('.g')!;
       nm.textContent = label(n.id); g.textContent = gName(gOf.get(n.id)!); chip.title = label(n.id);
     }
+    /** A group card or a stub (the groups view): what it stands for, at its own size. */
+    private fillItem(card: HTMLElement, chip: HTMLElement, n: MNode, it: LevelItem) {
+      const stub = it.role !== 'group', g = it.role === 'group' || it.role === 'stub-group';
+      const real = realById.get(it.ref);
+      const html = it.role === 'group' ? groupCardInner(this.groupData(it))
+        : stubInner({ kind: g ? 'group' : real?.kind ?? 'card', label: g ? hier.label(it.ref) : label(it.ref), side: it.side ?? 'in', ...(g ? { cards: it.members.filter((id) => realById.has(id) && !isPh(id)).length } : {}), proposed: g ? isPropGroup(it.ref) : nodeMark(it.ref) === 'proposed' });
+      const b = this.box(n.id);
+      const sig = `lv|${it.role}|${b.w}x${b.h}|${html}`;
+      if (card.dataset.sig === sig) return;
+      card.dataset.sig = sig;
+      card.innerHTML = html;
+      for (const c of ['is-ext', 'is-actor', 'is-idle', 'sp-proposed', 'sp-removed', 'sp-renamed', 'sp-moved', 'sp-ph']) card.classList.remove(c);
+      card.classList.toggle('bd-gcard', !stub); card.classList.toggle('bd-stub', stub);
+      card.classList.toggle('sp-proposed', g ? isPropGroup(it.ref) : nodeMark(it.ref) === 'proposed');
+      card.style.width = `${b.w}px`; card.style.height = `${b.h}px`;
+      const slotN = !g ? ML.slotOf.get(it.ref) : undefined;
+      if (slotN !== undefined) card.dataset.cat = String(slotN); else delete card.dataset.cat;
+      const name = g ? hier.label(it.ref) : label(it.ref);
+      card.title = it.role === 'group' ? `${name}: go into this group (Enter)` : `${it.side === 'in' ? 'calls in' : 'called from here'}: ${name} · click to go across`;
+      const pg = g && isPropGroup(it.ref) ? 'proposed ' : '';
+      card.setAttribute('aria-label', it.role === 'group' ? `${pg}group ${name}, ${it.members.filter((id) => !isPh(id)).length} cards: go into it` : `${it.side === 'in' ? 'inlet' : 'outlet'} ${pg}${name}: go across to it`);
+      const nm = chip.querySelector('.nm')!, gg = chip.querySelector('.g')!;
+      nm.textContent = name; gg.textContent = gName(gOf.get(n.id)!); chip.title = name;
+    }
     /** A card's (and its chip's) listeners: open, pick, drag, hover, focus; in a splice, the connect handle and rename. */
     private wireCard(id: string) {
       const card = this.cardEl(id)!, chip = this.stage.dom.querySelector<HTMLElement>(`#h-${cssId(id)}`)!;
@@ -914,7 +1302,7 @@ function boardClass(baseModel: Model, o: BoardOpts) {
         onEnd: () => this.drop(),
       });
       card.addEventListener('pointerdown', (e) => { if ((e.target as HTMLElement).closest('.sp-handle')) this.startLink(id, e); });
-      card.addEventListener('dblclick', (e) => { if (this.sp && this.stage.inBench && (e.target as HTMLElement).closest('.mm-name')) this.startRename(id); });
+      card.addEventListener('dblclick', (e) => { if (this.sp && this.stage.inBench && !itemOf(id) && (e.target as HTMLElement).closest('.mm-name')) this.startRename(id); });
       card.addEventListener('pointerenter', () => { if (!this.drag && !this.gdrag && byId.has(id)) { this.hover = id; this.stage.redraw(); } });
       card.addEventListener('pointerleave', () => { if (this.hover === id) { this.hover = null; this.stage.redraw(); } });
       card.addEventListener('focus', () => { if (byId.has(id)) { this.st.cursor = id; this.stage.redraw(); } });
@@ -925,8 +1313,22 @@ function boardClass(baseModel: Model, o: BoardOpts) {
     /** A click on a card: placing a proposed node (where it goes), selecting by its name in a splice, picking (⌥/⇧ in Bench), else open. */
     private cardPress(id: string, e: MouseEvent) {
       if (!byId.has(id)) return;
+      // placing a proposed group: a group card is where it goes (inside it), a card makes it that card's outlet
+      if (this.sp && this.placing?.group) {
+        const it = itemOf(id);
+        if (it?.role === 'group') this.placeGroup({ into: it.ref });
+        else if (it?.role === 'stub-group') this.flash('that is a group outside this one: click empty space, a group card here, or a card', true);
+        else if (isPh(id)) this.placeGroup({});
+        else if (nodeMark(it?.ref ?? id) === 'removed') this.flash(`${label(it?.ref ?? id)} is removed in this splice; pick another card`, true);
+        else this.placeGroup({ outletOf: it?.ref ?? id });
+        return;
+      }
+      // the groups view: a group card goes into it, a stub across (placing a proposed card carries on there)
+      if (itemOf(id)) { this.enterItem(id); return; }
       if (this.sp && this.placing) {
         if (nodeMark(id) === 'removed') { this.flash(`${label(id)} is removed in this splice; pick another card`, true); return; }
+        // a proposed group's empty state: the card goes into that group (and takes over its relationships)
+        if (isPh(id)) { this.placeAt(null, undefined, gOfAny(id)); return; }
         this.placeAt(e.shiftKey ? { before: id } : e.altKey ? { after: id } : { attach: { to: id, dir: 'in' } });
         return;
       }
@@ -936,11 +1338,12 @@ function boardClass(baseModel: Model, o: BoardOpts) {
     }
     /** A click in the details (the plate's panel, or the pinned inspector: `inDock`) or on the plate's own buttons. */
     private onDetailsClick(e: MouseEvent, inDock: boolean) {
-      const t = (e.target as HTMLElement).closest<HTMLElement>('[data-drill],[data-reset],[data-save],[data-close],[data-copy],[data-goto],[data-pin],[data-section],[data-unsection],[data-jump],[data-dockpin]');
+      const t = (e.target as HTMLElement).closest<HTMLElement>('[data-level],[data-drill],[data-reset],[data-save],[data-close],[data-copy],[data-goto],[data-pin],[data-section],[data-unsection],[data-jump],[data-dockpin]');
       if (!t) return;
       const d = t.dataset;
       const dv = inDock ? this.dockView() : null;
-      if (d.drill !== undefined) this.drillTo(this.st.drill === d.drill ? null : d.drill);
+      if (d.level !== undefined) { this.navTo('groups', d.level || null); this.stage.viewport.focus({ preventScroll: true }); }
+      else if (d.drill !== undefined) this.drillTo(this.st.drill === d.drill ? null : d.drill);
       else if (d.reset !== undefined) this.resetLayout();
       else if (d.save !== undefined) void this.saveTeam(t as HTMLButtonElement);
       else if (d.close !== undefined) { this.close(); this.stage.viewport.focus({ preventScroll: true }); }
@@ -978,8 +1381,8 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       const p = this.clampCard(dg.cur, true, this.box(dg.id));
       const at = this.st.drill ? { x: p.x - this.drillOff.x, y: p.y - this.drillOff.y } : p;
       // in a splice, arrangement stays in the splice (saved with it); the real view's positions are never touched
-      if (this.sp) this.sp.positions[dg.id] = at;
-      else { this.viewer.positions[dg.id] = at; this.saveViewer(); }
+      if (this.sp) this.sp.positions[this.posKey(dg.id)] = at;
+      else { this.viewer.positions[this.posKey(dg.id)] = at; this.saveViewer(); }
       if (p.y !== dg.cur.y || p.x !== dg.cur.x) {
         const t = this.targets(); t.set(key, { ...t.get(key)!, x: dg.cur.x, y: dg.cur.y });
         this.morph.snap(t); this.morph.retarget(this.targets()); this.stage.transition();
@@ -1026,7 +1429,7 @@ function boardClass(baseModel: Model, o: BoardOpts) {
         const into = this.sp ? this.sp.positions : this.viewer.positions;
         for (const [id, p0] of g.start) {
           const p = { x: p0.x + g.d.x, y: p0.y + g.d.y };
-          into[id] = this.st.drill ? { x: p.x - this.drillOff.x, y: p.y - this.drillOff.y } : p;
+          into[this.posKey(id)] = this.st.drill ? { x: p.x - this.drillOff.x, y: p.y - this.drillOff.y } : p;
         }
         if (!this.sp) this.saveViewer();
       }
@@ -1054,6 +1457,12 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       if (this.sp && this.placing) {
         // placing a proposed node: a wire puts it between its two cards; empty space drops it there
         const t = e.target as HTMLElement, { key, at } = this.wireAt(e);
+        if (this.placing.group) {
+          if (key) { this.flash('a group goes on empty space, into a group card, or as a card\'s outlet (click the card)', true); return; }
+          if (!t.closest('.mm-card, .bd-chip, .bd-panel, .bd-foot, .bd-toolbar, .bd-gl, .sp-pal, .sp-banner, .sp-rename, button, input, select, label')) this.placeGroup({}, at);
+          return;
+        }
+        if (key && LV?.under.has(key)) { this.flash('that wire stands for several relationships: go into a group, then put the card between two of its cards', true); return; }
         if (key) {
           const w = wireByKey.get(key)!, m = wireMark(key);
           if (m === 'removed' || m === 'rerouted') { this.flash('that wire is gone in this splice; pick a live one', true); return; }
@@ -1077,7 +1486,7 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       const sp = this.sp ? { id: this.sp.splice.id, title: this.spNamed ? this.sp.title : '', ops: [...this.sp.splice.ops] } : null;
       const pl = this.stk, hs = this.host?.scene?.getState();
       const stack = pl ? { splices: pl.layers.map((l) => l.splice.id), combine: pl.combine.map((i) => pl.layers[i]!.splice.id), cur: hs?.cur ?? pl.cur, tab: hs?.tab ?? null, shown: !!this.host && this.hostFade !== 'out', conflict: hs?.warnPin ?? null, ...(pl.same.length ? { same: [...pl.same] } : {}) } : null;
-      return { ...this.st, pins: [...this.st.pins], picked: [...this.st.picked], bench: this.stage.inBench, splice: sp, stack };
+      return { ...this.st, pins: [...this.st.pins], picked: [...this.st.picked], bench: this.stage.inBench, splice: sp, stack, ...(hier.available ? { nav: view, at: LV ? at : null } : {}) };
     }
     setState(raw: unknown) {
       const s = { ...blank(), ...(raw && typeof raw === 'object' ? raw as Partial<BoardState> : {}) };
@@ -1087,6 +1496,8 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       this.placing = null; this.linking = null; this.renaming = null; this.spAsk = null;
       if (this.sp) { this.sp = null; this.remodel(false); }
       this.dropHost(); this.stk = null;
+      // back to the level the board starts on, at once
+      if (view !== START || at !== START_AT) this.navTo(START, START_AT, { snap: true });
       this.snapAll();
       const sp = s.splice && typeof s.splice === 'object' && Array.isArray(s.splice.ops) ? s.splice : null;
       if (sp) {
@@ -1097,12 +1508,33 @@ function boardClass(baseModel: Model, o: BoardOpts) {
         this.remodel(false);
       }
       const ids = (xs: unknown) => (Array.isArray(xs) ? xs.filter((x): x is string => typeof x === 'string') : []);
+      // group navigation: the view and level asked for, else the open card's level, else where the board starts
+      if (hier.available) {
+        const nv = s.nav === 'groups' || s.nav === 'cards' ? s.nav : view;
+        let na: string | null = nv === 'groups' ? at : null;
+        if (nv === 'groups') {
+          if (typeof s.at === 'string' && hier.all.has(s.at)) na = s.at;
+          else if (s.at === null) na = null;
+          else if (s.open && realById.has(s.open)) na = hier.levelOf(s.open);
+          else if (typeof s.drill === 'string' && hier.all.has(s.drill)) na = s.drill;
+        }
+        if (nv !== view || na !== at) this.navTo(nv, na, { play: false });
+      }
+      // a wire named by its cards, drawn here as the wire between what draws them (a group's)
+      const wk = (k: string | null | undefined) => {
+        if (!k || wireByKey.has(k) || !LV) return k && wireByKey.has(k) ? k : null;
+        const w = realWireByKey.get(k), a = w && LV.rep.get(w.from), b = w && LV.rep.get(w.to);
+        const k2 = a && b ? pairKey(a, b) : null;
+        return k2 && wireByKey.has(k2) ? k2 : null;
+      };
+      const card = (id: string | null | undefined) => !!id && byId.has(id) && !itemOf(id);
+      s.wire = wk(s.wire); s.wirePin = wk(s.wirePin);
       this.st = {
-        open: s.open && byId.has(s.open) ? s.open : null,
-        section: s.open && byId.has(s.open) && typeof s.section === 'string' ? s.section : null,
-        drill: s.drill && members.has(s.drill) ? s.drill : null,
+        open: card(s.open) ? s.open! : null,
+        section: card(s.open) && typeof s.section === 'string' ? s.section : null,
+        drill: !LV && s.drill && members.has(s.drill) ? s.drill : null,
         pins: ids(s.pins).map((p) => resolveEntry(this.entries(), p)).filter((p): p is string => !!p),
-        picked: this.stage.inBench ? ids(s.picked).filter((id) => byId.has(id)) : [],
+        picked: this.stage.inBench ? ids(s.picked).filter(card) : [],
         cursor: s.cursor ?? null,
         hover: s.hover ? resolveEntry(this.entries(), s.hover) : null,
         wire: s.wire && wireByKey.has(s.wire) ? s.wire : null,
@@ -1127,6 +1559,9 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       }
     }
     states() {
+      // over every card of the model (the groups view's states open a card on its level, and go into groups)
+      const L = Lc, nbrs = realNbrs, byId = realById, wires = realWires, wireByKey = realWireByKey, slot = (id: string) => Lc.pos.get(id)!;
+      const G = START === 'groups';
       // the busiest card with the scene's own details (any kind but an actor, an external or a module)
       const svc = L.nodes.filter((n) => !['actor', 'external', 'module'].includes(n.kind)).sort((a, b) => Number(!!o.details?.(b)) - Number(!!o.details?.(a)) || nbrs.get(b.id)!.size - nbrs.get(a.id)!.size)[0] ?? L.nodes[0];
       const out: { name: string; state: BoardState }[] = [{ name: 'overview', state: blank() }];
@@ -1142,10 +1577,12 @@ function boardClass(baseModel: Model, o: BoardOpts) {
         const ks = kits.sections(ns[0]!)[0];
         if (ks) out.push({ name: `kind-${k}-${ks.id}`, state: { ...blank(), open: ns[0]!.id, cursor: ns[0]!.id, section: ks.id } });
       }
-      const g = svc ? gOf.get(svc.id)! : groups[0]?.id;
-      if (g) out.push({ name: `drill-${gName(g)}`, state: { ...blank(), drill: g } });
+      const sl = (x: string) => x.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      // the groups view: each group entered (the change of level runs mid-transition); the cards view: the drill
+      if (G) for (const gg of [...hier.all].sort((a, b) => hier.path(a).join('/').localeCompare(hier.path(b).join('/'))).slice(0, 8)) out.push({ name: `group-${sl(hier.path(gg).join(' '))}`, state: { ...blank(), at: gg } });
+      else { const g = svc ? hier.leaf(svc.id) : Lc.groups[0]?.id; if (g) out.push({ name: `drill-${gName(g)}`, state: { ...blank(), drill: g } }); }
       const slug = (e: LegendEntry) => e.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-      const all = this.entries();
+      const all = G ? this.entryList : this.entries();
       // a declared tag (the one the scene leads with when it names one), a category, a derived tag
       const tag = (o.lead?.tag ? all.find((e) => e.id === o.lead!.tag) : undefined) ?? all.find((e) => e.kind === 'tag') ?? all.find((e) => e.kind === 'team');
       const cat = all.find((e) => e.kind === 'category');
@@ -1154,13 +1591,18 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       if (cat) out.push({ name: `legend-hover-${slug(cat)}`, state: { ...blank(), hover: cat.id } });
       if (cat && tag) out.push({ name: 'legend-pin-2', state: { ...blank(), pins: [cat.id, tag.id] } });
       else if (der) out.push({ name: `legend-pin-${slug(der)}`, state: { ...blank(), pins: [der.id] } });
-      const two = [...L.nodes].filter((n) => n.kind !== 'actor').sort((a, b) => slot(a.id).y - slot(b.id).y || slot(a.id).x - slot(b.id).x).slice(0, 2).map((n) => n.id);
+      const svcAt = G && svc ? hier.levelOf(svc.id) : null;
+      const two = [...L.nodes].filter((n) => n.kind !== 'actor' && (!G || hier.levelOf(n.id) === svcAt)).sort((a, b) => slot(a.id).y - slot(b.id).y || slot(a.id).x - slot(b.id).x).slice(0, 2).map((n) => n.id);
       // a wire hovered, and one pinned: the one the scene leads with when it names one, else the most recorded calls
-      const wk = (o.lead?.wire && wireByKey.has(o.lead.wire) ? o.lead.wire : undefined) ?? [...wires].sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))[0]?.key;
+      // (the groups view: on the overview, the wire between groups that stands for the most relationships)
+      const top = (id: string) => repOf(hier, id, null).item, agg = new Map<string, number>();
+      if (G) for (const w of wires) { const a = top(w.from), b = top(w.to); if (a !== b) agg.set(pairKey(a, b), (agg.get(pairKey(a, b)) ?? 0) + 1); }
+      const wk = G ? [...agg].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0]
+        : (o.lead?.wire && wireByKey.has(o.lead.wire) ? o.lead.wire : undefined) ?? [...wires].sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))[0]?.key;
       if (wk) out.push({ name: `wire-hover-${wk}`, state: { ...blank(), wire: wk } }, { name: `wire-pin-${wk}`, state: { ...blank(), wirePin: wk } });
-      const warnW = wires.find((w) => w.style === 'warn') ?? wires.find((w) => w.style === 'dashed');
+      const warnW = G ? undefined : wires.find((w) => w.style === 'warn') ?? wires.find((w) => w.style === 'dashed');
       if (warnW) out.push({ name: `wire-hover-${warnW.key}`, state: { ...blank(), wire: warnW.key } });
-      out.push({ name: 'pick-2', state: { ...blank(), picked: two, bench: true } });
+      out.push({ name: 'pick-2', state: { ...blank(), picked: two, bench: true, ...(G ? { at: svcAt } : {}) } });
       out.push({ name: 'bench-off', state: { ...blank(), bench: false } });
       // splices (docs/ENGINE.md "Splice"): each example as proposed, and in Bench; its first proposed wire hovered; its legend's "proposed" hovered
       for (const ex of o.spliceExamples ?? []) {
@@ -1168,8 +1610,11 @@ function boardClass(baseModel: Model, o: BoardOpts) {
         const r = applySplice(baseModel, ex), pw = Object.entries(r.marks.edges).find(([, m]) => m === 'proposed')?.[0];
         out.push({ name: `splice-${ex.id}`, state: { ...blank(), splice: sp } });
         out.push({ name: `splice-${ex.id}-bench`, state: { ...blank(), splice: sp, bench: true } });
-        if (pw) out.push({ name: `splice-${ex.id}-wire`, state: { ...blank(), splice: sp, wire: pw } });
+        // the groups view: the proposals are inside a group; there the proposed wire, and the splice as that group shows it
+        const pn = r.model.nodes.find((n) => r.marks.nodes[n.id] === 'proposed'), pat = G && pn?.group && hier.all.has(pn.group) ? pn.group : null;
+        if (pw) out.push({ name: `splice-${ex.id}-wire`, state: { ...blank(), splice: sp, wire: pw, ...(pat ? { at: pat } : {}) } });
         out.push({ name: `splice-${ex.id}-legend`, state: { ...blank(), splice: sp, hover: 'splice:proposed' } });
+        if (pat) out.push({ name: `splice-${ex.id}-in-group`, state: { ...blank(), splice: sp, at: pat } });
       }
       // a stack of the example splices (docs/ENGINE.md "Stack of splices"): on the real view; a splice's tab hovered (what
       // it changes); one of them unsaved; and combined, on the combined slice with its conflict warning
@@ -1189,6 +1634,14 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       for (const ex of ids.length ? o.stackExamples ?? [] : []) {
         const two = [ids[0]!, ex.id];
         out.push({ name: `splice-stack-${ex.id}`, state: { ...blank(), stack: { splices: two, combine: two, cur: 3, conflict: 0 } } });
+      }
+      // group navigation (docs/ENGINE.md "Group navigation"): every card, from a board that starts on its groups; the
+      // groups, from one that starts on every card
+      if (G) out.push({ name: 'cards', state: { ...blank(), nav: 'cards' } });
+      else if (hier.available) {
+        out.push({ name: 'groups', state: { ...blank(), nav: 'groups', at: null } });
+        const t0 = hier.children(null)[0];
+        if (t0) out.push({ name: `groups-${sl(hier.label(t0))}`, state: { ...blank(), nav: 'groups', at: t0 } });
       }
       return out;
     }
@@ -1218,7 +1671,7 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       }
       this.spEl = {
         title: q('.sp-title'), sub: q('.sp-sub'), warn: q('.sp-warn'), msg: q('.sp-msg'), name: q<HTMLInputElement>('.sp-name'), ask: q('.sp-ask'), q: q('.sp-q'),
-        yes: q<HTMLButtonElement>('[data-sp="yes"]'), acts: q('.sp-acts'), save: q<HTMLButtonElement>('[data-sp="save"]'), stack: q<HTMLButtonElement>('[data-sp="stack"]'), add: q<HTMLButtonElement>('[data-sp="palette"]'),
+        yes: q<HTMLButtonElement>('[data-sp="yes"]'), acts: q('.sp-acts'), save: q<HTMLButtonElement>('[data-sp="save"]'), stack: q<HTMLButtonElement>('[data-sp="stack"]'), add: q<HTMLButtonElement>('[data-sp="palette"]'), gadd: q<HTMLButtonElement>('[data-sp="gpalette"]'),
         pal: q<HTMLFormElement>('.sp-pal'), rename: q<HTMLInputElement>('.sp-rename'), btn: shown ? b : null, list, pop,
       };
       dom.addEventListener('click', (e) => { const t = (e.target as HTMLElement).closest<HTMLElement>('[data-sp]'); if (t) this.onSpliceButton(t.dataset.sp!); });
@@ -1247,6 +1700,7 @@ function boardClass(baseModel: Model, o: BoardOpts) {
     private onSpliceButton(k: string) {
       switch (k) {
         case 'palette': return this.openPalette();
+        case 'gpalette': return this.openPalette(null, true);
         case 'palclose': return this.closePalette();
         case 'stack': return void (this.stk && !this.host ? this.spliceStackReturn() : this.spliceStack());
         case 'save': return void this.saveFromBanner();
@@ -1273,25 +1727,52 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       this.spMsgTimer = text ? setTimeout(() => { this.spMsg = null; this.spMsgTimer = 0; this.stage.redraw(); }, bad ? 6000 : 3500) : 0;
       this.stage.redraw();
     }
-    /** What a splice remembers of the view it was made in (reopening it lands there). */
-    private spliceViewState() { return { drill: this.st.drill, open: this.st.open, positions: { ...(this.sp?.positions ?? {}) } }; }
+    /** What a splice remembers of the view it lives in (reopening it lands there): the level and group, with the
+     *  breadcrumb's words, Groups or every card, the drill, the selection, and its own arrangement. */
+    private spliceViewState(): SpliceViewState {
+      return {
+        ...(hier.available ? { nav: view, at: LV ? at : null, path: LV && at !== null ? hier.path(at) : [] } : {}),
+        drill: this.st.drill, open: this.st.open, section: this.st.section ?? null, cursor: this.st.cursor,
+        positions: { ...(this.sp?.positions ?? {}) },
+      };
+    }
+    /** Where you are, in the breadcrumb's words ("Orders › Notifications", "All groups", "every card"). */
+    private whereWords(): string {
+      if (LV) return at === null ? 'All groups' : hier.path(at).join(' › ');
+      if (this.st.drill) return gName(this.st.drill);
+      return hier.available ? 'every card' : '';
+    }
     spliceView(): SpliceView | null {
       if (!this.sp) return null;
-      return { ...this.sp.view(), title: this.spNamed ? this.sp.title : 'untitled' };
+      const pg = Object.entries(marks?.groups ?? {}).filter(([, v]) => v === 'proposed').map(([g]) => g).filter((g) => hier.all.has(g) || groups.some((x) => x.id === g));
+      return {
+        ...this.sp.view(), title: this.spNamed ? this.sp.title : 'untitled', where: this.whereWords(),
+        groups: pg.map((g) => ({ id: g, label: hier.label(g), path: hier.path(g).join(' › '), cards: hier.under(g).filter((id) => !isPh(id)).length })),
+      };
     }
     spliceOpen(o: { title?: string; splice?: Splice; file?: string | null } = {}): SpliceView {
       const splice = o.splice ?? emptySplice({ model: o_modelRef, commit: null }, this.spliceViewState(), o.title?.trim() ? { title: o.title.trim() } : {});
-      const v = (splice.view && typeof splice.view === 'object' ? splice.view : {}) as { drill?: unknown; positions?: Record<string, XY> };
+      const v = (splice.view && typeof splice.view === 'object' ? splice.view : {}) as { drill?: unknown; nav?: unknown; at?: unknown; positions?: Record<string, XY> };
       this.spAsk = null; this.placing = null; this.linking = null; this.renaming = null;
       // a saved splice you stepped away from (through the stack) with unsaved changes comes back with them
       const kept = o.file ? this.stash.get(o.file) : undefined;
       if (kept) this.stash.delete(o.file!);
       this.sp = kept ?? new SpliceSession(baseModel, splice, { file: o.file ?? null, saved: !!o.splice && !!o.file, positions: o.splice && v.positions && typeof v.positions === 'object' ? v.positions : {} });
       this.spNamed = !!o.title?.trim() || !!o.splice;
-      // a saved splice reopens where it was made (inside its group, if it was)
-      if (o.splice && typeof v.drill === 'string') this.st.drill = v.drill;
       this.flash(null);
+      if (!o.splice) { this.remodel(); return this.spliceView()!; }
+      // a saved splice reopens in the view it lives in: its level and group (it slides in; a group the splice proposes
+      // too), its drill and its selection; an older splice that doesn't say opens at the top level
+      const tgt0 = viewTarget(splice.view, { available: hier.available, start: START, has: () => true });
+      if (!tgt0.drill || LV) this.st.drill = null;
+      if (tgt0.drill && !LV && tgt0.nav === 'cards') this.st.drill = tgt0.drill;
       this.remodel();
+      const tgt = viewTarget(splice.view, { available: hier.available, start: START, has: (g) => hier.all.has(g) });
+      if (hier.available) this.navTo(tgt.nav, tgt.at);
+      if (!LV && tgt.drill && members.has(tgt.drill) && this.st.drill !== tgt.drill) this.drillTo(tgt.drill);
+      const card = (id: string | null) => !!id && byId.has(id) && !itemOf(id);
+      if (card(tgt.open)) { this.st.open = tgt.open; this.st.section = tgt.section; this.panelFor = tgt.open; this.st.cursor = tgt.open; this.go(); }
+      else if (card(tgt.cursor)) { this.st.cursor = tgt.cursor; this.stage.redraw(); }
       return this.spliceView()!;
     }
     async spliceOpenSaved(ref: string): Promise<{ ok: boolean; view?: SpliceView; error?: string }> {
@@ -1401,8 +1882,8 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       const live = new Set(byId.keys());
       derive(this.sp ? this.sp.drawn : baseModel, this.sp ? this.sp.result.marks : null);
       this.fitMemo.clear();
-      const r = this.space ? arrange(L, this.space, arrangeOpts) : DEFAULT;
-      this.arr = r.a; this.W = r.W; this.H = r.H;
+      const r = this.fitFor(this.space, this.chromeK);
+      this.arr = r.a; this.W = r.W; this.H = r.H; this.fitted = r;
       this.syncCards();
       this.fixState();
       this.renderLegend();
@@ -1426,17 +1907,21 @@ function boardClass(baseModel: Model, o: BoardOpts) {
     /** After the drawn model changed: let go of what no longer exists (an open card, a drill, a pinned wire …). */
     private fixState() {
       const st = this.st;
-      if (st.open && !byId.has(st.open)) { st.open = null; st.section = null; }
+      // the groups view: a card opens, picks and connects only where it is drawn as itself
+      const card = (id: string) => byId.has(id) && !itemOf(id);
+      if (st.open && !card(st.open)) { st.open = null; st.section = null; }
       if (st.cursor && !byId.has(st.cursor)) st.cursor = null;
-      st.picked = st.picked.filter((id) => byId.has(id));
+      st.picked = st.picked.filter(card);
+      if (LV) st.drill = null;
       if (st.drill && !members.has(st.drill)) st.drill = null;
       if (st.drill) this.drillOff = this.computeDrillOff(st.drill);
       if (st.wire && !wireByKey.has(st.wire)) { st.wire = null; st.wireAt = null; }
       if (st.wirePin && !wireByKey.has(st.wirePin)) st.wirePin = null;
       if (this.panelFor && !byId.has(this.panelFor)) this.panelFor = null;
       if (this.hover && !byId.has(this.hover)) this.hover = null;
-      if (this.dockLock && !byId.has(this.dockLock.id)) { this.dockLock = null; this.stage.dock?.lock(false); }
-      if (this.spot) { const m = this.spot.members.filter((id) => byId.has(id)); this.spot = m.length ? highlightEntry(m) : null; if (!m.length) st.pins = st.pins.filter((p) => p !== HIGHLIGHT); }
+      if (st.hover && !this.entries().some((e) => e.id === st.hover)) st.hover = null;
+      if (this.dockLock && !realById.has(this.dockLock.id)) { this.dockLock = null; this.stage.dock?.lock(false); }
+      if (this.spot) { const m = this.spot.members.filter((id) => realById.has(id)); this.spot = m.length ? highlightEntry(m) : null; if (!m.length) st.pins = st.pins.filter((p) => p !== HIGHLIGHT); }
       this.drag = null; this.gdrag = null;
     }
     /** The splice's legend entries: what it proposes, what it removes (or reroutes), what it renames or moves. Hovering one
@@ -1444,8 +1929,8 @@ function boardClass(baseModel: Model, o: BoardOpts) {
     private spliceEntries(): LegendEntry[] {
       const mk = marks;
       if (!mk) return [];
-      const nodes = (ms: string[]) => Object.entries(mk.nodes).filter(([id, m]) => ms.includes(m) && byId.has(id)).map(([id]) => id);
-      const edges = (ms: string[]) => Object.entries(mk.edges).filter(([k, m]) => ms.includes(m) && wireByKey.has(k)).map(([k]) => wireByKey.get(k)!);
+      const nodes = (ms: string[]) => Object.entries(mk.nodes).filter(([id, m]) => ms.includes(m) && realById.has(id)).map(([id]) => id);
+      const edges = (ms: string[]) => Object.entries(mk.edges).filter(([k, m]) => ms.includes(m) && realWireByKey.has(k)).map(([k]) => realWireByKey.get(k)!);
       // a relationship between two cards the splice leaves alone lights those two cards
       const ends = (ws: Wire[]) => ws.filter((w) => !mk.nodes[w.from] && !mk.nodes[w.to]).flatMap((w) => [w.from, w.to]);
       const entry = (id: string, name: string, hint: string, ns: string[], ws: Wire[]): LegendEntry => ({ id, name, kind: 'splice', hint, members: uniq([...ns, ...ends(ws)]), count: ns.length + ws.length });
@@ -1458,13 +1943,16 @@ function boardClass(baseModel: Model, o: BoardOpts) {
     }
     // ---- editing in Bench: the palette, placing, connecting, renaming, deleting
     /** The palette: name a node, then place it; with `replaces` (a card), the new node takes that card's place at once. */
-    private openPalette(replaces: string | null = null) {
+    private openPalette(replaces: string | null = null, group = false) {
       if (!this.sp) return;
       if (!this.stage.inBench) this.stage.bench(true);
       this.placing = null;
       const f = this.spEl.pal;
       (f.elements.namedItem('replaces') as HTMLInputElement).value = replaces ?? '';
-      f.querySelector('.sp-pal-h')!.textContent = replaces ? `replace ${label(replaces)} with` : 'propose a node';
+      (f.elements.namedItem('mode') as HTMLInputElement).value = group ? 'group' : '';
+      f.classList.toggle('is-group', group);
+      (f.elements.namedItem('label') as HTMLInputElement).placeholder = group ? 'e.g. Notifications' : 'e.g. Cache';
+      f.querySelector('.sp-pal-h')!.textContent = replaces ? `replace ${label(replaces)} with` : group ? 'propose a group' : 'propose a node';
       f.querySelector<HTMLButtonElement>('[type="submit"]')!.textContent = replaces ? 'Replace it' : 'Place it';
       if (replaces) (f.elements.namedItem('kind') as HTMLSelectElement).value = NODE_KINDS.includes(byId.get(replaces)?.kind as NodeKind) ? byId.get(replaces)!.kind : 'service';
       f.hidden = false;
@@ -1481,15 +1969,16 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       const f = this.spEl.pal, get = (n: string) => (f.elements.namedItem(n) as HTMLInputElement | HTMLSelectElement).value.trim();
       const lbl = get('label');
       if (!lbl || !this.sp) return;
-      const cat = get('category'), rep = get('replaces');
+      const cat = get('category'), rep = get('replaces'), grp = get('mode') === 'group';
       const kind = (NODE_KINDS.includes(get('kind') as NodeKind) ? get('kind') : 'service') as NodeKind;
       f.reset(); f.hidden = true;
+      if (grp) { this.placing = { label: lbl, kind: 'service', group: true }; this.stage.viewport.focus({ preventScroll: true }); this.stage.redraw(); return; }
       if (rep) {
         // swap the card for the new node: it takes over every relationship of the card, which stays as a ghost
         this.stage.viewport.focus({ preventScroll: true });
         const op = spliceOp.replace(rep, lbl, { kind, ...(cat ? { category: cat } : {}), taken: this.sp.drawn });
-        const at = this.sp.positions[rep];
-        if (at) this.sp.positions[(op.with as { id: string }).id] = { ...at };
+        const at0 = this.sp.positions[this.posKey(rep)];
+        if (at0) this.sp.positions[this.posKey((op.with as { id: string }).id)] = { ...at0 };
         this.spliceOp(op);
         return;
       }
@@ -1497,26 +1986,44 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       this.stage.viewport.focus({ preventScroll: true });
       this.stage.redraw();
     }
-    private placeAt(where: SplicePlace | null, at?: XY) {
+    private placeAt(where: SplicePlace | null, xy?: XY, into?: string) {
       const p = this.placing;
       if (!p || !this.sp) return;
       this.placing = null;
-      const op = spliceOp.add(p.label, where, { kind: p.kind, ...(p.category ? { category: p.category } : {}), taken: this.sp.drawn });
+      // the groups view: a card dropped on empty space inside a group joins that group (on the overview, its own); inside
+      // a group the splice proposes, every new card joins it
+      const grp = into ?? (LV && at !== null && (!where || isPropGroup(at)) ? at : null);
+      const op = spliceOp.add(p.label, where, { kind: p.kind, ...(p.category ? { category: p.category } : {}), ...(grp ? { group: grp } : {}), taken: this.sp.drawn });
       const id = op.node.id!;
       const b = kits.size(p.kind) ?? { w: CARD_W, h: CARD_H };
-      if (!where && at) this.sp.positions[id] = this.clampCard({ x: at.x - b.w / 2, y: at.y - b.h / 2 }, true, b);
+      const k = LV ? `@${at ?? ''}|${id}` : id;
+      if (!where && xy) this.sp.positions[k] = this.clampCard({ x: xy.x - b.w / 2, y: xy.y - b.h / 2 }, true, b);
       const r = this.spliceOp(op);
-      if (!r.applied) delete this.sp.positions[id];
+      if (!r.applied) delete this.sp.positions[k];
+    }
+    /** Place the proposed group being placed: on this level (dropped at `xy`), inside a group card (`into`), or as a
+     *  card's outlet (`outletOf`: the card calls the new group). */
+    private placeGroup(where: { into?: string; outletOf?: string }, xy?: XY) {
+      const p = this.placing;
+      if (!p?.group || !this.sp) return;
+      this.placing = null;
+      const parent = where.into ?? (LV ? at : null);
+      const op = spliceOp.group(p.label, { ...(parent ? { parent } : {}), ...(where.outletOf ? { attach: { to: where.outletOf, dir: 'in' as const } } : {}), taken: this.sp.drawn });
+      const k = `@${at ?? ''}|${GPRE}${op.group.id}`;
+      if (xy && LV && !where.into) this.sp.positions[k] = this.clampCard({ x: xy.x - GCARD.w / 2, y: xy.y - GCARD.h / 2 }, true, GCARD);
+      const r = this.spliceOp(op);
+      if (!r.applied) delete this.sp.positions[k];
     }
     private startLink(from: string, e: PointerEvent) {
-      if (!this.sp || !this.stage.inBench || e.button !== 0 || !byId.has(from) || nodeMark(from) === 'removed') return;
+      if (!this.sp || !this.stage.inBench || e.button !== 0 || !byId.has(from) || itemOf(from) || nodeMark(from) === 'removed') return;
       e.preventDefault(); e.stopPropagation();
       this.linking = { from, at: this.stage.toStage(e.clientX, e.clientY), over: null };
       const move = (ev: PointerEvent) => {
         if (ev.pointerId !== e.pointerId || !this.linking) return;
         this.linking.at = this.stage.toStage(ev.clientX, ev.clientY);
         const id = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest<HTMLElement>('.bd-card')?.dataset.node ?? null;
-        this.linking.over = id && id !== from && byId.has(id) && nodeMark(id) !== 'removed' ? id : null;
+        // a card, or a group card (a proposed group: the relationship goes to its entry card)
+        this.linking.over = id && id !== from && byId.has(id) && (!itemOf(id) || itemOf(id)!.role === 'group') && nodeMark(id) !== 'removed' ? id : null;
         this.stage.redraw();
       };
       const up = (ev: PointerEvent) => {
@@ -1524,14 +2031,18 @@ function boardClass(baseModel: Model, o: BoardOpts) {
         removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
         const l = this.linking;
         this.linking = null;
-        if (l?.over && ev.type === 'pointerup') this.spliceOp(spliceOp.connect(l.from, l.over));
+        const g = l?.over ? itemOf(l.over) : null;
+        if (l?.over && ev.type === 'pointerup' && g) {
+          if (isPropGroup(g.ref)) this.spliceOp(spliceOp.connect(l.from, g.ref));
+          else this.flash(`${hier.label(g.ref)} is a group in the code: go into it and drop on one of its cards`, true);
+        } else if (l?.over && ev.type === 'pointerup') this.spliceOp(spliceOp.connect(l.from, l.over));
         else this.stage.redraw();
       };
       addEventListener('pointermove', move); addEventListener('pointerup', up); addEventListener('pointercancel', up);
       this.stage.redraw();
     }
     private startRename(id: string) {
-      if (!this.sp || !byId.has(id) || nodeMark(id) === 'removed') return;
+      if (!this.sp || !byId.has(id) || itemOf(id) || nodeMark(id) === 'removed') return;
       this.renaming = id;
       const b = this.$(`#${cssId(id)}`).bounds(), inp = this.spEl.rename;
       Object.assign(inp.style, { left: `${Math.round(b.x + 8)}px`, top: `${Math.round(b.y + (byId.get(id)!.kind === 'actor' ? b.h / 2 - 13 : 20))}px`, width: `${Math.round(Math.max(120, b.w - 16))}px` });
@@ -1556,7 +2067,7 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       const wp = this.st.wirePin ? wireByKey.get(this.st.wirePin) : null;
       if (wp && wireMark(wp.key) !== 'removed' && wireMark(wp.key) !== 'rerouted') { this.st.wirePin = null; this.spliceOp(spliceOp.disconnect(wp.from, wp.to)); return; }
       const id = this.st.cursor ?? this.st.open;
-      if (id && byId.has(id) && nodeMark(id) !== 'removed') { this.spliceOp(spliceOp.remove(id)); return; }
+      if (id && byId.has(id) && !itemOf(id) && nodeMark(id) !== 'removed') { this.spliceOp(spliceOp.remove(id)); return; }
       this.flash('select a card (click its name) or pin a wire (click it), then Delete', true);
     }
     // ---- a stack of splices (docs/ENGINE.md "Stack of splices"): compare many in a Stack view, edit one at a time here
@@ -1796,7 +2307,7 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       const l = await this.spliceList();
       if (pop.hidden) return;
       this.popEntries = l.entries;
-      const row = (e: SpliceEntry) => `<button type="button" class="sp-e" data-file="${esc(e.file)}"><span class="t">${esc(e.title || e.id)}</span><span class="lb${e.landed ? '' : ' none'}">${e.landed ? `${e.landed} of ${e.ops} landed` : 'not landed'}</span><span class="m">${e.ops} change${e.ops === 1 ? '' : 's'}${e.warnings ? ` · <span class="w">⚠ ${e.warnings} no longer appl${e.warnings === 1 ? 'ies' : 'y'}</span>` : ''}${e.updated ? ` · ${esc(e.updated.slice(0, 10))}` : ''}${e.error ? ` · <span class="w">${esc(e.error)}</span>` : ''}</span></button>`;
+      const row = (e: SpliceEntry) => `<button type="button" class="sp-e" data-file="${esc(e.file)}"><span class="t">${esc(e.title || e.id)}</span><span class="lb${e.landed ? '' : ' none'}">${e.landed ? `${e.landed} of ${e.ops} landed` : 'not landed'}</span><span class="m">${e.home ? `in ${esc(e.home)} · ` : ''}${e.ops} change${e.ops === 1 ? '' : 's'}${e.warnings ? ` · <span class="w">⚠ ${e.warnings} no longer appl${e.warnings === 1 ? 'ies' : 'y'}</span>` : ''}${e.updated ? ` · ${esc(e.updated.slice(0, 10))}` : ''}${e.error ? ` · <span class="w">${esc(e.error)}</span>` : ''}</span></button>`;
       this.savedCount = l.ok ? l.entries.length : this.savedCount;
       const n = l.entries.length;
       pop.innerHTML = `<div class="pl-label">saved splices · ${esc(SPLICE_DIR_REL ?? '')}</div>${l.ok ? l.entries.map(row).join('') || '<div class="sp-none">none yet: open a splice, propose changes, then Save</div>' : `<div class="sp-none">${esc(l.error ?? 'unavailable')}</div>`}<div class="sp-row2"><button type="button" class="plate-btn sp-new" data-new>New splice from this view</button><button type="button" class="plate-btn sp-new" data-stack${n ? '' : ' disabled'} title="${n ? `Compare ${n === 1 ? 'it' : `all ${n}`} with the real view in a Stack view (⇧S)` : 'Save a splice first'}">Stack ${n === 1 ? 'it' : `all ${n}`}</button></div>`;
@@ -1833,12 +2344,14 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       }
       const add = on && this.stage.inBench;
       if (E.add.hidden === add) E.add.hidden = !add;
+      if (E.gadd.hidden === (add && !!LV)) E.gadd.hidden = !(add && LV);
       if (!add && !E.pal.hidden) E.pal.hidden = true;
       if (!sp) return;
       const n = sp.splice.ops.length;
       set(E.title, this.spNamed ? sp.title : 'untitled');
       E.title.classList.toggle('is-untitled', !this.spNamed);
-      set(E.sub, `— proposals only · ${n} change${n === 1 ? '' : 's'}${sp.note ? ` · ${sp.note}` : ''} · ${sp.dirty ? 'not saved' : sp.file ? 'saved' : 'nothing to save yet'}`);
+      const where = this.whereWords();
+      set(E.sub, `— ${where ? `in ${where} · ` : ''}proposals only · ${n} change${n === 1 ? '' : 's'}${sp.note ? ` · ${sp.note}` : ''} · ${sp.dirty ? 'not saved' : sp.file ? 'saved' : 'nothing to save yet'}`);
       const ws = sp.result.warnings.length;
       if (E.warn.hidden === !!ws) E.warn.hidden = !ws;
       set(E.warn, ws ? `⚠ ${ws} change${ws === 1 ? '' : 's'} no longer appl${ws === 1 ? 'ies' : 'y'}` : '');
@@ -1885,7 +2398,7 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       }
       if (e.metaKey || e.ctrlKey) return false;
       if (this.sp && this.stage.inBench && (k === 'Delete' || k === 'Backspace')) { this.deleteSelected(); return true; }
-      if (this.sp && this.stage.inBench && k === 'n' && !e.altKey) { this.openPalette(); return true; }
+      if (this.sp && k === 'n' && !e.altKey) { this.openPalette(); return true; }
       // r in a splice: replace the selected (or open) card with a new node, named in the palette
       if (this.sp && this.stage.inBench && k === 'r' && !e.altKey) {
         const id = this.st.cursor ?? this.st.open;
@@ -1905,6 +2418,10 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       if (k === 'k' || k === 'ArrowUp' || k === 'ArrowLeft') { this.moveCursor(-1); return true; }
       if (k === 'Enter' || k === ' ') { if (this.st.cursor) this.open(this.st.cursor); else this.moveCursor(1); return true; }
       if (k === 'x') { if (this.st.cursor && this.stage.inBench) this.togglePick(this.st.cursor); return this.stage.inBench; }
+      // group navigation: g switches view; in the groups view l goes into the group at the cursor, h up a level
+      if (k === 'g' && !e.altKey && hier.available) { this.groupView(view === 'groups' ? 'cards' : 'groups'); return true; }
+      if (LV && k === 'l') { const c = this.st.cursor ? itemOf(this.st.cursor) : null; if (c) this.enterItem(c.id); return true; }
+      if (LV && k === 'h') { this.up(); return true; }
       if (k === 'l') { const id = this.st.cursor ?? this.st.open; if (id && !this.folded(id)) this.drillTo(gOf.get(id)!); return true; }
       if (k === 'h') { if (this.st.drill) this.drillTo(null); return true; }
       if (/^[1-9]$/.test(k)) { const en = this.entries()[+k - 1]; if (en) this.togglePin(en.id); return true; }
@@ -1928,9 +2445,17 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       out.push({ group: N, keys: ['j', '↓', '→'], does: cur ? 'next card' : 'step to the first card' });
       out.push({ group: N, keys: ['k', '↑', '←'], does: cur ? 'previous card' : 'step to the last card' });
       out.push({ group: N, keys: ['Enter', 'Space'], does: cur ? `open ${cur}` : 'step to the first card' });
-      const at = st.cursor ?? st.open, into = at && !this.folded(at) ? gOf.get(at)! : null;
-      out.push(into && into !== st.drill ? { group: N, keys: 'l', does: `drill into ${gName(into)}` } : { group: N, keys: 'l', does: 'drill into the card\'s group', off: true, when: 'with a card at the cursor' });
-      out.push(st.drill ? { group: N, keys: 'h', does: `step out of ${gName(st.drill)}` } : { group: N, keys: 'h', does: 'step out of the group', off: true, when: 'when drilled in' });
+      const curItem = st.cursor ? itemOf(st.cursor) : null;
+      if (curItem) out[2] = { group: N, keys: ['Enter', 'Space'], does: curItem.role === 'group' ? `go into ${hier.label(curItem.ref)}` : `go across to ${cur}` };
+      if (LV) {
+        out.push(curItem ? { group: N, keys: 'l', does: curItem.role === 'group' ? `go into ${hier.label(curItem.ref)}` : `go across to ${cur}` } : { group: N, keys: 'l', does: 'go into the group at the cursor', off: true, when: 'with a group card or stub at the cursor' });
+        out.push(at !== null ? { group: N, keys: 'h', does: `up to ${hier.parent(at) ? hier.label(hier.parent(at)!) : 'all groups'}` } : { group: N, keys: 'h', does: 'up a level', off: true, when: 'inside a group' });
+      } else {
+        const ca = st.cursor ?? st.open, into = ca && !this.folded(ca) ? gOf.get(ca)! : null;
+        out.push(into && into !== st.drill ? { group: N, keys: 'l', does: `drill into ${gName(into)}` } : { group: N, keys: 'l', does: 'drill into the card\'s group', off: true, when: 'with a card at the cursor' });
+        out.push(st.drill ? { group: N, keys: 'h', does: `step out of ${gName(st.drill)}` } : { group: N, keys: 'h', does: 'step out of the group', off: true, when: 'when drilled in' });
+      }
+      if (hier.available) out.push({ group: N, keys: 'g', does: view === 'groups' ? 'show every card' : 'show the groups (one card per group)' });
       const esc = this.escWords();
       if (esc) out.push({ group: N, keys: 'Esc', does: esc });
       out.push(st.open ? { group: C, keys: ['PgUp', 'PgDn'], does: `scroll ${label(st.open)}'s details` } : { group: C, keys: ['PgUp', 'PgDn'], does: 'scroll the details', off: true, when: 'with a card open' });
@@ -1942,7 +2467,7 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       if (SPLICE_DIR_REL !== null || sp || this.stk) out.push({ group: S, keys: '⇧S', does: this.stk ? 'back to the stack of splices' : 'stack the saved splices' });
       if (sp) {
         const v = sp.view();
-        out.push(bench ? { group: S, keys: 'n', does: '+ node: propose a new card' } : { group: S, keys: 'n', does: '+ node: propose a new card', off: true, when: 'in Bench' });
+        out.push({ group: S, keys: 'n', does: bench ? '+ node: propose a new card' : '+ node: propose a new card (opens Bench)' });
         const wp = st.wirePin ? wireByKey.get(st.wirePin) : null, live = wp && wireMark(wp.key) !== 'removed' && wireMark(wp.key) !== 'rerouted';
         const sel = st.cursor ?? st.open, card = sel && byId.has(sel) && nodeMark(sel) !== 'removed' ? sel : null;
         out.push(bench && (live || card) ? { group: S, keys: ['Delete', 'Backspace'], does: live ? `disconnect ${label(wp!.from)} → ${label(wp!.to)}` : `remove ${label(card!)}` } : { group: S, keys: ['Delete', 'Backspace'], does: 'remove the selected card or pinned wire', off: true, when: bench ? 'with a card selected' : 'in Bench, with a card selected' });
@@ -1957,12 +2482,13 @@ function boardClass(baseModel: Model, o: BoardOpts) {
     /** What Esc does now, in words (`back()`'s order), or null when it does nothing on the board. */
     private escWords(): string | null {
       if (this.linking) return 'cancel the new relationship';
-      if (this.placing) return 'cancel placing the new card';
-      if (this.sp && !this.spEl.pal.hidden) return 'close the + node form';
+      if (this.placing) return this.placing.group ? 'cancel placing the new group' : 'cancel placing the new card';
+      if (this.sp && !this.spEl.pal.hidden) return this.spEl.pal.classList.contains('is-group') ? 'close the + group form' : 'close the + node form';
       if (this.spAsk) return 'cancel the question';
       if (this.st.wirePin) return 'close the pinned wire card';
       if (this.st.open) return `close ${label(this.st.open)}`;
       if (this.st.pins.length) return 'clear the pinned legend entries';
+      if (LV && at !== null) return `up to ${hier.parent(at) ? hier.label(hier.parent(at)!) : 'all groups'}`;
       if (this.st.drill) return `step out of ${gName(this.st.drill)}`;
       if (this.st.picked.length) return 'drop the picked cards';
       if (this.stk && !this.host) return 'back to the stack of splices';
@@ -1978,6 +2504,7 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       if (this.st.wirePin) { this.st.wirePin = null; this.stage.redraw(); return true; }
       if (this.st.open) { this.close(); return true; }
       if (this.st.pins.length) { this.st.pins = []; this.go(); return true; }
+      if (LV && at !== null) { this.up(); return true; }
       if (this.st.drill) { this.drillTo(null); return true; }
       if (this.st.picked.length) { this.st.picked = []; this.stage.redraw(); return true; }
       // on a slice opened from a stack of splices: back to the stack
@@ -1993,7 +2520,8 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       if (this.note) return this.note;
       if (this.sp) {
         if (this.renaming) return `renaming ${label(this.renaming)} — type the new name · Enter proposes it · Esc cancels`;
-        if (this.linking) return `proposing ${label(this.linking.from)} → ${this.linking.over ? label(this.linking.over) : '…'} — let go on a card · Esc cancels`;
+        if (this.linking) return `proposing ${label(this.linking.from)} → ${this.linking.over ? label(this.linking.over) : '…'} — let go on a card${LV ? ' or a new group\'s card' : ''} · Esc cancels`;
+        if (this.placing?.group) return `placing the group “${this.placing.label}”: click empty space to put it here · a group card: inside it · a card: an outlet of that card · Esc cancels`;
         if (this.placing) return `placing “${this.placing.label}”: click a wire to put it between its cards · ⇧-click a card: before it · ⌥-click: after it · click a card: it calls the new one · click empty space: drop it · Esc cancels`;
         if (this.spAsk === 'name') return 'name this splice, then Enter saves it · Esc cancels';
       }
@@ -2007,12 +2535,13 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       if (this.st.open && this.openInDock()) return `open: ${label(this.st.open)} · in the inspector${this.dockLock ? ' (locked)' : ''} — scroll it, or PgUp/PgDn · the tabs switch section · Esc to close · i unpins${picked}`;
       if (this.stage.dock?.shown && this.dockLock && !this.st.open) return `inspector locked on ${label(this.dockLock.id)} — open other cards to compare · its lock button follows again · i unpins${picked}`;
       if (this.st.open && sec) return `open: ${label(this.st.open)} · ${this.sectionsOf(this.st.open).find((x) => x.id === sec)!.title} — scroll, or PgUp/PgDn · the tabs switch section · Esc to close${picked}`;
-      if (this.st.open) return `open: ${label(this.st.open)} — Esc to close · click another card to switch · PgUp/PgDn scroll it · l to drill into ${gName(gOf.get(this.st.open)!)}${picked}`;
+      if (this.st.open) return `open: ${label(this.st.open)} — Esc to close · click another card to switch · PgUp/PgDn scroll it${LV ? '' : ` · l to drill into ${gName(gOf.get(this.st.open)!)}`}${picked}`;
       if (this.st.pins.length) {
         const es = this.st.pins.map((p) => this.entry(p)!).filter(Boolean), n = pinnedMembers(this.entries(), this.st.pins)?.size ?? 0;
         return `pinned: ${es.map((x) => x.name).join(' + ')} (${n}) — click an entry again to unpin · Esc clears${picked}`;
       }
       if (this.st.drill) return `inside ${gName(this.st.drill)} — h or Esc to step out · click a card or a rail head to open it${picked}`;
+      if (LV && this.hover && itemOf(this.hover)) { const it = itemOf(this.hover)!; return it.role === 'group' ? `${hier.label(it.ref)} — click to go into it` : `${label(this.hover)} — ${it.side === 'in' ? 'calls in from outside' : 'called from inside'} · click to go across`; }
       if (c) return `picked ${c} — + tag makes a tag of ${c === 1 ? 'it' : 'them'} · ⌥/⇧-click to pick more · Esc drops them`;
       if (this.sp) {
         // honest about what the splice holds: its last change, in plain words
@@ -2021,6 +2550,9 @@ function boardClass(baseModel: Model, o: BoardOpts) {
           ? `${last} — proposals only · + node (n) adds · drag a card's ● onto another to connect · click a name, Delete removes it · double-click a name renames · ⌘Z / ⌘⇧Z`
           : `${last} — proposals only · b to edit in Bench · ⌘Z undo · ⌘⇧Z redo`;
       }
+      if (LV && !bench) return at === null
+        ? 'groups: click a group to go into it · hover a wire for what runs between them · hover the legend to light a set · g shows every card'
+        : `inside ${hier.path(at).join(' › ')} — h or Esc goes up · stubs at the edges go across · click a card to open · g shows every card`;
       return bench
         ? 'bench: drag cards, or a group by its frame, to arrange · ⌥/⇧-click to pick, then + tag · hover the legend to light a set, click to pin · b leaves'
         : 'click a card to open · hover the legend to light a set, click to pin · j/k step · l drill in · b to arrange';
@@ -2038,23 +2570,44 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       this.stage.dom.classList.toggle('wh-over', !!this.st.wire);
       this.stage.dom.classList.toggle('bd-moving', !!(this.drag || this.gdrag));
       for (const n of L.nodes) {
-        const card = this.stage.dom.querySelector<HTMLElement>(`#${cssId(n.id)}`)!, chip = this.stage.dom.querySelector<HTMLElement>(`#h-${cssId(n.id)}`)!;
+        const card = this.$(`#${cssId(n.id)}`).el, chip = this.$(`#h-${cssId(n.id)}`).el;
         const ex = String(this.st.open === n.id);
         if (card.getAttribute('aria-expanded') !== ex) { card.setAttribute('aria-expanded', ex); chip.setAttribute('aria-expanded', ex); }
         const f = this.folded(n.id);
         if (card.tabIndex !== (f ? -1 : 0)) card.tabIndex = f ? -1 : 0;
         if (chip.tabIndex !== (f ? 0 : -1)) chip.tabIndex = f ? 0 : -1;
       }
+      this.syncLevel();
       for (const b of this.stage.dom.querySelectorAll<HTMLButtonElement>('.bd-drill')) {
         const inside = this.st.drill === b.dataset.drill, g = gName(b.dataset.drill!);
         const tx = inside ? '⤡' : '⤢';
         if (b.textContent !== tx) { b.textContent = tx; b.setAttribute('aria-label', inside ? `Step out of ${g}` : `Drill into ${g}`); b.title = inside ? `Step out of ${g} (h)` : `Drill into ${g} (l)`; }
       }
     }
+    /** The breadcrumb ("All groups › App › Data"), the view toggle and the groups view's class (DOM written on change). */
+    private syncLevel() {
+      const dom = this.stage.dom;
+      if (dom.classList.contains('bd-groups') !== !!LV) dom.classList.toggle('bd-groups', !!LV);
+      const nav = dom.querySelector<HTMLElement>('.bd-crumbs');
+      if (nav) {
+        const sig = LV ? `${at ?? ''}` : '·cards';
+        if (nav.dataset.sig !== sig) {
+          nav.dataset.sig = sig;
+          nav.hidden = !LV;
+          if (LV) {
+            const chain = at === null ? [] : [...hier.chain(at)].reverse();
+            const crumb = (g: string | null, text: string, cur: boolean) => cur ? `<span aria-current="location">${esc(text)}</span>` : `<button type="button" data-level="${esc(g ?? '')}" title="Up to ${esc(text)} (h or Esc goes up one level)">${esc(text)}</button>`;
+            nav.innerHTML = [crumb(null, 'All groups', at === null), ...chain.map((g, i) => crumb(g, hier.label(g), i === chain.length - 1))].join('<span class="sep" aria-hidden="true">›</span>');
+          } else nav.innerHTML = '';
+        }
+      }
+      const vb = this.viewBtns;
+      if (vb) for (const [k, b] of Object.entries(vb)) { const on = String(view === k); if (b.getAttribute('aria-pressed') !== on) b.setAttribute('aria-pressed', on); }
+    }
     // ------------------------------------------------------------------ details: sections
     /** A card's details as named sections: the board's own (summary, calls, checks), then the scene's (`details`). */
     private sectionsOf(id: string): Sec[] {
-      const n = byId.get(id)!;
+      const n = realById.get(id)!;
       const ref = n.ref ? `${n.ref.file}${n.ref.line ? `:${n.ref.line}` : ''}` : '';
       const tag = (w: Wire) => {
         const glyph = `<i class="bd-glyph ${w.style === 'warn' ? 'warn' : w.style === 'dashed' ? 'dash' : w.style === 'idle' ? 'idle' : w.style === 'proposed' ? 'proposed' : ''}"></i>`;
@@ -2063,8 +2616,8 @@ function boardClass(baseModel: Model, o: BoardOpts) {
           undeclared: `<span class="bd-tag warn">seen${n}, not ${statics ? 'in the code' : 'declared'}</span>`,
           confirmed: `<span class="bd-tag">${w.decl ? 'declared' : 'in the code'} · seen${n}</span>`,
           entry: `<span class="bd-tag">entry · seen${n}</span>`,
-          unseen: '<span class="bd-tag">declared, not seen</span>',
-          extracted: '<span class="bd-tag">in the code, not seen</span>',
+          unseen: runs ? '<span class="bd-tag">declared, not seen</span>' : '<span class="bd-tag">declared</span>',
+          extracted: runs ? '<span class="bd-tag">in the code, not seen</span>' : '<span class="bd-tag">in the code</span>',
           unexercised: '<span class="bd-tag">not exercised</span>',
           possible: '<span class="bd-tag">possible, not declared</span>',
           proposed: '<span class="bd-tag">proposed</span>',
@@ -2074,7 +2627,7 @@ function boardClass(baseModel: Model, o: BoardOpts) {
         return [glyph, what + sp, kinds.length ? `<span class="bd-tag">${esc(kinds.join(', '))}</span>` : ''];
       };
       const row = (w: Wire, other: string) => { const [g, t, k] = tag(w); return `<div class="bd-edge" data-item="${esc(label(other))}">${g}<button type="button" class="bd-link" data-goto="${esc(other)}" title="Open ${esc(label(other))}">${esc(label(other))}</button>${t}${k}</div>`; };
-      const outs = wires.filter((w) => w.from === id), ins = wires.filter((w) => w.to === id);
+      const outs = realWires.filter((w) => w.from === id), ins = realWires.filter((w) => w.to === id);
       const cs = nodeChecks.get(id)!;
       // its category and every tag it carries, each a chip that pins it
       const mine = this.entries().filter((e) => e.id !== HIGHLIGHT && e.members.includes(id));
@@ -2115,7 +2668,7 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       return out;
     }
     sections(nodeId: string): SectionInfo[] {
-      if (!byId.has(nodeId)) return [];
+      if (!realById.has(nodeId)) return [];
       return this.sectionsOf(nodeId).map((x) => ({ id: x.id, title: x.title, count: x.count, noun: x.noun, keywords: [...x.keywords], items: itemsIn(x.html) }));
     }
     /** The plate's 📌: pins the inspector beside the window (shown only where the dock can show). */
@@ -2124,9 +2677,9 @@ function boardClass(baseModel: Model, o: BoardOpts) {
     }
     /** The ordinary panel: header, summary, then every section in a scrolling body. */
     private panelHTML(id: string) {
-      const n = byId.get(id)!, secs = this.sectionsOf(id);
+      const n = realById.get(id)!, secs = this.sectionsOf(id);
       const sum = secs.find((x) => x.id === 'summary')!;
-      const head = `<div class="bd-ph"><span class="pl-label">${esc(n.kind)} · ${esc(gName(gOf.get(id)!))}${n.lang ? ` · ${esc(n.lang)}` : ''}</span>${this.pinBtn()}<button type="button" class="bd-x" data-close aria-label="Close panel" title="Close (Esc)">×</button></div>
+      const head = `<div class="bd-ph"><span class="pl-label">${esc(n.kind)} · ${esc(gName(gOfAny(id)))}${n.lang ? ` · ${esc(n.lang)}` : ''}</span>${this.pinBtn()}<button type="button" class="bd-x" data-close aria-label="Close panel" title="Close (Esc)">×</button></div>
         <div class="bd-pt">${esc(label(id))}</div>`;
       const body = secs.map((x) => {
         if (x.id === 'summary') return `<section class="bd-sec" data-sec="summary">${x.compact}</section>`;
@@ -2140,11 +2693,11 @@ function boardClass(baseModel: Model, o: BoardOpts) {
     /** The section view: that section large, the others behind a tab row. In the pinned inspector (`docked`) the dock's
      *  header carries pin, lock and side, so there is no "card ⤡"; × closes the card it follows (not a locked one). */
     private sectionHTML(id: string, sec: string, docked = false) {
-      const n = byId.get(id)!, secs = this.sectionsOf(id), cur = secs.find((x) => x.id === sec) ?? secs[0]!;
+      const n = realById.get(id)!, secs = this.sectionsOf(id), cur = secs.find((x) => x.id === sec) ?? secs[0]!;
       const items = itemsIn(cur.html);
       const x = docked ? (this.dockLock ? '' : `<button type="button" class="bd-x" data-close aria-label="Close the card" title="Close the card (Esc); the inspector stays pinned">×</button>`)
         : `${this.pinBtn()}<button type="button" class="bd-x" data-close aria-label="Close panel" title="Close (Esc)">×</button>`;
-      return `<div class="bd-ph"><span class="pl-label">${esc(n.kind)} · ${esc(gName(gOf.get(id)!))}${n.lang ? ` · ${esc(n.lang)}` : ''} · ${esc(cur.title)}</span>${x}</div>
+      return `<div class="bd-ph"><span class="pl-label">${esc(n.kind)} · ${esc(gName(gOfAny(id)))}${n.lang ? ` · ${esc(n.lang)}` : ''} · ${esc(cur.title)}</span>${x}</div>
         <div class="bd-pt">${esc(label(id))}</div>
         <div class="bd-tabs" role="tablist" aria-label="Sections">${secs.map((x) => `<button type="button" class="bd-tab" role="tab" data-section="${esc(x.id)}" aria-selected="${x.id === cur.id}">${esc(x.title)}${x.count !== null ? `<span class="c">${x.count}</span>` : ''}</button>`).join('')}${docked ? '' : '<button type="button" class="bd-exp" data-unsection title="Back to the small card panel">card ⤡</button>'}</div>
         ${items.length > 1 ? `<div class="bd-jump" aria-label="Jump to">${items.map((it) => `<button type="button" data-jump="${esc(it)}">${esc(it)}</button>`).join('')}</div>` : ''}
@@ -2192,7 +2745,7 @@ function boardClass(baseModel: Model, o: BoardOpts) {
     private dockView(): { id: string; sec: string } | null {
       const d = this.stage.dock;
       if (!d?.shown) return null;
-      if (this.dockLock && byId.has(this.dockLock.id)) return this.dockLock;
+      if (this.dockLock && realById.has(this.dockLock.id)) return this.dockLock;
       const id = this.st.open;
       return id ? { id, sec: this.dockSectionFor(id, this.st.section ?? null) } : null;
     }
@@ -2326,7 +2879,9 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       return { open: id, label: label(id), sections: this.sectionsOf(id).map((x) => ({ id: x.id, title: x.title, count: x.count })), ...m };
     }
     openDetails(nodeId: string, section: string | null = null) {
-      if (!byId.has(nodeId)) return;
+      if (itemOf(nodeId) && isGroupItem(nodeId)) { this.enterItem(nodeId); return; }
+      if (!realById.has(nodeId)) return;
+      if (LV && LV.items.get(nodeId)?.role !== 'node') this.navTo('groups', hier.levelOf(nodeId));
       const sec = section && this.sectionsOf(nodeId).some((x) => x.id === section) ? section : null;
       if (this.folded(nodeId)) this.st.drill = null;
       if (sec && this.stage.dock?.shown && !this.dockLock) this.dockSec = sec;
@@ -2378,6 +2933,7 @@ function boardClass(baseModel: Model, o: BoardOpts) {
           else this.hostFade = null;
         }
       }
+      if (f.t >= f.duration) this.prevWires = [];
       this.syncChrome();
       const hv = this.hover ? new Set([this.hover, ...nbrs.get(this.hover)!]) : null;
       // a hovered legend entry lights its cards at once, over whatever is pinned
@@ -2416,12 +2972,15 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       for (const id of this.cardDom) {
         if (byId.has(id)) continue;
         const v = this.morph.value(`c:${id}`) as unknown as CardV | undefined;
-        this.$(`#${cssId(id)}`).set(v ? { x: v.x, y: v.y, sx: v.sx, sy: v.sy, opacity: v.o, hidden: v.o < 0.02 } : { opacity: 0, hidden: true });
+        // (squared: what leaves a level is gone well before it lands, so it never crowds the new scene)
+        this.$(`#${cssId(id)}`).set(v ? { x: v.x, y: v.y, sx: v.sx, sy: v.sy, opacity: LV || this.levelGone.has(id) ? v.o * v.o : v.o, hidden: v.o < 0.02 } : { opacity: 0, hidden: true });
         this.$(`#h-${cssId(id)}`).set({ opacity: 0, hidden: true });
       }
       for (const gid of this.groupDom) if (!members.has(gid)) this.$(`#g-${cssId(gid)}`).set({ opacity: 0, hidden: true });
       // group frames follow their members' current boxes
       for (const g of groups) {
+        // the overview's group cards have no frame around them
+        if (LV?.bare.has(g.id)) { this.$(`#g-${cssId(g.id)}`).set({ opacity: 0, hidden: true }); continue; }
         const rs = members.get(g.id)!.map((id) => rects.get(id)!);
         const x0 = Math.min(...rs.map((r) => r.x)) - 14, y0 = Math.min(...rs.map((r) => r.y)) - 22;
         const x1 = Math.max(...rs.map((r) => r.x + r.w)) + 14, y1 = Math.max(...rs.map((r) => r.y + r.h)) + 14;
@@ -2451,9 +3010,9 @@ function boardClass(baseModel: Model, o: BoardOpts) {
         // panel stays beside its (zoomed) card, at its fit size, inside the visible part and clear of the chrome
         const view = this.stage.view, pw = this.el.panel.offsetWidth;
         if (sec) this.el.panel.dataset.plChrome = ''; else delete this.el.panel.dataset.plChrome;
-        if (!sec && view.zoomed) {
+        if (!sec && view.scaled) {
           const o = view.overlay({ x: r.x, y: r.y }, pw, ph, [r], (_at, w, h, W, H, av) => {
-            const c = av[0]!, k = 1 / view.zoom, g = PANEL_GAP * k, m = 8 * k;
+            const c = av[0]!, k = view.cardScale, g = PANEL_GAP * k, m = 8 * k;
             let x: number, y: number;
             if (c.x + c.w + g + w <= W - m) { x = c.x + c.w + g; y = c.y - m; dx = -1; }
             else if (c.x - g - w >= m) { x = c.x - g - w; y = c.y - m; dx = 1; }
@@ -2499,6 +3058,7 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       const lit = litMembers(this.entries(), this.st.pins, this.st.hover ?? null);
       const touches = (w: Wire, id: string | null | undefined) => !!id && (w.from === id || w.to === id);
       const lanes = new Map<string, number>();   // one bracket lane per caller, so a fan-out shares a trunk
+      const drawnWn = new Set<string>();
       const sw = this.shownWire();
       this.wirePaths.clear();
       let top: (() => void) | null = null;
@@ -2506,6 +3066,26 @@ function boardClass(baseModel: Model, o: BoardOpts) {
       const boxes = new Map<string, Rect>();
       for (const n of L.nodes) if (this.drag?.id === n.id || this.morph.value(`c:${n.id}`)!.o! >= 0.5) boxes.set(n.id, this.$(`#${cssId(n.id)}`).bounds());
       const others = (a: string, b: string) => [...boxes].filter(([id]) => id !== a && id !== b).map(([, r]) => r);
+      // routes are reused while everything they were routed from is unchanged: free routing reads every card's box, so
+      // those are one signature (exact: a number's string is that number), and the generation changes when it does
+      let sig = '';
+      for (const [id, r] of boxes) sig += `${id}:${rectKey(r)};`;
+      if (sig !== this.obstacleSig) { this.obstacleSig = sig; this.obstacleGen++; }
+      // how low a wire may run: above the legend as drawn (the chrome floor draws it k times deeper from the bottom)
+      const floor = Math.round(this.H - (LEG_H - 4) * this.stage.chrome.k - 20);
+      const memo = this.routeMemo, routes = new Map<string, { k: string; p: Path }>();
+      const routed = (key: string, k: string, make: () => Path) => {
+        const m = memo.get(key);
+        const r = m && m.k === k ? m : { k, p: make() };
+        routes.set(key, r);
+        return r.p;
+      };
+      // a count badge keeps clear of every card, every group's label and the badges placed before it (badgeAt)
+      const avoid: Rect[] = [...boxes.values()], placedWn: Rect[] = [];
+      if (LV) for (const g of groups) {
+        const fr = this.$(`#g-${cssId(g.id)}`), gl = fr.hidden || LV?.bare.has(g.id) ? null : fr.el.querySelector<HTMLElement>('.bd-gl');
+        if (gl) avoid.push({ x: fr.x + gl.offsetLeft, y: fr.y + gl.offsetTop, w: gl.offsetWidth, h: gl.offsetHeight });
+      }
       // a splice's legend entry lights exactly its wires (proposed; removed and rerouted), hovered or pinned
       const spHover = this.st.hover && ENTRY_MARKS[this.st.hover] ? ENTRY_MARKS[this.st.hover]! : null;
       const spPinned = this.st.pins.flatMap((p) => ENTRY_MARKS[p] ?? []);
@@ -2514,18 +3094,22 @@ function boardClass(baseModel: Model, o: BoardOpts) {
         const A = this.$(`#${cssId(w.from)}`), B = this.$(`#${cssId(w.to)}`);
         const ca = this.$(`#h-${cssId(w.from)}`), cb = this.$(`#h-${cssId(w.to)}`);
         const va = this.morph.value(`c:${w.from}`)!, vb = this.morph.value(`c:${w.to}`)!;
-        const fa = this.drag?.id !== w.from && va.o! < 0.5, fb = this.drag?.id !== w.to && vb.o! < 0.5;
-        const ra = A.bounds(), rb = B.bounds();
-        let p;
-        if (fa && fb) p = railRoute(ra, rb, lanes.get(w.from) ?? lanes.set(w.from, lanes.size).get(w.from)!);
+        // a card folded into the rail (the cards view's drill); the groups view has no rail
+        const fa = !LV && this.drag?.id !== w.from && va.o! < 0.5, fb = !LV && this.drag?.id !== w.to && vb.o! < 0.5;
+        const ra = A.bounds(), rb = B.bounds(), ends = `${rectKey(ra)}|${rectKey(rb)}`;
+        // free routing: around every other card on the board (the generation stands for their boxes)
+        const free = () => routed(w.key, `f|${this.obstacleGen}|${w.from}|${w.to}|${ends}|${floor}`, () => boardRoute(ra, rb, undefined, others(w.from, w.to), floor));
+        let p: Path;
+        if (fa && fb) { const lane = lanes.get(w.from) ?? lanes.set(w.from, lanes.size).get(w.from)!; p = routed(w.key, `r|${lane}|${ends}`, () => railRoute(ra, rb, lane)); }
         else if (!this.drag || (this.drag.id !== w.from && this.drag.id !== w.to)) {
           // both cards keep their auto-layout arrangement relative to each other (moved by the same offset): the map's router
           const sa = slot(w.from), sb = slot(w.to);
           const same = Math.abs(A.x - sa.x - (B.x - sb.x)) < 0.5 && Math.abs(A.y - sa.y - (B.y - sb.y)) < 0.5 && A.sx === 1 && B.sx === 1 && A.sy === 1 && B.sy === 1;
           // the caller's column edge moves with it (a wider kit card in the column: the turn stays in the gutter)
           const right = sa.right !== undefined ? A.x + sa.right - sa.x : undefined;
-          p = same ? boardRoute(ra, rb, { a: { x: A.x, y: A.y, layer: sa.layer, right }, b: { x: B.x, y: B.y, layer: sb.layer } }) : boardRoute(ra, rb, undefined, others(w.from, w.to));
-        } else p = boardRoute(ra, rb, undefined, others(w.from, w.to));
+          const grid = { a: { x: A.x, y: A.y, layer: sa.layer, right }, b: { x: B.x, y: B.y, layer: sb.layer } };
+          p = same ? routed(w.key, `g|${grid.a.x},${grid.a.y},${grid.a.layer},${grid.a.right}|${grid.b.x},${grid.b.y},${grid.b.layer}|${ends}|${floor}|${sb.layer <= sa.layer ? this.obstacleGen : ''}`, () => boardRoute(ra, rb, grid, sb.layer <= sa.layer ? others(w.from, w.to) : undefined, floor)) : free();
+        } else p = free();
         this.wirePaths.set(w.key, p);
         const mk = wireMark(w.key), ghost = mk === 'removed' || mk === 'rerouted', proposed = mk === 'proposed' || w.style === 'proposed';
         const lit2 = markLit(mk) || (!spHover && !!lit && lit.has(w.from) && lit.has(w.to));
@@ -2563,8 +3147,33 @@ function boardClass(baseModel: Model, o: BoardOpts) {
         };
         // the hovered wire is drawn last, on top of the others
         if (shown) top = paint; else paint();
+        // a wire that stands for several relationships (the groups view) says how many
+        const wn = this.wnEl.get(w.key);
+        if (wn) {
+          // (one relationship under it, between a card and a group, needs no count)
+          const n0 = LV?.under.get(w.key)?.length ?? 0, n = n0 > 1 ? n0 : 0, t = String(n);
+          const b = n ? badgeAt(p, t.length, avoid, placedWn, this.W, this.H) : { x: 0, y: 0, w: 0, h: 0 };
+          if (n) placedWn.push(b);
+          if (wn.textContent !== t) wn.textContent = t;
+          wn.classList.toggle('is-on', on);
+          wn.style.transform = `translate(${b.x.toFixed(1)}px, ${b.y.toFixed(1)}px)`;
+          wn.style.opacity = (n ? Math.min(1, alpha * 1.6) : 0).toFixed(3);
+          wn.style.visibility = n && alpha > 0.03 ? '' : 'hidden';
+          drawnWn.add(w.key);
+        }
       }
       top?.();
+      this.routeMemo = routes;
+      for (const [k, e] of this.wnEl) if (!drawnWn.has(k) && e.style.visibility !== 'hidden') e.style.visibility = 'hidden';
+      // the last level's wires fade with their cards while the change of level runs
+      for (const w of this.prevWires) {
+        const ea = this.cardEl(w.from), eb = this.cardEl(w.to);
+        if (!ea || !eb) continue;
+        const A = this.$(ea), B = this.$(eb), a = Math.min(A.hidden ? 0 : A.opacity, B.hidden ? 0 : B.opacity) * 0.6;
+        if (a < 0.02) continue;
+        const p = boardRoute(A.bounds(), B.bounds(), undefined, []);
+        Ln.path(p, { color: w.style === 'warn' ? 'accent2' : 'line', width: 1.4, alpha: a });
+      }
       // dragging from a card's handle: the relationship it would propose, to the pointer (or the card under it)
       if (this.linking) {
         const A = this.$(`#${cssId(this.linking.from)}`), pa = A.at('right', 0.5, 3);

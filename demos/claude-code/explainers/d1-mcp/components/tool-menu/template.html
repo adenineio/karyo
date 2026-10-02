@@ -1,0 +1,12 @@
+<div class="pl-card box">
+  {{#if title}}<div class="pl-label head">{{title}}</div>{{/if}}
+  <ul class="tools">
+    {{#each tools}}<li class="tool st-{{state}}{{#if open}} is-open{{/if}}">
+      {{#if open}}<div class="part"><span class="lbl">name</span><span class="nm">{{name}}</span></div>
+      <div class="part"><span class="lbl">description</span><span class="ds">{{description}}</span></div>
+      {{#if fields}}<div class="part"><span class="lbl">input form</span><span class="form">{{#each fields}}<span class="fld"><span class="fn">{{name}}{{#if required}}<i class="req">*</i>{{/if}}</span>{{#if kind}}<span class="fk">{{kind}}</span>{{/if}}<span class="fv{{#unless value}} empty{{/unless}}">{{value}}</span></span>{{/each}}</span></div>{{/if}}
+      {{else}}<span class="nm">{{name}}</span><span class="ds">{{description}}</span>{{/if}}
+    </li>
+    {{/each}}
+  </ul>
+</div>

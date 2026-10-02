@@ -11,7 +11,8 @@ export interface PlateOutline {
   title: string;
   /** Everything on the plate that can be named (model nodes, explainer elements). */
   nodes: { id: string; label: string; group: string | null; category: string | null; tags: string[]; /** In a splice: proposed, removed, renamed or moved. */ mark?: string }[];
-  groups: { id: string; label: string }[];
+  /** `mark`: proposed (a group a splice proposes). */
+  groups: { id: string; label: string; mark?: string }[];
   /** The legend as it stands now: categories, tags, derived entries (each with its member count). */
   tags: { id: string; label: string; count: number }[];
   /** Step titles in order (requests on a trace board, slices on a Stack view); empty when the plate has none. */

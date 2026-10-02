@@ -12,6 +12,7 @@
 // with many, on the focused plate (or the one in the theater).
 import type { Stage } from './stage';
 import { ZOOM_MAX } from './viewport';
+import { uiSize, UI_SIZES } from './uisize';
 
 /** One line of the card: a key (or alternatives that do the same) and what it does. */
 export interface KeyHelp {
@@ -32,7 +33,7 @@ export interface KeyHelp {
   id?: string;
 }
 /** What a scene's `keys()` may return: its lines, and engine lines to leave out right now (by id: 'bench', 'theater',
- *  'theater-esc', 'inspector', 'zoom-in', 'zoom-out', 'fit', 'zoom-pointer', 'pan', 'transport'). */
+ *  'theater-esc', 'inspector', 'zoom-in', 'zoom-out', 'fit', 'zoom-pointer', 'pan', 'ui-size', 'transport'). */
 export type KeyHelpList = KeyHelp[] | { keys: KeyHelp[]; without?: string[] };
 /** A host page's own keys (Jarvis): a group of lines, and keys it takes for itself (drawn nowhere else). */
 export interface PageKeys { keys: () => KeyHelp[]; omit?: string[] }
@@ -285,6 +286,11 @@ function engineKeys(s: Stage): KeyHelp[] {
   const d = s.dock;
   if (d) out.push({ id: 'inspector', group: V, keys: 'i', does: d.pinned ? 'unpin the inspector' : 'pin the inspector beside the plate', ...(d.available ? {} : { off: true, when: 'in the theater' }) });
   out.push(...zoomKeys(s.view));
+  // the interface size (docs/ENGINE.md "Chrome floor"): how large chrome is drawn, page-wide
+  if (s.view.enabled) {
+    const u = uiSize(), i = UI_SIZES.indexOf(u);
+    out.push({ id: 'ui-size', group: V, keys: ['[', ']'], does: `smaller / larger interface (now ${u.label.toLowerCase()}${i === 0 ? ', the smallest' : i === UI_SIZES.length - 1 ? ', the largest' : ''})` });
+  }
   out.push({ id: 'help', group: V, keys: '?', does: 'show or hide these keys' });
   return out;
 }

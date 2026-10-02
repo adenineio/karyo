@@ -1,0 +1,16 @@
+.box { box-sizing: border-box; height: 100%; display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.bar { flex: none; display: flex; align-items: center; gap: 9px; padding: 9px 14px; border-bottom: 1px solid var(--pl-card-border); }
+.ic { flex: none; width: 10px; height: 13px; border: 1.5px solid var(--pl-muted); border-radius: 1.5px; }
+.ttl { flex: 1; min-width: 0; font: 600 13.5px/1.2 var(--pl-font-mono); color: var(--pl-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note { flex: none; font: 600 12px/1.2 var(--pl-font); color: var(--pl-accent-2); }
+.lines { list-style: none; margin: 0; padding: 10px 12px 12px 6px; display: grid; gap: 1px; }
+.ln { display: flex; gap: 12px; padding: 2px 8px 2px 0; border-radius: 4px; font: 14.5px/1.5 var(--pl-font-mono); }
+.n { flex: none; width: 2ch; text-align: right; color: color-mix(in srgb, var(--pl-muted) 70%, transparent); user-select: none; }
+.tx { flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--pl-fg); }
+mark { color: inherit; background: none; border-radius: 3px; padding: 0 1px; margin: 0 -1px; }
+.m-hit { background: color-mix(in srgb, var(--pl-accent-2) 34%, transparent); color: var(--pl-fg); font-weight: 700; }
+.m-miss { text-decoration: underline wavy color-mix(in srgb, var(--pl-muted) 80%, transparent); text-underline-offset: 4px; }
+.st-lit { background: color-mix(in srgb, var(--pl-accent-2) 9%, transparent); }
+.st-lit .n { color: var(--pl-accent-2); font-weight: 700; }
+.st-dim .tx, .st-dim .n { opacity: 0.38; }
+:host(.is-lit) .box { border-color: var(--pl-accent); }

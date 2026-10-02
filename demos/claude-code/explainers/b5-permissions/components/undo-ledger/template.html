@@ -1,0 +1,7 @@
+<div class="pl-card box">
+  <div class="hd"><span class="pl-label">{{title}}</span><span class="pl-label">{{head}}</span></div>
+  <ul class="rows">
+    {{#each rows}}<li class="r u-{{undo}}{{#if mark}} is-mark{{/if}}"><div class="what"><div class="tx">{{{what}}}</div>{{#if via}}<div class="via">{{via}}</div>{{/if}}</div><div class="verdict"><span class="v">{{undo}}</span>{{#if why}}<span class="why">{{why}}</span>{{/if}}</div></li>
+    {{/each}}
+  </ul>
+</div>

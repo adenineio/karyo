@@ -1,0 +1,23 @@
+{
+  "name": "try-it",
+  "description": "The hands-on card that ends an explainer: one thing to type in your own Terminal, or one thing to ask Claude Code, with a line on what to expect.",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": ["title"],
+    "additionalProperties": false,
+    "properties": {
+      "title": { "type": "string", "minLength": 1 },
+      "command": { "type": "string", "description": "a command to type in Terminal (shown in mono, after a prompt)" },
+      "ask": { "type": "string", "description": "something to say to Claude Code (shown as a quote)" },
+      "expect": { "type": "string", "description": "markdown-lite: what you should see" }
+    }
+  },
+  "size": { "w": 440 },
+  "motion": ["appear", "emphasize"],
+  "example": {
+    "title": "See where you are",
+    "command": "pwd",
+    "expect": "It prints the folder you're in, such as `/Users/sam` (your home folder)."
+  }
+}

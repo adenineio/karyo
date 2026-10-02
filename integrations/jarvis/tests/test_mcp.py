@@ -9,12 +9,12 @@ from jarvis.view_mcp import build
 
 pytestmark = pytest.mark.anyio
 
-SPLICE_TOOLS = {"splice_open", "splice_add", "splice_connect", "splice_disconnect", "splice_remove", "splice_replace", "splice_rename", "splice_move",
+SPLICE_TOOLS = {"splice_open", "splice_add", "splice_group", "splice_connect", "splice_disconnect", "splice_remove", "splice_replace", "splice_rename", "splice_move",
                 "splice_undo", "splice_redo", "splice_save", "splice_discard", "splice_leave", "splice_list",
                 "splice_stack", "splice_stack_open", "splice_stack_return", "splice_stack_leave", "splice_stack_conflict",
                 "splice_stack_swap", "splice_stack_same"}
 ACTION_TOOLS = {"focus", "open", "close", "drill", "back", "highlight", "clear", "show_details", "scroll", "step", "select",
-                "theater", "fan", "bench", "pin_inspector", "zoom", "pan"} | SPLICE_TOOLS
+                "theater", "fan", "bench", "pin_inspector", "zoom", "pan", "groups"} | SPLICE_TOOLS
 
 
 class FakeServer:
@@ -168,6 +168,23 @@ async def test_splice_actions_reach_the_page(client, fake):
         ("splice_move", {"node": "Audit log", "group": "pipeline"}), ("splice_undo", {}), ("splice_redo", {}),
         ("splice_save", {"name": "caching"}), ("splice_list", {}), ("splice_leave", {}), ("splice_leave", {"force": True}),
         ("splice_discard", {}),
+    ]
+
+
+async def test_group_splice_actions_reach_the_page(client, fake):
+    await call(client, "splice_open", new=True, group="Orders")
+    await call(client, "splice_group", label="Notifications", outlet_of="Orders API")
+    await call(client, "splice_group", label="Email", parent="Notifications", first="SMTP relay", show=False)
+    await call(client, "splice_add", label="Mailer", group="Notifications")
+    await call(client, "splice_rename", group="Notifications", label="Alerts")
+    await call(client, "splice_remove", group="Alerts")
+    assert fake.actions == [
+        ("splice_open", {"new": True, "group": "Orders"}),
+        ("splice_group", {"label": "Notifications", "outlet_of": "Orders API"}),
+        ("splice_group", {"label": "Email", "parent": "Notifications", "first": "SMTP relay", "show": False}),
+        ("splice_add", {"label": "Mailer", "group": "Notifications"}),
+        ("splice_rename", {"group": "Notifications", "label": "Alerts"}),
+        ("splice_remove", {"group": "Alerts"}),
     ]
 
 

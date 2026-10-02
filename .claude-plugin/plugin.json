@@ -1,8 +1,8 @@
 {
   "name": "karyo",
   "displayName": "Karyo",
-  "version": "0.2.1",
-  "description": "Visual docs where the code describes itself: a local web view of your project's Karyo model and explainers (Bench, theater, Splice), the karyo CLI, the karyo-explain and docket skills, the Karyo MCP server, and Jarvis voice mode.",
+  "version": "0.3.0",
+  "description": "Visual docs where the code describes itself: a local web view of your project's Karyo model and explainers (Bench, theater, Splice), the karyo CLI, the karyo-explain and docket skills, a built-in demo (/karyo:demo), the Karyo MCP server, and Jarvis voice mode.",
   "author": {
     "name": "adenineio",
     "url": "https://github.com/adenineio"

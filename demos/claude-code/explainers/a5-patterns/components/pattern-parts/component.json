@@ -1,0 +1,39 @@
+{
+  "name": "pattern-parts",
+  "description": "A pattern or a short command taken apart: each piece in large mono type with a coloured underline and a short label saying what it means, plus an optional plain-English reading underneath.",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": ["parts"],
+    "additionalProperties": false,
+    "properties": {
+      "title": { "type": "string", "description": "small label above, e.g. `A wildcard`" },
+      "parts": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 8,
+        "items": {
+          "type": "object",
+          "required": ["text"],
+          "additionalProperties": false,
+          "properties": {
+            "text": { "type": "string", "minLength": 1, "description": "the piece as typed (spaces kept)" },
+            "label": { "type": "string", "description": "what it means, a few words" },
+            "tone": { "enum": ["wild", "exact", "how", "plain"], "default": "plain", "description": "wild: a piece that stands for other text; exact: literal text; how: an instruction (a command letter, an option); plain: punctuation with no label" }
+          }
+        }
+      },
+      "gloss": { "type": "string", "description": "markdown-lite: the whole thing read as plain English" }
+    }
+  },
+  "size": { "w": 560 },
+  "motion": ["appear", "emphasize"],
+  "example": {
+    "title": "A wildcard",
+    "parts": [
+      { "text": "*", "label": "any characters", "tone": "wild" },
+      { "text": ".csv", "label": "then exactly .csv", "tone": "exact" }
+    ],
+    "gloss": "Every name that ends in **.csv**."
+  }
+}

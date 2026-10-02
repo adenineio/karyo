@@ -15,7 +15,7 @@ allowed-tools:
 `karyo` below is the plugin's CLI, run by its full path: `"${CLAUDE_PLUGIN_ROOT}/cli/karyo"` (it isn't on PATH).
 
 1. Run `karyo view $ARGUMENTS` (no argument: the git repo you're in, else the working directory). It starts the
-   view server for that project on a free port in 5781–5799, or reuses the one already running, and prints the
+   view server for that project on a free port in 5782–5799, or reuses the one already running, and prints the
    URL plus what it found: model files (`*.model.json`) and explainers (`*.explainer.json`).
 2. Give the user the URL (`http://localhost:<port>/project.html`) in one line, and say what it shows. Add `--open`
    only if they asked you to open the browser.

@@ -16,7 +16,7 @@ const REST_T = 60; // seconds; the engine clamps to the transition's end, so thi
 // ---------------------------------------------------------------- args
 
 type Args = { _: string[]; flags: Record<string, string | true> };
-const BOOL = new Set(['json', 'global', 'force', 'help', 'h', 'no-validate', 'quiet', 'all', 'open', 'jarvis', 'no-whisper', 'no-brain', 'yes', 'y']);
+const BOOL = new Set(['json', 'global', 'force', 'help', 'h', 'no-validate', 'quiet', 'all', 'open', 'jarvis', 'no-whisper', 'no-brain', 'yes', 'y', 'no-open']);
 function parseArgs(argv: string[]): Args {
   const a: Args = { _: [], flags: {} };
   for (let i = 0; i < argv.length; i++) {
@@ -228,7 +228,7 @@ usage: karyo <command> [args] [--json]
   build <spec> [-o file.html]     one self-contained HTML file (default: next to the spec)
   open <spec> [-o file.html]      build, then open it in the browser
   view [dir] [--port N] [--open]  the project's web view: its models (structure boards, Bench, Splice, flows) and
-                                  explainers, served locally on a free port (5781–5799); prints the URL.
+                                  explainers, served locally on a free port (5782–5799); prints the URL.
                                   [dir] defaults to the git repo you're in (else the working dir)
   jarvis [dir] [--port N] [--spec <spec>] [--no-whisper] [--no-brain]
                                   Jarvis mode (voice, local only): the view plus the Whisper + claude -p server;
@@ -238,21 +238,29 @@ usage: karyo <command> [args] [--json]
   status                          the running view/jarvis servers
   model scan [<package-dir>…] [-o karyo.model.json] [--name N]
                                   read the project's Python '# karyo:' directives (sdk/python) into .karyo/ and
-                                  build karyo.model.json (no package given: every package holding a directive)
+                                  build karyo.model.json (no package given: every package holding a directive);
+                                  karyo/config.json's mode when the project has one
   model build [-o karyo.model.json] [--name N]
                                   merge the fragments in .karyo/ (from scans and recorded runs) into the model
-  init [dir] [--hook stop|edit|git|none] [--ci | --no-ci] [--dry-run] [--yes] [--remove [--purge]]
+  init [dir] [--hook stop|edit|git|none] [--ci | --no-ci] [--mode auto|directives] [--dry-run] [--yes] [--remove [--purge]]
                                   set a project up for Karyo (docs/ADOPT.md): shows what it will change, asks, then
-                                  writes the launcher (karyo/karyo.sh), .gitignore entries, karyo-* recipes in an
-                                  existing justfile/Makefile, and the refresh hook / CI workflow you pick; idempotent.
+                                  writes the launcher (karyo/karyo.sh), the settings (karyo/config.json: mode auto,
+                                  every class and function with directives refining theirs, or directives only),
+                                  .gitignore entries, karyo-* recipes in an existing justfile/Makefile, and the
+                                  refresh hook / CI workflow you pick; idempotent.
                                   --remove takes out everything it wrote (--purge: your karyo/ files too)
   refresh [dir] [--if-stale] [--check] [--outline] [--hook]
-                                  re-scan the code (automatic mode where there are no directives) and rebuild
+                                  re-scan the code (in karyo/config.json's mode: automatic, directives on top) and rebuild
                                   karyo.model.json with karyo/curation.json; reports curation-unresolved entries and
                                   drift. --check exits 1 on unresolved entries; --hook: quiet, debounced, never fails
   record [dir] [--keep] [-- <command …>]
                                   run the tests (default: the detected test command) once under the sys.monitoring
                                   recorder, then rebuild: the board shows real calls and what was not exercised
+  demo [name] [--no-open] [--out DIR] [--force]
+                                  a demo series that ships with Karyo (demos/<name>/): no name lists them; with one,
+                                  builds every page to self-contained HTML (cached in the plugin's data dir, rebuilt
+                                  only when Karyo's version or the demo changes; --out: build into DIR instead) and
+                                  opens its index.html in the browser (--no-open: just print the path)
   setup [--jarvis]                check bun, uv, python3 and Chrome; install the JS dependencies and the MCP
                                   server's Python env (with --jarvis, Jarvis's too) into the plugin's data dir
   docket <command> …              the project's docket: decisions, reviews and come-back-tos that need you
@@ -660,6 +668,66 @@ async function cmdSetup() {
   });
 }
 
+// ---------------------------------------------------------------- demos (src/explainer/demo.ts): demos/<name>/demo.json
+
+const DEMOS = path.join(ROOT, 'demos');
+
+function karyoVersion(): string {
+  try { return String(JSON.parse(readFileSync(path.join(ROOT, '.claude-plugin/plugin.json'), 'utf8')).version ?? 'dev'); } catch { return 'dev'; }
+}
+
+/** Open a file in the default browser, without waiting for it. */
+function openInBrowser(file: string) {
+  const cmd = process.platform === 'darwin' ? ['open', file] : process.platform === 'win32' ? ['cmd', '/c', 'start', '""', file] : ['xdg-open', file];
+  try { Bun.spawn(cmd, { stdout: 'ignore', stderr: 'ignore' }).unref(); return true; } catch { return false; }
+}
+
+async function cmdDemo(): Promise<number> {
+  const { listDemos, readDemo, buildDemo, DemoError } = await core('demo.ts');
+  const name = args._[1];
+  const all = listDemos(DEMOS);
+  if (!name) {
+    if (JSON_OUT) { emit({ demos: all }); return 0; }
+    if (!all.length) { say('no demos in this Karyo install'); return 0; }
+    const w = Math.max(...all.map((d: any) => d.name.length));
+    for (const d of all) say(`${d.name.padEnd(w)}  ${d.problem ? `broken: ${d.problem}` : `${d.title} (${d.pages} pages)${d.description ? `: ${d.description}` : ''}`}`);
+    say(`
+open one with: karyo demo <name>`);
+    return 0;
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(name) || !existsSync(path.join(DEMOS, name, 'demo.json')))
+    throw new UserError(`no demo "${name}"${all.length ? ` (have: ${all.map((d: any) => d.name).join(', ')})` : ''}`);
+  return withRuntime(async (r) => {
+    try {
+      const demo = readDemo(path.join(DEMOS, name));
+      r.ensureDeps(say);   // vite and three, for the explainer runtime (a fresh install's first run)
+      const data = r.dataDir().dir;
+      const tty = !JSON_OUT && process.stdout.isTTY;
+      const res = await buildDemo(demo, {
+        version: karyoVersion(), cacheRoot: path.join(data, 'demos'), runtimeDir: path.join(data, 'explainer-runtime'),
+        out: str('out'), force: args.flags.force === true,
+        onProgress: (done: number, total: number) => {
+          if (JSON_OUT) return;
+          if (done === 0) { if (tty) process.stdout.write(`building ${total} pages… `); else say(`building ${total} pages…`); }
+          else if (tty) process.stdout.write(`\rbuilding ${total} pages… ${done}/${total} `);
+        },
+      });
+      const open = args.flags['no-open'] !== true;
+      const opened = open ? openInBrowser(res.index) : false;
+      if (JSON_OUT) { emit({ demo: name, title: demo.manifest.title, index: res.index, dir: res.dir, key: res.key, built: res.built, seconds: +(res.ms / 1000).toFixed(2), pages: res.pages, warnings: res.warnings, opened }); return 0; }
+      if (res.built) { if (tty) process.stdout.write(`\rbuilding ${res.pages.length} pages… done in ${(res.ms / 1000).toFixed(1)} s\n`); else say(`done in ${(res.ms / 1000).toFixed(1)} s`); }
+      else say(`${res.pages.length} pages, already built for this version (cached)`);
+      if (res.warnings.length) say(`${res.warnings.length} warning(s); --json lists them`);
+      say(`${demo.manifest.title}: ${res.index}`);
+      if (open) say(opened ? 'opened it in your browser' : `couldn't start the browser; open the file above`);
+      return 0;
+    } catch (e) {
+      if (e instanceof DemoError || e instanceof UserError || e instanceof r.RuntimeError) throw new UserError((e as Error).message);
+      throw new UserError(`demo "${name}" didn't build: ${(e as Error).message}`);
+    }
+  });
+}
+
 // ---------------------------------------------------------------- adoption (src/cli/adopt.ts, docs/ADOPT.md): init, refresh, record
 
 async function cmdAdopt(cmd: string): Promise<number> {
@@ -844,6 +912,7 @@ async function main(): Promise<number> {
     case 'status': await cmdStatus(); return 0;
     case 'model': await cmdModel(); return 0;
     case 'setup': return cmdSetup();
+    case 'demo': case 'demos': return cmdDemo();
     case 'init': case 'refresh': case 'record': return cmdAdopt(cmd);
     default: throw new UserError(`unknown command "${cmd}" (karyo --help lists them)`);
   }

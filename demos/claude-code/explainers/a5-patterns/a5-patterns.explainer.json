@@ -1,0 +1,1349 @@
+{
+  "karyo": "explainer/1",
+  "id": "a5-patterns",
+  "title": "Patterns: wildcards, regular expressions, sed and awk",
+  "summary": "Describe the shape instead of the exact text: `*` for file names, regular expressions for the text inside files, and two small tools that use the same idea.",
+  "note": "Names, companies and files here are **made-up examples**.",
+  "narration": "side",
+  "uses": [
+    "text-file",
+    "pattern-parts",
+    "file-tree",
+    "terminal",
+    "chat-turn",
+    "try-it"
+  ],
+  "layout": {
+    "kind": "free"
+  },
+  "categories": [
+    {
+      "id": "files",
+      "label": "your files"
+    },
+    {
+      "id": "patterns",
+      "label": "patterns"
+    },
+    {
+      "id": "computer",
+      "label": "the computer"
+    },
+    {
+      "id": "claude",
+      "label": "Claude"
+    }
+  ],
+  "elements": [
+    {
+      "id": "tree",
+      "type": "file-tree",
+      "category": "files",
+      "label": "The Documents folder",
+      "props": {
+        "title": "~/Documents",
+        "items": [
+          {
+            "name": "Documents",
+            "kind": "folder",
+            "depth": 0,
+            "state": "here",
+            "note": "you are here"
+          },
+          {
+            "name": "inbox.txt",
+            "kind": "file",
+            "depth": 1
+          },
+          {
+            "name": "notes.txt",
+            "kind": "file",
+            "depth": 1
+          },
+          {
+            "name": "orders.csv",
+            "kind": "file",
+            "depth": 1
+          },
+          {
+            "name": "Q3-notes.txt",
+            "kind": "file",
+            "depth": 1
+          },
+          {
+            "name": "Q3-report.docx",
+            "kind": "file",
+            "depth": 1
+          },
+          {
+            "name": "Q4-plan.txt",
+            "kind": "file",
+            "depth": 1
+          },
+          {
+            "name": "sales.csv",
+            "kind": "file",
+            "depth": 1
+          }
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 0,
+        "w": 440
+      }
+    },
+    {
+      "id": "page",
+      "type": "text-file",
+      "category": "files",
+      "label": "The file being searched",
+      "props": {
+        "title": "inbox.txt",
+        "lines": [
+          {
+            "parts": [
+              {
+                "t": "From: dana.lee@example.com"
+              }
+            ],
+            "state": "dim"
+          },
+          {
+            "parts": [
+              {
+                "t": "Invoice "
+              },
+              {
+                "t": "INV",
+                "mark": "hit"
+              },
+              {
+                "t": "-20417 paid on 2026-03-14."
+              }
+            ],
+            "state": "lit"
+          },
+          {
+            "parts": [
+              {
+                "t": "Please resend "
+              },
+              {
+                "t": "INV",
+                "mark": "hit"
+              },
+              {
+                "t": "-20418; the PDF was blank."
+              }
+            ],
+            "state": "lit"
+          },
+          {
+            "parts": [
+              {
+                "t": "Globex says "
+              },
+              {
+                "t": "INV",
+                "mark": "hit"
+              },
+              {
+                "t": "-2042 is still open."
+              }
+            ],
+            "state": "lit"
+          },
+          {
+            "parts": [
+              {
+                "t": "Attached: sales.csv and orders.csv."
+              }
+            ],
+            "state": "dim"
+          },
+          {
+            "parts": [
+              {
+                "t": "Next payment run: 2026/03/20."
+              }
+            ],
+            "state": "dim"
+          },
+          {
+            "parts": [
+              {
+                "t": "Note: "
+              },
+              {
+                "t": "INV",
+                "mark": "hit"
+              },
+              {
+                "t": "-99999 is only a test number."
+              }
+            ],
+            "state": "lit"
+          }
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 285,
+        "w": 470
+      }
+    },
+    {
+      "id": "term",
+      "type": "terminal",
+      "category": "computer",
+      "label": "Terminal window",
+      "props": {
+        "prompt": "Documents %",
+        "lines": [
+          {
+            "kind": "cmd",
+            "text": "ls *.csv"
+          },
+          {
+            "kind": "out",
+            "text": "orders.csv\tsales.csv",
+            "mark": true
+          },
+          {
+            "kind": "cmd",
+            "text": "ls Q3*"
+          },
+          {
+            "kind": "out",
+            "text": "Q3-notes.txt\tQ3-report.docx",
+            "mark": true
+          },
+          {
+            "kind": "cmd",
+            "text": "ls Q?-*.txt"
+          },
+          {
+            "kind": "out",
+            "text": "Q3-notes.txt\tQ4-plan.txt",
+            "mark": true
+          }
+        ]
+      },
+      "at": {
+        "x": 520,
+        "y": 0,
+        "w": 580
+      }
+    },
+    {
+      "id": "parts",
+      "type": "pattern-parts",
+      "category": "patterns",
+      "label": "The pattern, piece by piece",
+      "props": {
+        "title": "A glob: a pattern with wildcards",
+        "parts": [
+          {
+            "text": "*",
+            "label": "any characters",
+            "tone": "wild"
+          },
+          {
+            "text": ".csv",
+            "label": "then exactly .csv",
+            "tone": "exact"
+          }
+        ],
+        "gloss": "Every name that ends in **.csv**. And `?` is exactly one character: `Q?-*.txt` fits Q3-notes.txt and Q4-plan.txt."
+      },
+      "at": {
+        "x": 520,
+        "y": 310,
+        "w": 580
+      }
+    },
+    {
+      "id": "warn",
+      "type": "callout",
+      "category": "patterns",
+      "label": "Where patterns trip people up",
+      "props": {
+        "tone": "warn",
+        "title": "Precise, not clever",
+        "md": "A pattern matches the shape. It can't tell a real invoice from *INV-99999*, a test number in a note."
+      },
+      "at": {
+        "x": 520,
+        "y": 525,
+        "w": 580
+      }
+    },
+    {
+      "id": "claude",
+      "type": "chat-turn",
+      "category": "claude",
+      "label": "Claude's answer",
+      "props": {
+        "who": "claude",
+        "text": "Two CSV files: **orders.csv** and **sales.csv**. The inbox mentions INV-20417, INV-20418 and INV-99999, though the last is only a test.",
+        "actions": [
+          "Bash: find . -name \"*.csv\"",
+          "Bash: grep -oE \"INV-[0-9]{5}\" inbox.txt"
+        ]
+      },
+      "at": {
+        "x": 520,
+        "y": 655,
+        "w": 580
+      }
+    },
+    {
+      "id": "try",
+      "type": "try-it",
+      "label": "Try it",
+      "props": {
+        "title": "Every PDF in Documents",
+        "command": "ls ~/Documents/*.pdf",
+        "expect": "Each PDF in your Documents folder, with its full path. None there? zsh says *no matches found*. Then try `*.docx` or `*2026*`."
+      },
+      "at": {
+        "x": 0,
+        "y": 555,
+        "w": 470
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "title": "Wildcards: * and ?",
+      "text": "The pattern most people know: in a file name, `*` means *any characters*. `ls *.csv` lists every CSV and `ls Q3*` everything starting with Q3; `?` stands for exactly one character. This kind of pattern is a **glob**.",
+      "show": [
+        "tree",
+        "term",
+        "parts"
+      ],
+      "emphasize": [
+        "term",
+        "parts"
+      ],
+      "set": {
+        "tree": {
+          "items": [
+            {
+              "name": "Documents",
+              "kind": "folder",
+              "depth": 0,
+              "state": "here",
+              "note": "you are here"
+            },
+            {
+              "name": "inbox.txt",
+              "kind": "file",
+              "depth": 1
+            },
+            {
+              "name": "notes.txt",
+              "kind": "file",
+              "depth": 1
+            },
+            {
+              "name": "orders.csv",
+              "kind": "file",
+              "depth": 1,
+              "state": "hit",
+              "note": "*.csv"
+            },
+            {
+              "name": "Q3-notes.txt",
+              "kind": "file",
+              "depth": 1,
+              "state": "hit",
+              "note": "Q3*  Q?-*.txt"
+            },
+            {
+              "name": "Q3-report.docx",
+              "kind": "file",
+              "depth": 1,
+              "state": "hit",
+              "note": "Q3*"
+            },
+            {
+              "name": "Q4-plan.txt",
+              "kind": "file",
+              "depth": 1,
+              "state": "hit",
+              "note": "Q?-*.txt"
+            },
+            {
+              "name": "sales.csv",
+              "kind": "file",
+              "depth": 1,
+              "state": "hit",
+              "note": "*.csv"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s2",
+      "title": "The shell fills in the names",
+      "text": "zsh, the shell, expands the glob *before* the command runs, so `ls` only ever sees the matching names. That's why it works with almost any command. When nothing matches, zsh stops with *no matches found* (bash would pass `*.pdf` on unchanged).",
+      "emphasize": [
+        "term",
+        "parts",
+        "tree"
+      ],
+      "set": {
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "echo *.csv"
+            },
+            {
+              "kind": "out",
+              "text": "orders.csv sales.csv",
+              "mark": true
+            },
+            {
+              "kind": "cmd",
+              "text": "grep -l Acme *.txt"
+            },
+            {
+              "kind": "out",
+              "text": "notes.txt"
+            },
+            {
+              "kind": "out",
+              "text": "Q3-notes.txt"
+            },
+            {
+              "kind": "cmd",
+              "text": "ls *.pdf"
+            },
+            {
+              "kind": "err",
+              "text": "zsh: no matches found: *.pdf"
+            }
+          ]
+        },
+        "tree": {
+          "items": [
+            {
+              "name": "Documents",
+              "kind": "folder",
+              "depth": 0,
+              "state": "here",
+              "note": "you are here"
+            },
+            {
+              "name": "inbox.txt",
+              "kind": "file",
+              "depth": 1,
+              "state": "hit",
+              "note": "*.txt"
+            },
+            {
+              "name": "notes.txt",
+              "kind": "file",
+              "depth": 1,
+              "state": "hit",
+              "note": "*.txt"
+            },
+            {
+              "name": "orders.csv",
+              "kind": "file",
+              "depth": 1,
+              "state": "dim"
+            },
+            {
+              "name": "Q3-notes.txt",
+              "kind": "file",
+              "depth": 1,
+              "state": "hit",
+              "note": "*.txt"
+            },
+            {
+              "name": "Q3-report.docx",
+              "kind": "file",
+              "depth": 1,
+              "state": "dim"
+            },
+            {
+              "name": "Q4-plan.txt",
+              "kind": "file",
+              "depth": 1,
+              "state": "hit",
+              "note": "*.txt"
+            },
+            {
+              "name": "sales.csv",
+              "kind": "file",
+              "depth": 1,
+              "state": "dim"
+            }
+          ]
+        },
+        "parts": {
+          "title": "What the command receives",
+          "parts": [
+            {
+              "text": "*.csv",
+              "label": "you type",
+              "tone": "wild"
+            },
+            {
+              "text": "→"
+            },
+            {
+              "text": "orders.csv sales.csv",
+              "label": "what it gets",
+              "tone": "exact"
+            }
+          ],
+          "gloss": "zsh swaps the pattern for the matching names, then runs the command."
+        }
+      }
+    },
+    {
+      "id": "s3",
+      "title": "Exact text falls short",
+      "text": "Globs match file names. To search the text *inside* a file you use grep, and exact text isn't enough: one invoice number finds one line, and *INV* also finds *INV-2042*, a typo with four digits.",
+      "add": [
+        "page"
+      ],
+      "emphasize": [
+        "page",
+        "term"
+      ],
+      "dim": [
+        "tree",
+        "parts"
+      ],
+      "set": {
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "grep \"INV-20417\" inbox.txt"
+            },
+            {
+              "kind": "out",
+              "text": "Invoice INV-20417 paid on 2026-03-14."
+            },
+            {
+              "kind": "cmd",
+              "text": "grep \"INV\" inbox.txt"
+            },
+            {
+              "kind": "out",
+              "text": "Invoice INV-20417 paid on 2026-03-14."
+            },
+            {
+              "kind": "out",
+              "text": "Please resend INV-20418; the PDF was blank."
+            },
+            {
+              "kind": "out",
+              "text": "Globex says INV-2042 is still open.",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "Note: INV-99999 is only a test number."
+            }
+          ]
+        },
+        "tree": {
+          "items": [
+            {
+              "name": "Documents",
+              "kind": "folder",
+              "depth": 0,
+              "state": "here",
+              "note": "you are here"
+            },
+            {
+              "name": "inbox.txt",
+              "kind": "file",
+              "depth": 1
+            },
+            {
+              "name": "notes.txt",
+              "kind": "file",
+              "depth": 1
+            },
+            {
+              "name": "orders.csv",
+              "kind": "file",
+              "depth": 1
+            },
+            {
+              "name": "Q3-notes.txt",
+              "kind": "file",
+              "depth": 1
+            },
+            {
+              "name": "Q3-report.docx",
+              "kind": "file",
+              "depth": 1
+            },
+            {
+              "name": "Q4-plan.txt",
+              "kind": "file",
+              "depth": 1
+            },
+            {
+              "name": "sales.csv",
+              "kind": "file",
+              "depth": 1
+            }
+          ]
+        },
+        "page": {
+          "note": "4 lines contain INV"
+        }
+      }
+    },
+    {
+      "id": "s4",
+      "title": "Describe the shape",
+      "text": "A **regular expression** (regex) describes the shape of text, like describing a suspect instead of naming them. `INV-[0-9]{5}` is *INV-, then five digits*: the typo doesn't fit. *INV-99999* does, though it's only a test: a pattern knows shapes, not meaning.",
+      "add": [
+        "warn"
+      ],
+      "emphasize": [
+        "parts",
+        "page",
+        "warn"
+      ],
+      "dim": [
+        "tree"
+      ],
+      "set": {
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "grep -oE \"INV-[0-9]{5}\" inbox.txt"
+            },
+            {
+              "kind": "out",
+              "text": "INV-20417",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "INV-20418",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "INV-99999",
+              "mark": true
+            }
+          ]
+        },
+        "parts": {
+          "title": "A regular expression",
+          "parts": [
+            {
+              "text": "INV-",
+              "label": "exactly INV-",
+              "tone": "exact"
+            },
+            {
+              "text": "[0-9]",
+              "label": "any one digit",
+              "tone": "wild"
+            },
+            {
+              "text": "{5}",
+              "label": "five of them",
+              "tone": "how"
+            }
+          ],
+          "gloss": "`-E` lets grep read the `{5}`; `-o` prints only the matching part. Two more pieces: `.` is any one character, `^` the start of a line."
+        },
+        "page": {
+          "lines": [
+            {
+              "parts": [
+                {
+                  "t": "From: dana.lee@example.com"
+                }
+              ],
+              "state": "dim"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Invoice "
+                },
+                {
+                  "t": "INV-20417",
+                  "mark": "hit"
+                },
+                {
+                  "t": " paid on 2026-03-14."
+                }
+              ],
+              "state": "lit"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Please resend "
+                },
+                {
+                  "t": "INV-20418",
+                  "mark": "hit"
+                },
+                {
+                  "t": "; the PDF was blank."
+                }
+              ],
+              "state": "lit"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Globex says "
+                },
+                {
+                  "t": "INV-2042",
+                  "mark": "miss"
+                },
+                {
+                  "t": " is still open."
+                }
+              ],
+              "state": "dim"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Attached: sales.csv and orders.csv."
+                }
+              ],
+              "state": "dim"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Next payment run: 2026/03/20."
+                }
+              ],
+              "state": "dim"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Note: "
+                },
+                {
+                  "t": "INV-99999",
+                  "mark": "hit"
+                },
+                {
+                  "t": " is only a test number."
+                }
+              ],
+              "state": "lit"
+            }
+          ],
+          "note": "3 matches"
+        }
+      }
+    },
+    {
+      "id": "s5",
+      "title": "Two pattern languages",
+      "text": "The trap: globs and regexes are different languages. In a regex, *any characters* is `.*`, and a lone `*` means *repeat the thing before me*. So `grep -E \"*.csv\"` is an error (plain grep quietly finds nothing).",
+      "emphasize": [
+        "warn",
+        "term",
+        "parts"
+      ],
+      "dim": [
+        "tree"
+      ],
+      "set": {
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "grep -E \"*.csv\" inbox.txt"
+            },
+            {
+              "kind": "err",
+              "text": "grep: repetition-operator operand invalid",
+              "mark": true
+            },
+            {
+              "kind": "cmd",
+              "text": "grep -E \".*csv\" inbox.txt"
+            },
+            {
+              "kind": "out",
+              "text": "Attached: sales.csv and orders.csv.",
+              "mark": true
+            }
+          ]
+        },
+        "parts": {
+          "title": "Any characters, in a regex",
+          "parts": [
+            {
+              "text": ".",
+              "label": "any one character",
+              "tone": "wild"
+            },
+            {
+              "text": "*",
+              "label": "repeated, any number of times",
+              "tone": "how"
+            }
+          ],
+          "gloss": "So a regex says *any characters* as `.*`. A glob says it as `*`."
+        },
+        "warn": {
+          "tone": "warn",
+          "title": "Two pattern languages",
+          "md": "In a file name (a glob), `*` means *any characters*. In a regex that's `.*`; a lone `*` means *repeat the thing before me*."
+        },
+        "page": {
+          "lines": [
+            {
+              "parts": [
+                {
+                  "t": "From: dana.lee@example.com"
+                }
+              ],
+              "state": "dim"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Invoice INV-20417 paid on 2026-03-14."
+                }
+              ],
+              "state": "dim"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Please resend INV-20418; the PDF was blank."
+                }
+              ],
+              "state": "dim"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Globex says INV-2042 is still open."
+                }
+              ],
+              "state": "dim"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Attached: sales.csv and orders.csv",
+                  "mark": "hit"
+                },
+                {
+                  "t": "."
+                }
+              ],
+              "state": "lit"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Next payment run: 2026/03/20."
+                }
+              ],
+              "state": "dim"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Note: INV-99999 is only a test number."
+                }
+              ],
+              "state": "dim"
+            }
+          ],
+          "note": "1 line"
+        }
+      }
+    },
+    {
+      "id": "s6",
+      "title": "sed swaps text",
+      "text": "`sed` swaps text as it passes through. `s/Acme Corp/Acme/g` reads: find *Acme Corp*, put *Acme* in its place, every time. It prints a changed copy; the file stays as it was.",
+      "emphasize": [
+        "term",
+        "parts"
+      ],
+      "dim": [
+        "tree",
+        "warn"
+      ],
+      "set": {
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "cat notes.txt"
+            },
+            {
+              "kind": "out",
+              "text": "Acme Corp renewal is due in May."
+            },
+            {
+              "kind": "out",
+              "text": "Send Acme Corp the Q3 report."
+            },
+            {
+              "kind": "out",
+              "text": "Globex wants a call on Friday."
+            },
+            {
+              "kind": "cmd",
+              "text": "sed 's/Acme Corp/Acme/g' notes.txt"
+            },
+            {
+              "kind": "out",
+              "text": "Acme renewal is due in May.",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "Send Acme the Q3 report.",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "Globex wants a call on Friday."
+            },
+            {
+              "kind": "note",
+              "text": "(notes.txt itself is unchanged: sed printed a changed copy)"
+            }
+          ]
+        },
+        "parts": {
+          "title": "Reading a sed swap",
+          "parts": [
+            {
+              "text": "s",
+              "label": "swap",
+              "tone": "how"
+            },
+            {
+              "text": "/"
+            },
+            {
+              "text": "Acme Corp",
+              "label": "find this",
+              "tone": "exact"
+            },
+            {
+              "text": "/"
+            },
+            {
+              "text": "Acme",
+              "label": "put this instead",
+              "tone": "wild"
+            },
+            {
+              "text": "/"
+            },
+            {
+              "text": "g",
+              "label": "every time on the line",
+              "tone": "how"
+            }
+          ],
+          "gloss": "Find *Acme Corp*, put *Acme* in its place: `Acme Corp called` → `Acme called`."
+        },
+        "page": {
+          "title": "notes.txt",
+          "lines": [
+            {
+              "parts": [
+                {
+                  "t": "Acme Corp",
+                  "mark": "hit"
+                },
+                {
+                  "t": " renewal is due in May."
+                }
+              ],
+              "state": "lit"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Send "
+                },
+                {
+                  "t": "Acme Corp",
+                  "mark": "hit"
+                },
+                {
+                  "t": " the Q3 report."
+                }
+              ],
+              "state": "lit"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Globex wants a call on Friday."
+                }
+              ],
+              "state": "dim"
+            }
+          ],
+          "note": "2 to swap"
+        }
+      }
+    },
+    {
+      "id": "s7",
+      "title": "awk picks columns",
+      "text": "`awk` reads each line as columns. `-F,` says commas separate them and `{print $2}` prints the second: the customer. The header line comes out too, because it's a line like any other.",
+      "emphasize": [
+        "term",
+        "page",
+        "parts"
+      ],
+      "dim": [
+        "tree",
+        "warn"
+      ],
+      "set": {
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "awk -F, '{print $2}' sales.csv"
+            },
+            {
+              "kind": "out",
+              "text": "customer"
+            },
+            {
+              "kind": "out",
+              "text": "Acme",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "Globex",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "Initech",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "Acme",
+              "mark": true
+            }
+          ]
+        },
+        "parts": {
+          "title": "Reading an awk line",
+          "parts": [
+            {
+              "text": "-F,",
+              "label": "commas split columns",
+              "tone": "how"
+            },
+            {
+              "text": "'{print $2}'",
+              "label": "print column 2",
+              "tone": "wild"
+            },
+            {
+              "text": "sales.csv",
+              "label": "this file",
+              "tone": "exact"
+            }
+          ],
+          "gloss": "For every line: cut it at the commas and print the second piece."
+        },
+        "page": {
+          "title": "sales.csv",
+          "lines": [
+            {
+              "parts": [
+                {
+                  "t": "date,"
+                },
+                {
+                  "t": "customer",
+                  "mark": "hit"
+                },
+                {
+                  "t": ",amount"
+                }
+              ]
+            },
+            {
+              "parts": [
+                {
+                  "t": "2026-03-02,"
+                },
+                {
+                  "t": "Acme",
+                  "mark": "hit"
+                },
+                {
+                  "t": ",1200"
+                }
+              ],
+              "state": "lit"
+            },
+            {
+              "parts": [
+                {
+                  "t": "2026-03-02,"
+                },
+                {
+                  "t": "Globex",
+                  "mark": "hit"
+                },
+                {
+                  "t": ",450"
+                }
+              ],
+              "state": "lit"
+            },
+            {
+              "parts": [
+                {
+                  "t": "2026-03-03,"
+                },
+                {
+                  "t": "Initech",
+                  "mark": "hit"
+                },
+                {
+                  "t": ",980"
+                }
+              ],
+              "state": "lit"
+            },
+            {
+              "parts": [
+                {
+                  "t": "2026-03-04,"
+                },
+                {
+                  "t": "Acme",
+                  "mark": "hit"
+                },
+                {
+                  "t": ",2300"
+                }
+              ],
+              "state": "lit"
+            }
+          ],
+          "note": "column 2"
+        }
+      }
+    },
+    {
+      "id": "s8",
+      "title": "Claude uses both",
+      "text": "On a Mac, Claude Code finds files by name with a glob (`find . -name \"*.csv\"`; the quotes let find do the matching) and searches inside them with regexes. You don't need to write these: knowing them lets you ask for them, and spot them when Claude runs them.",
+      "show": "*",
+      "set": {
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "find . -name \"*.csv\""
+            },
+            {
+              "kind": "out",
+              "text": "./orders.csv"
+            },
+            {
+              "kind": "out",
+              "text": "./sales.csv"
+            }
+          ],
+          "badge": "run by Claude"
+        },
+        "tree": {
+          "items": [
+            {
+              "name": "Documents",
+              "kind": "folder",
+              "depth": 0,
+              "state": "here",
+              "note": "you are here"
+            },
+            {
+              "name": "inbox.txt",
+              "kind": "file",
+              "depth": 1
+            },
+            {
+              "name": "notes.txt",
+              "kind": "file",
+              "depth": 1
+            },
+            {
+              "name": "orders.csv",
+              "kind": "file",
+              "depth": 1,
+              "state": "hit",
+              "note": "*.csv"
+            },
+            {
+              "name": "Q3-notes.txt",
+              "kind": "file",
+              "depth": 1
+            },
+            {
+              "name": "Q3-report.docx",
+              "kind": "file",
+              "depth": 1
+            },
+            {
+              "name": "Q4-plan.txt",
+              "kind": "file",
+              "depth": 1
+            },
+            {
+              "name": "sales.csv",
+              "kind": "file",
+              "depth": 1,
+              "state": "hit",
+              "note": "*.csv"
+            }
+          ]
+        },
+        "parts": {
+          "title": "A glob: a pattern with wildcards",
+          "parts": [
+            {
+              "text": "*",
+              "label": "any characters",
+              "tone": "wild"
+            },
+            {
+              "text": ".csv",
+              "label": "then exactly .csv",
+              "tone": "exact"
+            }
+          ],
+          "gloss": "Every name that ends in **.csv**. And `?` is exactly one character: `Q?-*.txt` fits Q3-notes.txt and Q4-plan.txt."
+        },
+        "page": {
+          "title": "inbox.txt",
+          "lines": [
+            {
+              "parts": [
+                {
+                  "t": "From: dana.lee@example.com"
+                }
+              ],
+              "state": "dim"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Invoice "
+                },
+                {
+                  "t": "INV-20417",
+                  "mark": "hit"
+                },
+                {
+                  "t": " paid on 2026-03-14."
+                }
+              ],
+              "state": "lit"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Please resend "
+                },
+                {
+                  "t": "INV-20418",
+                  "mark": "hit"
+                },
+                {
+                  "t": "; the PDF was blank."
+                }
+              ],
+              "state": "lit"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Globex says "
+                },
+                {
+                  "t": "INV-2042",
+                  "mark": "miss"
+                },
+                {
+                  "t": " is still open."
+                }
+              ],
+              "state": "dim"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Attached: sales.csv and orders.csv."
+                }
+              ],
+              "state": "dim"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Next payment run: 2026/03/20."
+                }
+              ],
+              "state": "dim"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Note: "
+                },
+                {
+                  "t": "INV-99999",
+                  "mark": "hit"
+                },
+                {
+                  "t": " is only a test number."
+                }
+              ],
+              "state": "lit"
+            }
+          ],
+          "note": "3 matches"
+        }
+      }
+    }
+  ]
+}

@@ -3,7 +3,7 @@
 // entries), not-exercised marks after a recording that watched whole packages, and the fold view. The invariants hold
 // throughout, also over random models (property test at the end).
 import { describe, expect, test } from 'bun:test';
-import { foldView, invariants, merge, normalize, pairKey, reconcile, relations, wiresOf, wireStyle, type Fragment, type MCheck, type Model, type MNode } from '../src/model/model';
+import { foldView, hasRuns, invariants, merge, normalize, pairKey, reconcile, relations, wiresOf, wireStyle, type Fragment, type MCheck, type Model, type MNode } from '../src/model/model';
 import { applyCuration, groupLabel, selector, validateCuration, type Curation } from '../src/model/curation';
 import { modelLegend } from '../src/model/legend';
 import { layout } from '../src/model/scenes';
@@ -62,10 +62,14 @@ const wire = (m: Model, a: string, b: string) => wiresOf(m).find((w) => w.key ==
 // ------------------------------------------------------------------ static relationships
 
 describe('extracted relationships', () => {
-  test('a static call nobody declared or saw is `extracted`: in the code, drawn dashed, never a warning', () => {
+  test('a static call nobody declared or saw is `extracted`: in the code, drawn dashed once a run is recorded, never a warning', () => {
     const m = merge([scan()]);
     expect(errors(m)).toEqual([]);
-    const w = wire(m, 'orders.api.checkout', 'orders.db.Store.get')!;
+    // no run recorded at all: nothing could have been seen, so it is drawn plainly (model.ts hasRuns)
+    const w0 = wire(m, 'orders.api.checkout', 'orders.db.Store.get')!;
+    expect([w0.verdict, w0.style, w0.decl, w0.seen]).toEqual(['extracted', 'solid', false, false]);
+    const ran: Model = { ...m, flows: [{ id: 'f', trace: 't', spans: [{ id: 's', parent: null, node: 'orders.api.checkout', start: 0 }] }] };
+    const w = wire(ran, 'orders.api.checkout', 'orders.db.Store.get')!;
     expect([w.verdict, w.style, w.decl, w.seen]).toEqual(['extracted', 'dashed', false, false]);
     expect((m.checks ?? []).filter((c) => c.level !== 'info')).toEqual([]);
   });
@@ -202,6 +206,27 @@ describe('curation', () => {
     expect(m.checks!.find((c) => c.code === 'curation-kept')!.subject).toBe('orders.db.helper');
   });
 
+  test('a hidden type whose recorded calls are only constructions goes, and its constructions with it', () => {
+    // checkout constructs a Store (a span that calls nothing): hiding the type takes the construction out of the flow
+    const m = build({ karyo: 'curation/1', hide: ['orders.db.Store'] });
+    expect(errors(m)).toEqual([]);
+    expect(m.nodes.some((x) => x.id === 'orders.db.Store')).toBe(false);
+    expect(m.flows.flatMap((f) => f.spans).some((s) => s.node === 'orders.db.Store')).toBe(false);
+    expect(m.flows[0]!.spans.map((s) => s.node)).toEqual(['orders.api.checkout', 'orders.db.Store.get', 'orders.db.helper', 'orders.db.Store.put', 'orders.db.Store.get']);
+    expect(m.checks!.some((c) => c.code === 'curation-kept')).toBe(false);
+    expect(m.nodes.find((x) => x.id === 'orders.db.Store.get')!.parent).toBeUndefined();
+    // a construction that called something recorded is kept (hiding it would lose that call), and said
+    const root = span('orders.api.checkout', null), ctor = span('orders.db.Store', root.id);
+    const busy = { ...monitored(), flows: [{ id: 'busy', trace: 't2', spans: [root, ctor, span('orders.db.helper', ctor.id)] }] } as Fragment;
+    const k = build({ karyo: 'curation/1', hide: ['orders.db.Store'] }, [scan(), busy]);
+    expect(errors(k)).toEqual([]);
+    expect(k.nodes.some((x) => x.id === 'orders.db.Store')).toBe(true);
+    expect(k.checks!.find((c) => c.code === 'curation-kept')!.subject).toBe('orders.db.Store');
+    // a flow left with nothing goes
+    const only = { ...monitored(), flows: [{ id: 'ctor-only', trace: 't3', spans: [span('orders.db.Store', null)] }] } as Fragment;
+    expect(build({ karyo: 'curation/1', hide: ['orders.db.Store'] }, [scan(), only]).flows).toEqual([]);
+  });
+
   test('an entry that names nothing is an unresolved warning, with a did-you-mean', () => {
     const m = build({ karyo: 'curation/1', top: ['orders.db.Store.gett'], hide: ['tests.*'], nodes: { 'orders.api.chekout': { label: 'X' } } });
     const un = m.checks!.filter((c) => c.code === 'curation-unresolved');
@@ -267,7 +292,7 @@ test('property: automatic models, with coverage and a random curation, and their
     // one wire per pair, and a wire's style is its verdict's
     const ws = wiresOf(v.model);
     expect(new Set(ws.map((w) => w.key)).size).toBe(ws.length);
-    for (const w of ws) expect(w.style).toBe(wireStyle(w.verdict));
+    for (const w of ws) expect(w.style).toBe(wireStyle(w.verdict, hasRuns(v.model)));
     // not exercised only where a recording watched: every marked node is in a coverage scope
     for (const n of m.nodes) if (n.exercised !== undefined) expect(m.coverage?.length ?? 0).toBeGreaterThan(0);
     // nothing folded shows as its own card

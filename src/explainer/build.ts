@@ -30,10 +30,11 @@ async function sourceHash() {
   return h.digest('hex').slice(0, 16);
 }
 
-/** The runtime's JS and CSS, rebuilt with Vite when src/engine, src/explainer or the tour helpers change. */
-export async function ensureRuntime(): Promise<{ js: string; css: string; hash: string; rebuilt: boolean }> {
+/** The runtime's JS and CSS, rebuilt with Vite when src/engine, src/explainer or the tour helpers change. `dir`: where
+ *  it is cached (default dist/runtime in the checkout; an installed plugin passes its data dir instead). */
+export async function ensureRuntime(dir = RUNTIME_DIR): Promise<{ js: string; css: string; hash: string; rebuilt: boolean }> {
   const hash = await sourceHash();
-  const stampFile = join(RUNTIME_DIR, 'stamp.json');
+  const stampFile = join(dir, 'stamp.json');
   const stamp = await readFile(stampFile, 'utf8').then((s) => JSON.parse(s).hash as string).catch(() => '');
   let rebuilt = false;
   if (stamp !== hash) {
@@ -41,26 +42,27 @@ export async function ensureRuntime(): Promise<{ js: string; css: string; hash: 
     await build({
       configFile: false, root: REPO, logLevel: 'warn', publicDir: false,
       build: {
-        outDir: RUNTIME_DIR, emptyOutDir: true, target: 'es2022', minify: true, copyPublicDir: false,
+        outDir: dir, emptyOutDir: true, target: 'es2022', minify: true, copyPublicDir: false,
         lib: { entry: join(REPO, 'src/explainer/standalone.ts'), formats: ['iife'], name: 'KaryoExplainer', fileName: () => 'karyo-explainer.js', cssFileName: 'karyo-explainer' },
       },
     });
     await writeFile(stampFile, JSON.stringify({ hash, built: new Date().toISOString() }) + '\n');
     rebuilt = true;
   }
-  const out = await readdir(RUNTIME_DIR);
-  const js = await readFile(join(RUNTIME_DIR, 'karyo-explainer.js'), 'utf8');
+  const out = await readdir(dir);
+  const js = await readFile(join(dir, 'karyo-explainer.js'), 'utf8');
   const cssName = out.find((f) => f.endsWith('.css'));
-  const css = cssName ? await readFile(join(RUNTIME_DIR, cssName), 'utf8') : '';
+  const css = cssName ? await readFile(join(dir, cssName), 'utf8') : '';
   return { js, css, hash, rebuilt };
 }
 
 const escText = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
-export async function buildHtml(specPath: string, outFile: string, opts: Omit<LoadOpts, 'specDir'> = {}): Promise<{ file: string; bytes: number; issues: Issue[] }> {
-  const b = await bundleSpec(specPath, opts);
+export async function buildHtml(specPath: string, outFile: string, opts: Omit<LoadOpts, 'specDir'> & { runtimeDir?: string } = {}): Promise<{ file: string; bytes: number; issues: Issue[] }> {
+  const { runtimeDir, ...load } = opts;
+  const b = await bundleSpec(specPath, load);
   const { spec, components, issues } = b;
-  const rt = await ensureRuntime();
+  const rt = await ensureRuntime(runtimeDir);
   const title = typeof spec.title === 'string' ? spec.title : 'Explainer';
   const data = JSON.stringify({ spec, components }).replace(/</g, '\\u003c');
   const js = rt.js.replace(/<\/script/gi, '<\\/script');

@@ -1,0 +1,13 @@
+.box { box-sizing: border-box; height: 100%; display: flex; flex-direction: column; gap: 12px; padding: 14px 18px 16px; }
+.head { font-family: var(--pl-font); }
+.parts { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 6px; }
+.part { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; --c: var(--pl-muted); }
+.w { font: 700 23px/1.2 var(--pl-font-mono); color: var(--pl-fg); white-space: pre; padding: 2px 6px 5px; border-bottom: 4px solid var(--c); border-radius: 4px 4px 0 0; background: color-mix(in srgb, var(--c) 12%, transparent); }
+.lab { font: 700 11px/1.25 var(--pl-font); letter-spacing: 0.05em; text-transform: uppercase; color: var(--c); padding: 0 6px; max-width: 7.5em; white-space: normal; }
+.t-wild { --c: var(--pl-accent-2); }
+.t-exact { --c: var(--pl-ok); }
+.t-how { --c: var(--pl-accent); }
+.t-plain .w { border-bottom-color: transparent; background: none; color: var(--pl-muted); padding-left: 0; padding-right: 0; }
+.gloss { font-size: 16px; line-height: 1.45; color: var(--pl-fg); }
+.gloss p { margin: 0; }
+:host(.is-lit) .box { border-color: var(--pl-accent); }

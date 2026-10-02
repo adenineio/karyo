@@ -1,0 +1,6 @@
+<div class="pl-card box tone-{{tone}}">
+  {{#if kicker}}<div class="pl-label">{{kicker}}</div>{{/if}}
+  <div class="line">{{line}}</div>
+  <div class="fields">{{#each fields}}<div class="f{{#if this.mark}} is-mark{{/if}}{{#if this.wide}} is-wide{{/if}}"><span class="k">{{this.k}}</span><span class="v">{{this.v}}</span></div>{{/each}}</div>
+  {{#if raw}}<div class="rawbox"><div class="rl">{{rawLabel}}</div><div class="raw">{{raw}}</div></div>{{/if}}
+</div>

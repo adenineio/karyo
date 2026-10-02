@@ -1,0 +1,451 @@
+{
+  "karyo": "explainer/1",
+  "id": "s1-three-claudes",
+  "title": "Where Claude works",
+  "summary": "The same Claude can work in a chat window, in a cloud workspace or at your own computer. What it can reach depends on where it works.",
+  "note": "Names, companies and files here are **made-up examples**.",
+  "narration": "side",
+  "uses": [
+    "terminal",
+    "file-tree",
+    "try-it"
+  ],
+  "layout": {
+    "kind": "free"
+  },
+  "groups": [
+    {
+      "id": "away",
+      "label": "Away from your computer"
+    },
+    {
+      "id": "mac",
+      "label": "On your Mac"
+    }
+  ],
+  "categories": [
+    {
+      "id": "claude",
+      "label": "Claude"
+    },
+    {
+      "id": "computer",
+      "label": "your computer"
+    },
+    {
+      "id": "you",
+      "label": "you"
+    }
+  ],
+  "elements": [
+    {
+      "id": "chat",
+      "type": "card",
+      "group": "away",
+      "category": "claude",
+      "props": {
+        "kicker": "Chat · claude.ai and the Claude apps",
+        "title": "An advisor on the phone",
+        "body": "Works with the files you upload. Runs code and makes files in an **isolated sandbox**, separate from your computer. **Connectors** link it to outside apps."
+      },
+      "at": {
+        "x": 0,
+        "y": 0,
+        "w": 360
+      }
+    },
+    {
+      "id": "cowork",
+      "type": "card",
+      "group": "away",
+      "category": "claude",
+      "props": {
+        "kicker": "Cowork",
+        "title": "An assistant in a borrowed office",
+        "body": "Runs in the cloud by default. Reads and writes files only in **folders you've connected**, fetching a copy of just the file it needs."
+      },
+      "at": {
+        "x": 0,
+        "y": 215,
+        "w": 360
+      }
+    },
+    {
+      "id": "code",
+      "type": "card",
+      "group": "mac",
+      "category": "claude",
+      "props": {
+        "kicker": "Claude Code · in your terminal",
+        "title": "An assistant at your own desk",
+        "body": "Your folder and the ones inside it, files elsewhere with your permission, and *any command you could run*."
+      },
+      "at": {
+        "x": 560,
+        "y": 0,
+        "w": 440
+      }
+    },
+    {
+      "id": "files",
+      "type": "file-tree",
+      "group": "mac",
+      "category": "computer",
+      "label": "Sam's files",
+      "props": {
+        "title": "~",
+        "items": [
+          {
+            "name": "Desktop",
+            "depth": 0,
+            "kind": "folder"
+          },
+          {
+            "name": "Documents",
+            "depth": 0,
+            "kind": "folder"
+          },
+          {
+            "name": "Clients",
+            "depth": 1,
+            "kind": "folder"
+          },
+          {
+            "name": "acme-notes.txt",
+            "depth": 2,
+            "kind": "file"
+          },
+          {
+            "name": "Reports",
+            "depth": 1,
+            "kind": "folder"
+          },
+          {
+            "name": "q3.csv",
+            "depth": 2,
+            "kind": "file"
+          },
+          {
+            "name": "Downloads",
+            "depth": 0,
+            "kind": "folder"
+          }
+        ]
+      },
+      "at": {
+        "x": 560,
+        "y": 200,
+        "w": 300
+      }
+    },
+    {
+      "id": "term",
+      "type": "terminal",
+      "group": "mac",
+      "category": "computer",
+      "label": "Commands run by Claude Code",
+      "props": {
+        "badge": "run by Claude",
+        "prompt": "Documents %",
+        "lines": [
+          {
+            "kind": "cmd",
+            "text": "ls"
+          },
+          {
+            "kind": "out",
+            "text": "Clients  Reports"
+          },
+          {
+            "kind": "cmd",
+            "text": "grep \"Acme\" Reports/q3.csv",
+            "mark": true
+          },
+          {
+            "kind": "out",
+            "text": "Acme,North,12400",
+            "mark": true
+          }
+        ]
+      },
+      "at": {
+        "x": 890,
+        "y": 200,
+        "w": 390
+      }
+    },
+    {
+      "id": "review",
+      "type": "callout",
+      "category": "you",
+      "props": {
+        "tone": "note",
+        "title": "You review, you steer",
+        "md": "Claude Code's own docs: *“You're responsible for reviewing proposed code and commands for safety before approval.”*"
+      },
+      "at": {
+        "x": 0,
+        "y": 470,
+        "w": 360
+      }
+    },
+    {
+      "id": "try",
+      "type": "try-it",
+      "props": {
+        "title": "Which have you used?",
+        "expect": "Nothing to install. Think of the last time you used Claude: was it chat, Cowork or Claude Code? And where were your files: uploaded, in a connected folder, or on your own Mac?"
+      },
+      "at": {
+        "x": 560,
+        "y": 470,
+        "w": 440
+      }
+    }
+  ],
+  "links": [
+    {
+      "id": "cw-files",
+      "from": "cowork",
+      "to": "files",
+      "label": "a copy of one file",
+      "style": "dashed"
+    },
+    {
+      "id": "code-term",
+      "from": "code",
+      "to": "term",
+      "label": "runs commands",
+      "style": "accent"
+    }
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "title": "Chat: an advisor on the phone",
+      "text": "As of October 2026, the same Claude can work in three places, and each reaches different things. In **chat**, like an advisor on the phone, Claude works with what you upload, in an isolated sandbox separate from your computer. **Connectors** link it to outside apps and services.",
+      "show": [
+        "chat"
+      ],
+      "emphasize": [
+        "chat"
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "Cowork: a borrowed office",
+      "text": "**Cowork** is built on the same agentic engine as Claude Code (it works through a task step by step on its own), with no terminal. It runs in the cloud by default and reads and writes only folders you've connected. Products change fast: Anthropic is merging chat and Cowork for some plans.",
+      "add": [
+        "cowork",
+        "files"
+      ],
+      "emphasize": [
+        "cowork"
+      ],
+      "dim": [
+        "chat"
+      ],
+      "connect": [
+        "cw-files"
+      ],
+      "set": {
+        "files": {
+          "items": [
+            {
+              "name": "Desktop",
+              "depth": 0,
+              "kind": "folder"
+            },
+            {
+              "name": "Documents",
+              "depth": 0,
+              "kind": "folder"
+            },
+            {
+              "name": "Clients",
+              "depth": 1,
+              "kind": "folder",
+              "state": "hit",
+              "note": "connected"
+            },
+            {
+              "name": "acme-notes.txt",
+              "depth": 2,
+              "kind": "file"
+            },
+            {
+              "name": "Reports",
+              "depth": 1,
+              "kind": "folder"
+            },
+            {
+              "name": "q3.csv",
+              "depth": 2,
+              "kind": "file"
+            },
+            {
+              "name": "Downloads",
+              "depth": 0,
+              "kind": "folder"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s3",
+      "title": "Claude Code: at your own desk",
+      "text": "**Claude Code** runs in your **terminal**, the app where you type commands and read the replies. It works on your own Mac with your keys: the folder you start it in and the ones inside, files elsewhere with your permission, any command you could run. (It can run in the cloud too; this series is about your Mac.)",
+      "add": [
+        "code"
+      ],
+      "emphasize": [
+        "code",
+        "files"
+      ],
+      "dim": [
+        "chat",
+        "cowork"
+      ],
+      "connect": [],
+      "set": {
+        "files": {
+          "items": [
+            {
+              "name": "Desktop",
+              "depth": 0,
+              "kind": "folder"
+            },
+            {
+              "name": "Documents",
+              "depth": 0,
+              "kind": "folder",
+              "state": "here",
+              "note": "Claude Code started here"
+            },
+            {
+              "name": "Clients",
+              "depth": 1,
+              "kind": "folder"
+            },
+            {
+              "name": "acme-notes.txt",
+              "depth": 2,
+              "kind": "file"
+            },
+            {
+              "name": "Reports",
+              "depth": 1,
+              "kind": "folder"
+            },
+            {
+              "name": "q3.csv",
+              "depth": 2,
+              "kind": "file"
+            },
+            {
+              "name": "Downloads",
+              "depth": 0,
+              "kind": "folder"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s4",
+      "title": "It works by running commands",
+      "text": "Claude Code works through text: with its **Bash tool** it runs commands in a shell it starts on your Mac, not in your Terminal window, and reads the replies, like `ls` to look around or `grep` to search inside files. About your files, it knows only what it has read.",
+      "add": [
+        "term"
+      ],
+      "emphasize": [
+        "code",
+        "term"
+      ],
+      "dim": [
+        "chat",
+        "cowork",
+        "files"
+      ],
+      "connect": [
+        "code-term"
+      ]
+    },
+    {
+      "id": "s5",
+      "title": "You review, you steer",
+      "text": "As of October 2026, Claude Code's default mode runs most commands without asking, with background safety checks, and the review is still yours. Knowing what a command does lets you check its work and steer it toward the efficient way.",
+      "add": [
+        "review"
+      ],
+      "emphasize": [
+        "review",
+        "term"
+      ],
+      "dim": [
+        "chat",
+        "cowork",
+        "files",
+        "code"
+      ],
+      "connect": [
+        "code-term"
+      ]
+    },
+    {
+      "id": "s6",
+      "title": "Recognise, don't memorise",
+      "text": "You don't need to type commands yourself. This series teaches you to *recognise* a handful and the ideas behind them. On a Mac the terminal speaks **zsh**; bash works the same for almost everything here (the one difference, a pattern that matches no files, is in A5, *Patterns*).",
+      "show": "*",
+      "emphasize": [
+        "try"
+      ],
+      "set": {
+        "files": {
+          "items": [
+            {
+              "name": "Desktop",
+              "depth": 0,
+              "kind": "folder"
+            },
+            {
+              "name": "Documents",
+              "depth": 0,
+              "kind": "folder",
+              "state": "here",
+              "note": "Claude Code started here"
+            },
+            {
+              "name": "Clients",
+              "depth": 1,
+              "kind": "folder",
+              "state": "hit",
+              "note": "connected"
+            },
+            {
+              "name": "acme-notes.txt",
+              "depth": 2,
+              "kind": "file"
+            },
+            {
+              "name": "Reports",
+              "depth": 1,
+              "kind": "folder"
+            },
+            {
+              "name": "q3.csv",
+              "depth": 2,
+              "kind": "file"
+            },
+            {
+              "name": "Downloads",
+              "depth": 0,
+              "kind": "folder"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

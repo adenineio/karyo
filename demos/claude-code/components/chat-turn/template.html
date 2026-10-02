@@ -1,0 +1,6 @@
+<div class="box who-{{who}}">
+  <div class="spk">{{#if name}}{{name}}{{else}}<span class="d-you">You</span><span class="d-claude">Claude</span>{{/if}}</div>
+  <div class="bubble"><div class="tx">{{{text}}}</div>
+    {{#if actions}}<div class="acts">{{#each actions}}<span class="act">{{this}}</span>{{/each}}</div>{{/if}}
+  </div>
+</div>

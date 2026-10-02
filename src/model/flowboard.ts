@@ -6,9 +6,10 @@
 // the transition itself carries a comet along the request's hops in order. Under the map, the
 // legend of the flow's nodes (categories, tags; hover lights, click pins). In Bench (`b`) the map
 // cards (and whole groups, by their frame) drag and their wires follow; positions persist per plate in localStorage.
-import { Scene, type Frame, type Fx, type SceneClass, type Vals, type Path, type DockChange, type KeyHelp, Morph, prog, ease, clamp, comet, pulseRing, lightUnder, outline, mix, motion, draggable, pickPath } from '../engine';
+import { Scene, type Frame, type Fx, type SceneClass, type Vals, type Path, type DockChange, type KeyHelp, Morph, prog, ease, clamp, comet, pulseRing, lightUnder, outline, mix, motion, draggable, pickPath, settleChrome, uiSize, CHROME_FLOOR } from '../engine';
 import { attributeCall, checksFor, wiresOf, type Model, type MNode, type MSpan, type MFlow } from './model';
-import { layout, cardHTML, cardKits, boxOf, route, cssId, esc, MAP_CSS, TOP, SIDE } from './scenes';
+import { layout, cardHTML, cardKits, boxOf, route, cssId, esc, MAP_CSS, TOP, SIDE, type CardSlot } from './scenes';
+import { arrange } from './arrange';
 import { kitsFor, type KitSet } from '../kits/registry';
 import { boardRoute } from './board-route';
 import { modelLegend, litMembers, pinnedMembers, resolveEntry, LegendStrip, LEGEND_CSS, type LegendEntry } from './legend';
@@ -44,6 +45,10 @@ const DWELL = 450;                   // replay: ms a landed request stays before
 const LEG = 100;                     // the legend under the map
 const DIM_PIN = 0.3, DIM_LEGEND = 0.22, DIM_WIRE = 0.55;
 type XY = { x: number; y: number };
+/** The board laid out for a space (`fit`): its size, where map cards rest, where the map starts (right of the request
+ *  column; `top` below the page layout's top), the legend's top as laid out (the chrome floor draws it from there),
+ *  and how low a card may go (above the legend as drawn). */
+interface Fitted { w: number; h: number; pos: Map<string, CardSlot>; offX: number; top: number; legY: number; floor: number; key: string }
 
 /** One recorded call: caller → callee, drawn on the wire `key` (backwards when `reversed`: see model.ts attributeCall). */
 interface Hop { key: string; from: string; to: string; reversed: boolean; err: boolean }
@@ -107,6 +112,29 @@ export function traceRequests(model: Model, flow: MFlow) {
   return { spans, byId, keep, wireOf, reqs, hopEnds };
 }
 
+/** What a span says it did, when the recording said more than the call itself: not an automatic `name()` label, nor
+ *  the node's id or label again. */
+const recordedLabel = (s: MSpan, n: MNode | undefined) => (s.label && s.label !== s.node && !s.label.endsWith('()') && s.label !== n?.label ? s.label : '');
+
+/** A request's name, from the model (never from a protocol): what its root span says it did, when the recording
+ *  labelled it (`text_slugify`); else, when the root is code the project left undeclared (no category: a dispatcher, a
+ *  framework's entry point), the first card the project did declare that the request reached, in call order (the
+ *  `POST /returns` card under a generic `__call__`); else the root's own card. `via`: the root's card, when the name
+ *  comes from deeper in the request. */
+export function requestName(nodeOf: Map<string, MNode>, root: MSpan, rows: readonly { s: MSpan }[]): { name: string; via: string | null } {
+  const rn = nodeOf.get(root.node), own = rn?.label ?? root.label ?? root.node;
+  const said = recordedLabel(root, rn);
+  if (said) return { name: said, via: null };
+  if (!rn?.category) {
+    const hit = rows.find(({ s }) => s.node !== root.node && nodeOf.get(s.node)?.category);
+    if (hit) {
+      const n = nodeOf.get(hit.s.node)!, op = recordedLabel(hit.s, n);
+      return { name: `${n.label ?? n.id}${op ? ` · ${op}` : ''}`, via: own };
+    }
+  }
+  return { name: own, via: null };
+}
+
 export function traceBoard(model0: Model, flowId: string, o: { title?: string; kits?: KitSet } = {}): SceneClass {
   // kit kinds (docs/KITS.md): their cards, sizes and legend entries
   const kits = o.kits ?? kitsFor(model0);
@@ -118,6 +146,8 @@ export function traceBoard(model0: Model, flowId: string, o: { title?: string; k
   const nodeOf = new Map(model.nodes.map((n) => [n.id, n]));
   const end = (s: MSpan) => s.end ?? s.start;
   const N = reqs.length;
+  /** Each request's name (requestName): the list, the inspector, describe() and the details all say it. */
+  const names = reqs.map((r) => requestName(nodeOf, r.root, r.rows));
 
   // ---- layout: request column on the left, the flow's map on the right
   const baseH = (r: Req) => BASE_H + (r.err ? ERR_H : 0);
@@ -133,6 +163,29 @@ export function traceBoard(model0: Model, flowId: string, o: { title?: string; k
   const mapBottom = Math.max(TOP, ...groups.map((g) => g.y + g.h));
   const LEG_X = OFF + SIDE - 14, LEG_Y = mapBottom + 26;
   const W = L0.W, H = Math.max(L0.H, LEG_Y + LEG + 44);
+  // ---- fitted to a space (docs/ENGINE.md "Theater"): the map's group bands arranged for the window's shape (arrange.ts,
+  // as the structure board does), with room for the chrome at the size the chrome floor draws it (`k`): the request
+  // column (left, from the top-left corner), the header (top) and the legend with the mode line (bottom) each get k times
+  // their room, so no card is under them at fit. On the page (no space, no boost) it is the layout above, unchanged.
+  const COL_NEED = COL_TOP + maxCol + 64;   // the request column with its longest request open (L0's minH)
+  const FOOT = LEG + 44;                    // the legend and the mode line under it
+  const DEF: Fitted = { w: W, h: H, pos, offX: OFF, top: 0, legY: LEG_Y, floor: LEG_Y - 12, key: 'page' };
+  const fitted = (space: { w: number; h: number } | null, k: number): Fitted => {
+    if (!space && k === 1) return DEF;
+    // a stage px of chrome is k / u screen px of the space at the fit this room is for (u: the floor times the
+    // interface size), so a minimum no larger than the space keeps it reachable: a request column longer than the
+    // window is drawn as large as the window allows
+    const u = CHROME_FLOOR * uiSize().k, most = (need: number, room: number) => Math.round(Math.min(need * k, Math.max(need, (room * k) / u)));
+    const offX = Math.round((SIDE + COLW) * k) + 48 - SIDE, top = Math.round(TOP * (k - 1));
+    const x = arrange(L0, space, { wires: L0.wires, padRight: SIDE - 14 + offX, padBottom: top + Math.round((26 + FOOT) * k), minW: space ? most(960, space.w) : Math.round(960 * k), minH: space ? most(COL_NEED, space.h) : Math.round(COL_NEED * k) });
+    const p = new Map([...x.a.pos].map(([id, s]) => [id, { ...s, x: s.x + offX, y: s.y + top, ...(s.right !== undefined ? { right: s.right + offX } : {}) }]));
+    // the legend and the mode line dock along the bottom edge (the floor draws them k times deeper from there), so the
+    // map passes under them when zoomed in; any height left above them is the request column's, for its longest request
+    const legY = x.H - FOOT;
+    return { w: x.W, h: x.H, pos: p, offX, top, legY, floor: x.H - Math.round(FOOT * k) - 12, key: `${x.a.key}|${x.W}x${x.H}|${offX}|${top}` };
+  };
+  /** Where a map card may be dropped (Bench): right of the request column, below the header, above the legend. */
+  const clampIn = (F: Fitted, p: XY, id: string): XY => { const b = box(id); return { x: clamp(p.x, F.offX, F.w - b.w - 8), y: clamp(p.y, TOP + F.top, F.floor - b.h) }; };
   const gOf = new Map(L0.nodes.map((n) => [n.id, n.kind === 'actor' ? '·outside' : n.group ?? 'other']));
   const gMembers = new Map(groups.map((g) => [g.id, L0.nodes.filter((n) => gOf.get(n.id) === g.id).map((n) => n.id)]));
   const ML = modelLegend({
@@ -147,7 +200,6 @@ export function traceBoard(model0: Model, flowId: string, o: { title?: string; k
   const SK = `karyo:trace:${flowId}`;
   const loadMoved = (): Record<string, XY> => { try { const v = JSON.parse(localStorage.getItem(SK) ?? 'null'); return v && typeof v === 'object' && v.positions && typeof v.positions === 'object' ? v.positions : {}; } catch { return {}; } };
   const saveMoved = (m: Record<string, XY>) => { try { localStorage.setItem(SK, JSON.stringify({ positions: m })); } catch { /* not persisted */ } };
-  const clampCard = (p: XY, id: string): XY => { const b = box(id); return { x: clamp(p.x, OFF, W - b.w - 8), y: clamp(p.y, TOP, LEG_Y - b.h - 12) }; };
   // one wire per caller → callee pair (model.ts wiresOf)
   const pairs = L0.wires;
   const total = new Map<string, number>();
@@ -181,12 +233,14 @@ export function traceBoard(model0: Model, flowId: string, o: { title?: string; k
   const hopWin = (r: Req, h: number): [number, number] => { const w = (HOPS[1] - HOPS[0]) / Math.max(1, r.hops.length); return [HOPS[0] + h * w, HOPS[0] + (h + 1) * w]; };
 
   const reqHTML = (r: Req, i: number) => {
-    const label = r.root.label ?? r.root.node;
+    const { name, via } = names[i]!;
     const method = String(r.root.attrs?.method ?? '');
     const n = r.rows.length;
+    // the second line: how it came in (a method the recording noted, else the card that received it), and its calls
+    const how = [method || via, `${n} call${n === 1 ? '' : 's'}`].filter(Boolean).join(' · ');
     return `<div class="pl-card tb-req" id="q${i}" data-pl-clip data-pl-chrome="bare">
-      <div class="tb-l1"><span class="tb-n">${i + 1}</span><span class="tb-name" title="${esc(label)}">${esc(midTrunc(label, 22))}</span><span class="tb-dur">${fmtMs(r.dur)}</span></div>
-      <div class="tb-l2"><span>${esc(method || r.root.node)} · ${n} call${n === 1 ? '' : 's'}</span><span class="tb-st ${r.err ? 'is-err' : ''}">${r.err ? 'error' : 'ok'}</span></div>
+      <div class="tb-l1"><span class="tb-n">${i + 1}</span><span class="tb-name" title="${esc(via ? `${name} (via ${via})` : name)}">${esc(midTrunc(name, 22))}</span><span class="tb-dur">${fmtMs(r.dur)}</span></div>
+      <div class="tb-l2"><span class="tb-how" title="${esc(how)}">${esc(how)}</span><span class="tb-st ${r.err ? 'is-err' : ''}">${r.err ? 'error' : 'ok'}</span></div>
       ${r.err ? `<div class="tb-err" title="${esc(r.errText)}">${esc(r.errText)}</div>` : ''}
       <div class="tb-rows">${r.rows.map(({ s, depth }) => { const w = what(s); return `<div class="tb-row ${s.status === 'error' ? 'is-err' : ''}"><span class="w" style="padding-left:${Math.min(4, depth - 1) * 12}px" title="${esc(w.text)}${s.status === 'error' && s.attrs?.error ? ` — ${esc(String(s.attrs.error))}` : ''}">${w.html}</span><span class="d">${fmtMs(end(s) - s.start)}</span></div>`; }).join('')}</div>
     </div>`;
@@ -208,7 +262,8 @@ export function traceBoard(model0: Model, flowId: string, o: { title?: string; k
     .tb-name { font: 600 13.5px/20px var(--pl-font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .tb-req.is-lit .tb-name { color: var(--pl-accent); }
     .tb-dur { font: 12px/20px var(--pl-font-mono); color: var(--pl-fg); font-variant-numeric: tabular-nums; }
-    .tb-l2 { display: flex; justify-content: space-between; margin: 6px 0 0 26px; font: 11px/16px var(--pl-font-mono); color: var(--pl-muted); height: 16px; }
+    .tb-l2 { display: flex; justify-content: space-between; gap: 10px; margin: 6px 0 0 26px; font: 11px/16px var(--pl-font-mono); color: var(--pl-muted); height: 16px; }
+    .tb-how { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .tb-st.is-err { color: var(--pl-accent-2); font-weight: 600; }
     .tb-err { margin: 2px 0 0 26px; height: 16px; font: 11px/16px var(--pl-font-mono); color: var(--pl-accent-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .tb-rows { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--pl-card-border); }
@@ -222,7 +277,8 @@ export function traceBoard(model0: Model, flowId: string, o: { title?: string; k
     .mm-card { cursor: pointer; }
     .mm-card.is-lit.is-err { border-color: var(--pl-accent-2); }
     .tb-chip { position: absolute; right: 8px; top: -12px; z-index: 4; font: 600 10px/1 var(--pl-font-mono); padding: 4px 7px; border-radius: 999px; background: var(--pl-fg); color: var(--pl-bg); white-space: nowrap; pointer-events: none; }
-    .tb-mode { position: absolute; left: ${SIDE}px; bottom: 20px; font: 12px/1.2 var(--pl-font-mono); color: var(--pl-muted); white-space: nowrap; }
+    /* under the legend, beside the request column (never under it: a long request fills the column to the bottom) */
+    .tb-mode { position: absolute; left: ${OFF + SIDE - 14}px; right: ${SIDE + 56}px; bottom: 20px; font: 12px/1.2 var(--pl-font-mono); color: var(--pl-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .tb-legend { position: absolute; right: ${SIDE}px; padding-top: 10px; border-top: 1px dashed var(--pl-line); }
     .tb-legend .lg-cats .lg-list { --lg-max-h: 28px; }
     .tb-bar [hidden] { display: none; }
@@ -295,6 +351,31 @@ export function traceBoard(model0: Model, flowId: string, o: { title?: string; k
     private wireAt: XY | null = null;
     private wirePin: string | null = null;
     private wireCardFor = '';
+    /** The layout for the space the plate has (`fit`; the page layout until then), the layouts tried, and whether a frame
+     *  has placed the cards there yet (a wire routed before that would be cached against the old places). */
+    private F: Fitted = DEF;
+    private fits = new Map<string, Fitted>();
+    private placed = true;
+
+    /** Theater, fill and Jarvis (docs/ENGINE.md "Theater"): the map's bands arranged for the space's shape, with room for
+     *  the chrome the floor draws `o.chrome` times larger (settled: see settleChrome). null: the page layout. A viewer's
+     *  own Bench positions still win; Reset layout returns to the arrangement. */
+    fit(space: { w: number; h: number } | null, o?: { chrome?: number }) {
+      const k0 = Math.max(1, Math.round((o?.chrome ?? 1) * 100) / 100);
+      const at = (k: number) => {
+        const key = `${space ? `${Math.round(space.w)}x${Math.round(space.h)}` : 'page'}@${k}/${uiSize().id}`;
+        return this.fits.get(key) ?? this.fits.set(key, fitted(space, k)).get(key)!;
+      };
+      const r = space && k0 > 1 ? settleChrome(space, k0, at, (s) => this.stage.chrome.boostAt(s)) : at(k0);
+      if (r.key !== this.F.key) {
+        this.F = r;
+        this.drag = null; this.gdrag = null;
+        this.paths.clear(); this.placed = false;
+        const lg = this.stage.dom.querySelector<HTMLElement>('#tb-legend');
+        if (lg) lg.style.top = `${r.legY}px`;
+      }
+      return { w: r.w, h: r.h };
+    }
 
     build(dom: HTMLElement) {
       dom.innerHTML = `<style>${MAP_CSS}${CSS}${kits.css()}</style>
@@ -306,7 +387,7 @@ export function traceBoard(model0: Model, flowId: string, o: { title?: string; k
         ${L0.nodes.map((n) => { const p = pos.get(n.id)!; return cardHTML(n, kx).replace('class="pl-card', `style="left:${p.x}px;top:${p.y}px" class="pl-card`).replace(/<\/div>\s*$/, `${this.chipHTML(n)}</div>`); }).join('')}
         ${badges.map((b, j) => `<div class="tb-badge" id="b${j}"><span>×${total.get(b.key)}</span></div>`).join('')}
         ${reqs.map(reqHTML).join('')}
-        <div class="tb-legend" id="tb-legend" data-pl-chrome style="left:${LEG_X}px;top:${LEG_Y}px"></div>
+        <div class="tb-legend" id="tb-legend" data-pl-chrome style="left:${LEG_X}px;top:${this.F.legY}px"></div>
         <div class="pl-card wh-card" id="wh-card" role="status" aria-live="polite"></div>
         <div class="tb-mode" id="tb-mode" data-pl-chrome></div>`;
 
@@ -319,7 +400,7 @@ export function traceBoard(model0: Model, flowId: string, o: { title?: string; k
           onClick: () => this.clickNode(n.id),
           // only in Bench: elsewhere the map is read-only
           onStart: () => { if (!this.stage.inBench) return; const p = this.at(n.id); this.drag = { id: n.id, start: p, cur: p }; },
-          onMove: ({ dx, dy }) => { if (!this.drag) return; this.drag.cur = clampCard({ x: this.drag.start.x + dx, y: this.drag.start.y + dy }, n.id); this.paths.clear(); this.stage.redraw(); },
+          onMove: ({ dx, dy }) => { if (!this.drag) return; this.drag.cur = clampIn(this.F, { x: this.drag.start.x + dx, y: this.drag.start.y + dy }, n.id); this.paths.clear(); this.stage.redraw(); },
           onEnd: () => {
             const d = this.drag;
             if (!d) return;
@@ -347,8 +428,9 @@ export function traceBoard(model0: Model, flowId: string, o: { title?: string; k
             if (!gd) return;
             // as a unit: the delta is clamped so every member stays where one card's drag may go
             const ps = [...gd.start].map(([id, p]) => ({ ...p, ...box(id) }));
-            const lo = { x: OFF - Math.min(...ps.map((p) => p.x)), y: TOP - Math.min(...ps.map((p) => p.y)) };
-            const hi = { x: W - 8 - Math.max(...ps.map((p) => p.x + p.w)), y: LEG_Y - 12 - Math.max(...ps.map((p) => p.y + p.h)) };
+            const F = this.F;
+            const lo = { x: F.offX - Math.min(...ps.map((p) => p.x)), y: TOP + F.top - Math.min(...ps.map((p) => p.y)) };
+            const hi = { x: F.w - 8 - Math.max(...ps.map((p) => p.x + p.w)), y: F.floor - Math.max(...ps.map((p) => p.y + p.h)) };
             gd.d = { x: clamp(dx, Math.min(0, lo.x), Math.max(0, hi.x)), y: clamp(dy, Math.min(0, lo.y), Math.max(0, hi.y)) };
             this.paths.clear(); this.stage.redraw();
           },
@@ -450,12 +532,12 @@ export function traceBoard(model0: Model, flowId: string, o: { title?: string; k
     /** The column is laid out so an open request always shows every call (maxCol), so what is listed is what is visible. */
     detailsView(): DetailsView | null {
       if (this.sel === null) return null;
-      const r = reqs[this.sel]!, names = r.rows.map(({ s }) => s.label ?? nodeOf.get(s.node)?.label ?? s.node), n = names.length;
+      const r = reqs[this.sel]!, calls = r.rows.map(({ s }) => s.label ?? nodeOf.get(s.node)?.label ?? s.node), n = calls.length;
       return {
-        open: `request ${this.sel + 1}`, label: r.root.label ?? r.root.node, section: this.open ? 'calls' : null,
+        open: `request ${this.sel + 1}`, label: names[this.sel]!.name, section: this.open ? 'calls' : null,
         sections: [{ id: 'calls', title: 'calls', count: n }],
         visible: this.open ? `${n} of ${n} calls` : `collapsed: its ${n} calls are folded away`,
-        shown: this.open ? names : [], partly: [], hidden: this.open ? [] : names, more: { above: false, below: false },
+        shown: this.open ? calls : [], partly: [], hidden: this.open ? [] : calls, more: { above: false, below: false },
       };
     }
     // ------------------------------------------------------------ the pinned inspector
@@ -472,9 +554,9 @@ export function traceBoard(model0: Model, flowId: string, o: { title?: string; k
       if (this.dockBuilt === key) return;
       this.dockBuilt = key;
       if (i === null) { d.setSubject(null, 'select a request to inspect its calls'); return; }
-      const r = reqs[i]!, name = r.root.label ?? r.root.node, n = r.rows.length, method = String(r.root.attrs?.method ?? '');
+      const r = reqs[i]!, { name, via } = names[i]!, n = r.rows.length, method = String(r.root.attrs?.method ?? '');
       d.body.innerHTML = `<div class="tb-insp" role="region" aria-label="Request ${i + 1}: its calls">
-        <div class="tb-ih"><span class="pl-label">request ${i + 1} of ${N}${method ? ` · ${esc(method)}` : ''}</span></div>
+        <div class="tb-ih"><span class="pl-label">request ${i + 1} of ${N}${method ? ` · ${esc(method)}` : via ? ` · via ${esc(via)}` : ''}</span></div>
         <div class="tb-it">${esc(name)}</div>
         <div class="tb-im">${n} call${n === 1 ? '' : 's'} · ${fmtMs(r.dur)} · <span class="${r.err ? 'is-err' : ''}">${r.err ? 'error' : 'ok'}</span></div>
         ${r.err ? `<div class="tb-ie">${esc(r.errText)}</div>` : ''}
@@ -514,7 +596,7 @@ export function traceBoard(model0: Model, flowId: string, o: { title?: string; k
       if (i === null) return inspectorOff(d, 'nothing: no request is selected, so it says "select a request to inspect its calls"');
       const body = d.body.querySelector<HTMLElement>('.tb-ibody')!;
       const m = measureItems(body, body, 'calls');
-      return { pinned: true, shown: true, locked: d.locked, side: d.side, width: d.px(), node: `request ${i + 1}`, label: reqs[i]!.root.label ?? reqs[i]!.root.node, section: 'calls', visible: m.visible, items: { shown: m.shown, partly: m.partly, hidden: m.hidden }, more: m.more };
+      return { pinned: true, shown: true, locked: d.locked, side: d.side, width: d.px(), node: `request ${i + 1}`, label: names[i]!.name, section: 'calls', visible: m.visible, items: { shown: m.shown, partly: m.partly, hidden: m.hidden }, more: m.more };
     }
     describe(): PlateOutline {
       return {
@@ -522,7 +604,7 @@ export function traceBoard(model0: Model, flowId: string, o: { title?: string; k
         nodes: L0.nodes.map((n) => ({ id: n.id, label: n.label ?? n.id, group: gOf.get(n.id) ?? null, category: n.category ?? null, tags: [...(n.tags ?? [])] })),
         groups: groups.map((g) => ({ id: g.id, label: g.id === '·outside' ? 'outside' : g.id })),
         tags: outlineTags(entries),
-        steps: reqs.map((r) => r.root.label ?? r.root.node),
+        steps: names.map((x) => x.name),
         stepMembers: reqs.map((r) => [...r.nodes]),
       };
     }
@@ -541,7 +623,7 @@ export function traceBoard(model0: Model, flowId: string, o: { title?: string; k
       if (this.drag?.id === id) return this.drag.cur;
       const gp = this.gdrag?.start.get(id);
       if (gp) return { x: gp.x + this.gdrag!.d.x, y: gp.y + this.gdrag!.d.y };
-      const m = this.moved[id]; const p = pos.get(id)!; return m ? clampCard(m, id) : { x: p.x, y: p.y }; }
+      const m = this.moved[id]; const p = this.F.pos.get(id)!; return m ? clampIn(this.F, m, id) : { x: p.x, y: p.y }; }
 
     // ------------------------------------------------------------ wires
     private wireUnder(e: MouseEvent): { key: string | null; at: XY } {
@@ -576,6 +658,8 @@ export function traceBoard(model0: Model, flowId: string, o: { title?: string; k
 
     // ------------------------------------------------------------ state
     private go(sel: number | null, open: boolean, force = false) {
+      // another request (or the whole trace) is shown whole: a zoom from before goes back to fit
+      if (sel !== this.sel && this.stage.view.zoomed) this.stage.view.reset();
       this.quiet = !force && sel === this.sel && sel !== null;
       this.fromSel = force && sel === this.sel ? null : this.sel;
       this.sel = sel; this.open = open;
@@ -724,7 +808,7 @@ export function traceBoard(model0: Model, flowId: string, o: { title?: string; k
 
     // ------------------------------------------------------------ frame
     private path(key: string): Path {
-      // map cards never move, so a wire's route is fixed once the cards are measured
+      // map cards rest between drags and fits, so a wire's route is fixed once the cards are measured where they rest
       let p = this.paths.get(key);
       if (!p) {
         const { from, to } = L0.wire.get(key) ?? hopEnds.get(key)!;
@@ -733,11 +817,16 @@ export function traceBoard(model0: Model, flowId: string, o: { title?: string; k
         const ma = this.at(from), mb = this.at(to);
         const da = { x: ma.x - a.x, y: ma.y - a.y }, db = { x: mb.x - b.x, y: mb.y - b.y };
         if (Math.abs(da.x - db.x) < 0.5 && Math.abs(da.y - db.y) < 0.5) {
-          // both cards keep their arrangement (untouched, or moved together): the map's own router
+          // both cards keep the page layout's arrangement (untouched, or moved together: a band arranged for the window,
+          // a group dragged in Bench): the map's own router
           const [pa, pb] = b.layer > a.layer ? [A.at('right', 0.5, 3), B.at('left', 0.5, 3)] : [A.at('bottom', 0.5, 3), B.at('bottom', 0.5, 3)];
           p = route({ ...a, x: a.x + da.x, y: a.y + da.y, ...(a.right !== undefined ? { right: a.right + da.x } : {}) }, { ...b, x: b.x + db.x, y: b.y + db.y }, pa, pb);
-        } else p = boardRoute(A.bounds(), B.bounds());
-        if (A.box.w && B.box.w && !this.drag && !this.gdrag) this.paths.set(key, p);
+        } else {
+          // free routing, out from behind the other cards (as the structure board routes, and as arrange.ts scores)
+          const others = L0.nodes.filter((n) => n.id !== from && n.id !== to).map((n) => ({ ...this.at(n.id), ...box(n.id) }));
+          p = boardRoute(A.bounds(), B.bounds(), undefined, others);
+        }
+        if (A.box.w && B.box.w && this.placed && !this.drag && !this.gdrag) this.paths.set(key, p);
       }
       return p;
     }
@@ -786,6 +875,7 @@ export function traceBoard(model0: Model, flowId: string, o: { title?: string; k
         card.classes['is-err'] = this.sel !== null && reqs[this.sel]!.hops.some((h) => h.to === n.id && h.err);
         this.$(`#c-${cssId(n.id)}`).hidden = this.hover !== n.id;
       }
+      this.placed = true;
       // group frames follow their members (a card dragged out in Bench stretches its frame)
       for (const g of groups) {
         const rs = gMembers.get(g.id)!.map((id) => rects.get(id)!);

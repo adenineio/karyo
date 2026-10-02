@@ -1,0 +1,28 @@
+/* One square per file: 11 px cells on a 14 px pitch. Theme tokens only; the engine owns time. */
+.box { height: 100%; display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; }
+.head { font-family: var(--pl-font-mono); text-transform: none; letter-spacing: 0; }
+.grid { position: relative; flex: none; width: calc(var(--cols) * 14px - 3px); height: calc(var(--rows) * 14px - 3px); }
+.layer { position: absolute; inset: 0;
+  background:
+    linear-gradient(to right, transparent 11px, var(--pl-card) 11px) 0 0 / 14px 14px,
+    linear-gradient(to bottom, transparent 11px, var(--pl-card) 11px) 0 0 / 14px 14px,
+    var(--fill); }
+.base { --fill: color-mix(in srgb, var(--pl-line) 55%, var(--pl-card)); }
+.read { --fill: color-mix(in srgb, var(--pl-accent) 72%, var(--pl-card)); clip-path: inset(0 0 calc((1 - var(--k, 0)) * 100%) 0); }
+.faded { --fill: color-mix(in srgb, var(--pl-accent) 36%, var(--pl-card)); clip-path: inset(0 0 calc((1 - var(--k, 0)) * 100%) 0); }
+.hit { position: absolute; box-sizing: border-box; left: calc(var(--c) * 14px - 3px); top: calc(var(--r) * 14px - 3px); width: 17px; height: 17px; border-radius: 4px; }
+.st-found { background: var(--pl-accent-2); box-shadow: 0 0 0 2px var(--pl-card), 0 0 10px color-mix(in srgb, var(--pl-accent-2) 70%, transparent); }
+.st-missed { background: color-mix(in srgb, var(--pl-accent-2) 14%, var(--pl-card)); border: 2px dashed var(--pl-accent-2); box-shadow: 0 0 0 2px var(--pl-card); }
+.stat { font-size: 14px; color: var(--pl-muted); }
+.stat b { font: 700 16px/1 var(--pl-font-mono); font-variant-numeric: tabular-nums; color: var(--pl-fg); }
+.key { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--pl-muted); }
+.k { display: flex; align-items: center; gap: 6px; }
+.sw { flex: none; box-sizing: border-box; width: 12px; height: 12px; border-radius: 3px; }
+.t-plain .sw { background: color-mix(in srgb, var(--pl-line) 55%, var(--pl-card)); }
+.t-read .sw { background: color-mix(in srgb, var(--pl-accent) 72%, var(--pl-card)); }
+.t-faded .sw { background: color-mix(in srgb, var(--pl-accent) 36%, var(--pl-card)); }
+.t-found .sw { background: var(--pl-accent-2); }
+.t-missed .sw { border: 2px dashed var(--pl-accent-2); background: color-mix(in srgb, var(--pl-accent-2) 14%, var(--pl-card)); }
+.note { font-size: 13.5px; line-height: 1.4; color: var(--pl-muted); }
+.note p { margin: 0; }
+:host(.is-lit) .box { border-color: var(--pl-accent); }

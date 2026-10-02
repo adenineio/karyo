@@ -9,6 +9,10 @@ functions), so what is recorded lands on the scan's nodes:
     library, the standard library) and code that is no node (a private helper, a lambda) gets
     `sys.monitoring.DISABLE`: that code object never calls back again, so it costs nothing after its
     first call. A node's code gets PY_RETURN turned on for it alone (`set_local_events`);
+  - constructing a class that is a node is a call of it: its own `__init__` (hand-written, or generated at run
+    time, as a dataclass's is) starts as the class node; a class whose construction runs no project code (no
+    `__init__` of its own) is seen where node code constructs it, through the CALL event, which is on only in
+    node code and disabled at every call site that constructs nothing of the kind after its first call;
   - a node call's caller is the nearest node frame below it on the stack (transparent code in between
     is skipped: a private helper's calls count as its caller's), else the node running in the same task
     (a context variable, for asyncio tasks), else none: a root call;
@@ -86,6 +90,7 @@ class Monitor:
         self.project = project
         self.tool: Optional[int] = None
         self.codes: dict = {}                     # code object -> node id | ("init", class node, receiver) | DISABLE
+        self.ctors: dict = {}                     # class -> its node, when constructing it runs no project code | DISABLE
         self.active: dict = {}                    # frame -> _Call
         self.mods: dict[str, am.Mod] = {}         # module name -> parsed module (indexed once)
         self.maps: dict[str, dict] = {}
@@ -196,10 +201,11 @@ class Monitor:
         if not module or not self._watched(module, code.co_filename):
             return DISABLE
         # code generated at run time (a dataclass's __init__ and __eq__: co_filename "<string>") runs with its module's
-        # globals but isn't in its file: never a node, and never what the module is indexed from
+        # globals but isn't in its file: never what the module is indexed from, and a node only as a generated
+        # constructor, which is constructing its class (below)
         file = frame.f_globals.get("__file__") or code.co_filename
         if code.co_filename.startswith("<") or os.path.abspath(code.co_filename) != os.path.abspath(file):
-            return DISABLE
+            return self._generated_init(code, frame, module, file)
         with self.lock:
             cmap = self._index(module, file)
         hits = (cmap or {}).get(code.co_qualname) or []
@@ -209,6 +215,34 @@ class Monitor:
         if hit[2]:                                # a class's __init__ / __new__ / __post_init__: the class node
             return ("init", hit[1], code.co_varnames[0] if code.co_argcount else None)
         return hit[1]
+
+    def _generated_init(self, code: Any, frame: Any, module: str, file: str) -> Any:
+        """A constructor generated at run time (a dataclass's `__init__`, an attrs class's): constructing the class of
+        the object it initializes, when that class is a node, as a hand-written `__init__` is (karyo/auto.py's rule).
+        Classified once per code object, like any code: the class is read from the receiver of this first call, and
+        later calls go through `_init_node` (a subclass that inherits the generated `__init__` is the one built)."""
+        if code.co_name not in am.INIT_METHODS or not code.co_argcount or not code.co_filename.startswith("<"):
+            return DISABLE
+        recv = code.co_varnames[0]
+        obj = frame.f_locals.get(recv)
+        cls = obj if isinstance(obj, type) else type(obj)
+        # the class whose generated code this is (a subclass may inherit it): that class is the node, as for a written __init__
+        cls = next((k for k in getattr(cls, "__mro__", (cls,)) if getattr(vars(k).get(code.co_name), "__code__", None) is code), cls)
+        mod, qn = getattr(cls, "__module__", None), getattr(cls, "__qualname__", None)
+        if not mod or not qn or not self._watched(mod, file):
+            return DISABLE
+        if mod not in self.mods:
+            f = getattr(sys.modules.get(mod), "__file__", None) if mod != module else file
+            if not f:
+                return DISABLE
+            with self.lock:
+                self._index(mod, f)
+        m = self.mods.get(mod)
+        ds = m.by_qualname.get(qn) if m is not None else None
+        d = ds[0] if ds else None
+        if d is None or not d.is_class or not d.own or not d.id:
+            return DISABLE
+        return ("init", d.id, recv)
 
     def _init_node(self, spec: tuple, frame: Any) -> str:
         """The node of the object being constructed: its own class's, when that class is a node (an
@@ -238,7 +272,8 @@ class Monitor:
             self.codes[code] = node
             if node is DISABLE:
                 return DISABLE if self.use_disable else None
-            M.set_local_events(self.tool, code, EV.PY_RETURN)
+            # CALL: constructions of classes whose own construction runs no project code (on_call)
+            M.set_local_events(self.tool, code, EV.PY_RETURN | EV.CALL)
         elif node is DISABLE:
             return DISABLE if self.use_disable else None
         if type(node) is tuple:
@@ -354,8 +389,8 @@ class Monitor:
         clean = "".join(ch if ch.isalnum() or ch in "_.:-" else "_" for ch in names[0]).strip("_") or "run"
         return clean, " ← ".join(names)
 
-    def _span(self, node: str, code: Any, parent: Optional[str], trace: str, fl: Optional[_Flow] = None) -> Any:
-        name = code.co_name
+    def _span(self, node: str, code: Any, parent: Optional[str], trace: str, fl: Optional[_Flow] = None, name: Optional[str] = None) -> Any:
+        name = name or code.co_name
         if name in am.INIT_METHODS:
             d = self.defs.get(node)
             name = d.name if d is not None else code.co_qualname.rpartition(".")[0].rpartition(".")[2] or name
@@ -369,6 +404,55 @@ class Monitor:
             f["spans"].append(s)
         self.kept += 1
         return s
+
+    def on_call(self, code: Any, offset: int, fn: Any, arg0: Any) -> Any:
+        """A call made in a node's code (CALL is on only there). Constructing a class that is a node, when no project
+        code of its own runs to construct it (no `__init__` of its own: `object`'s, an exception's, a library base's),
+        is still a call of the class node, recorded here (it takes no time: a zero-length span). Any other call site
+        is disabled after its first call (the callee's PY_START records a project function), so it costs nothing after."""
+        if not isinstance(fn, type):
+            return DISABLE
+        node = self.ctors.get(fn)
+        if node is None:
+            node = self.ctors[fn] = self._ctor_node(fn)
+        if node is DISABLE:
+            return DISABLE
+        parent = self.active.get(sys._getframe(1))
+        if parent is None or not parent.sampled:
+            return None
+        self.calls += 1
+        self.ran.add(node)
+        fl = parent.flow
+        if parent.span is not None and self.kept < self.max_spans and (fl is None or fl.spans < self.max_flow):
+            s = self._span(node, code, parent.span.id, parent.trace, name=fn.__name__)
+            s.end = s.start
+            if fl is not None:
+                fl.spans += 1
+        elif parent.node is not None and parent.node != node:
+            k = (parent.node, node)
+            self.counts[k] = self.counts.get(k, 0) + 1
+        return None
+
+    def _ctor_node(self, cls: type) -> Any:
+        """The node constructing `cls` is a call of, when no project code runs to construct it (else DISABLE: its
+        `__init__`'s PY_START records it, or it is no node)."""
+        mod, qn = getattr(cls, "__module__", None), getattr(cls, "__qualname__", None)
+        f = getattr(sys.modules.get(mod or ""), "__file__", None)
+        if not mod or not qn or not f or not self._watched(mod, f):
+            return DISABLE
+        owner = next((k for k in cls.__mro__ if "__init__" in vars(k)), object)
+        init = vars(owner).get("__init__")
+        omod = getattr(owner, "__module__", None)
+        of = getattr(sys.modules.get(omod or ""), "__file__", None)
+        if getattr(init, "__code__", None) is not None and omod and of and self._watched(omod, of):
+            return DISABLE                        # project code constructs it: PY_START records that
+        with self.lock:
+            if mod not in self.mods:
+                self._index(mod, f)
+        m = self.mods.get(mod)
+        ds = m.by_qualname.get(qn) if m is not None else None
+        d = ds[0] if ds else None
+        return d.id if d is not None and d.is_class and d.own and d.id else DISABLE
 
     def on_return(self, code: Any, offset: int, retval: Any) -> Any:
         call = self.active.pop(sys._getframe(1), None)
@@ -400,9 +484,29 @@ class Monitor:
 
     # ---------------------------------------------------------------- output
 
+    def _refine_declared(self) -> None:
+        """In automatic mode a declaration (a directive, the decorator) refines its def's automatic node: what it
+        doesn't say is the automatic node's (am.refine), as the scan writes it, so the two records of the node agree."""
+        if not self.auto:
+            return
+        for nid, n in list(karyo._nodes.items()):         # declared in a module no call has indexed yet (the decorator)
+            mod = n.get("module")
+            if "declared" in n.get("sources", ()) and mod and mod not in self.mods:
+                f = getattr(sys.modules.get(mod), "__file__", None)
+                if f and self._watched(mod, f):
+                    with self.lock:
+                        self._index(mod, f)
+        with karyo._lock:
+            for m in self.mods.values():
+                for nid, d in am.declared_defs(m).items():
+                    rec = karyo._nodes.get(nid)
+                    if rec is not None and rec.get("ref"):
+                        am.refine(rec, d)
+
     def part(self) -> dict:
         """What this recorder adds to the process's fragment: the nodes that ran, the calls not kept as spans,
         and what was watched."""
+        self._refine_declared()
         nodes = []
         for nid in sorted(self.ran):
             d = self.defs.get(nid)
@@ -410,7 +514,8 @@ class Monitor:
                 nodes.append({"id": nid, "kind": "function", "sources": ["observed"]})
                 continue
             if d.declared:                        # its declaration came from the directive (declare() above)
-                nodes.append({"id": nid, "kind": _declared_kind(d) or "function", "module": d.mod.name, "lang": "python",
+                kind = (karyo._nodes.get(nid) or {}).get("kind") or _declared_kind(d) or "function"
+                nodes.append({"id": nid, "kind": kind, "module": d.mod.name, "lang": "python",
                               "sources": ["observed"]})
                 continue
             rec = am.node_record(d)
@@ -467,6 +572,7 @@ def install(packages: list[str], *, sample: float = 1.0, out: Optional[str] = No
     M.register_callback(mon.tool, EV.PY_START, mon.on_start)
     M.register_callback(mon.tool, EV.PY_RETURN, mon.on_return)
     M.register_callback(mon.tool, EV.PY_UNWIND, mon.on_unwind)
+    M.register_callback(mon.tool, EV.CALL, mon.on_call)
     M.set_events(mon.tool, EV.PY_START | EV.PY_UNWIND)
     _monitor = mon
     karyo._recording = True
@@ -483,7 +589,7 @@ def uninstall() -> None:
     if mon is None or mon.tool is None:
         return
     M.set_events(mon.tool, 0)
-    for ev in (EV.PY_START, EV.PY_RETURN, EV.PY_UNWIND):
+    for ev in (EV.PY_START, EV.PY_RETURN, EV.PY_UNWIND, EV.CALL):
         M.register_callback(mon.tool, ev, None)
     M.free_tool_id(mon.tool)
     _monitor = None

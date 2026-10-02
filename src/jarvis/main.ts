@@ -70,8 +70,8 @@ function sizePlate() {
   if (!stage?.isReady) return;
   const r = area.getBoundingClientRect();
   const space = { w: Math.max(200, r.width - 2 * PAD), h: Math.max(150, r.height - 2 * PAD) };
-  let fitted: { w: number; h: number } | void = undefined;
-  try { fitted = stage.scene.fit?.(theater ? space : null); } catch (e) { console.error(e); }
+  // laid out for the space (with room for the chrome floor's larger chrome: docs/ENGINE.md "Chrome floor")
+  const fitted = stage.fitScene(theater ? space : null, Math.min(space.w, stage.W));
   stage.resize(fitted?.w ?? stage.Cls.width, fitted?.h ?? stage.Cls.height);
   let w = Math.min(space.w, space.h * (stage.W / stage.H));
   if (!theater) w = Math.min(w, stage.W);            // the page layout never grows past its own size

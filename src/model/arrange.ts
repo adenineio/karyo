@@ -12,7 +12,7 @@ import { boardRoute, type Rect, type Slot } from './board-route';
 import { COL_GAP, BAND_GAP, TOP, SIDE, boxOf, type Layout } from './scenes';
 
 export interface Arrangement {
-  /** A stable name: `default`, or the shelves as band indices (`0,1,2|3`). */
+  /** A stable name: `default`, the shelves as band indices (`0,1,2|3`), or `wrap:n` (a band's last n columns wrapped). */
   key: string;
   /** Where every card rests (x, y) and its layer (column in the layout: the map router's slot). */
   pos: Map<string, Slot>;
@@ -76,6 +76,24 @@ function place(L: Layout, bands: Band[], shelfOf: number[]): Arrangement {
   return { key, pos, right, bottom, moved };
 }
 
+/** A single band too wide for the window, wrapped: its columns from `c` on move under the first ones, as a second row
+ *  (each row keeps its columns and the cards in them). The wires that cross rows are routed freely, as the board does;
+ *  the scoring below weighs what that costs. */
+export function wrapped(L: Layout, c: number): Arrangement {
+  const ids = [...L.pos.keys()], box = (id: string) => boxOf(L, id);
+  const first = ids.filter((id) => L.pos.get(id)!.layer < c), rest = ids.filter((id) => L.pos.get(id)!.layer >= c);
+  const dx = L.colX[0]! - L.colX[c]!;
+  const dy = Math.max(...first.map((id) => L.pos.get(id)!.y + box(id).h)) + BAND_GAP - Math.min(...rest.map((id) => L.pos.get(id)!.y));
+  const pos = new Map<string, Slot>();
+  for (const id of ids) {
+    const p = L.pos.get(id)!;
+    pos.set(id, p.layer < c ? { ...p } : { ...p, x: p.x + dx, y: p.y + dy, ...(p.right !== undefined ? { right: p.right + dx } : {}) });
+  }
+  const right = Math.max(...ids.map((id) => pos.get(id)!.x + box(id).w)) + FRAME, bottom = Math.max(...ids.map((id) => pos.get(id)!.y + box(id).h)) + FRAME;
+  // (named by how many columns move: in a tie the longer first row, which reads on, wins)
+  return { key: `wrap:${L.layers - c}`, pos, right, bottom, moved: L.groups.map((g) => g.id) };
+}
+
 /** Every band → shelf assignment worth trying: all of them for a handful of bands (shelves in first-use order),
  *  else the contiguous splits of the band order. At most three shelves. */
 function assignments(n: number): number[][] {
@@ -123,11 +141,14 @@ export function crossings(L: Layout, a: Arrangement, wires: { from: string; to: 
 export function arrange(L: Layout, space: { w: number; h: number } | null, o: ArrangeOpts): { a: Arrangement; W: number; H: number } {
   const size = (a: Arrangement) => ({ W: Math.max(o.minW, Math.ceil(a.right + o.padRight)), H: Math.max(o.minH, Math.ceil(a.bottom + o.padBottom)) });
   const def = defaultArrangement(L);
-  if (!space || L.groups.length < 2) return { a: def, ...size(def) };
+  // one band (a level of group cards, a board with one group) can't move into shelves; a long one can wrap into two rows
+  const wraps = L.groups.length === 1 && L.layers >= 4;
+  if (!space || (L.groups.length < 2 && !wraps)) return { a: def, ...size(def) };
   const bands = bandsOf(L);
   const scale = (a: Arrangement) => { const s = size(a); return Math.min(space.w / s.W, space.h / s.H); };
   // cheap pass: how large each arrangement can be drawn; then route the best few
-  const all = assignments(bands.length).map((sh) => place(L, bands, sh)).filter((a) => a.key !== bands.map((_, i) => i).join(','));
+  const all = wraps ? Array.from({ length: L.layers - 2 }, (_, i) => wrapped(L, i + 2))
+    : assignments(bands.length).map((sh) => place(L, bands, sh)).filter((a) => a.key !== bands.map((_, i) => i).join(','));
   const top = all.map((a) => ({ a, s: scale(a) })).sort((x, y) => y.s - x.s || x.a.key.localeCompare(y.a.key)).slice(0, 10);
   // a larger picture is better, up to generous text; each wire behind a card costs 15%; the default wins a near tie
   const CAP = 1.6;

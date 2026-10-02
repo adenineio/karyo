@@ -107,7 +107,7 @@ const langsOf = (ns: MNode[]) => { const l = [...new Set(ns.map((n) => n.lang).f
  *  watched whole packages) dotted mean. */
 export function legendHTML(m: Model): string {
   const w = wireWords(m);
-  return `<span><i></i>${w.solid}</span><span><i class="dash"></i>${w.dashed}</span><span><i class="warn"></i>${w.warn}</span>${w.idle ? `<span><i class="idle"></i>${w.idle}</span>` : ''}`;
+  return `<span><i></i>${w.solid}</span>${w.dashed ? `<span><i class="dash"></i>${w.dashed}</span>` : ''}${w.warn ? `<span><i class="warn"></i>${w.warn}</span>` : ''}${w.idle ? `<span><i class="idle"></i>${w.idle}</span>` : ''}`;
 }
 export const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 export const cssId = (id: string) => 'n-' + id.replace(/[^A-Za-z0-9_-]/g, '_');

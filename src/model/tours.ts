@@ -5,7 +5,7 @@
 // so drift between a tour and the code shows up in the build output and on the page.
 //
 // Pure functions: file access is injected (`ReadFile`), so this runs in the CLI (scripts/model.ts) and in tests.
-import { kindsOf, relations, type BuiltCode, type BuiltStep, type BuiltTiming, type BuiltTour, type MCheck, type MCode, type MFlow, type MNode, type MSpan, type Model } from './model';
+import { kindsOf, pairKey, relations, type BuiltCode, type BuiltStep, type BuiltTiming, type BuiltTour, type MCheck, type MCode, type MFlow, type MNode, type MSpan, type Model } from './model';
 
 export type { BuiltCode, BuiltStep, BuiltTiming, BuiltTour } from './model';
 
@@ -15,6 +15,7 @@ export type { BuiltCode, BuiltStep, BuiltTiming, BuiltTour } from './model';
 export interface TourCodeRef { symbol?: string; file?: string; lines?: [number, number] }
 /** Recorded spans a step is timed by. All given fields must match; `request` is 1-based among the flow's requests (root spans). */
 export interface TourSpanRef { label?: string; node?: string; request?: number }
+// (a request is a root span that does work: a bare construction at the root, a type's span with nothing under it, isn't one)
 export interface AuthoredStep {
   id: string;
   title: string;
@@ -227,6 +228,44 @@ export function excerpt(file: string, src: string, start: number, end: number): 
   return code;
 }
 
+// ---------------------------------------------------------------- a step's small diagram
+
+/** What a node stands for on a step's diagram: itself and every node under it by `parent` (a type and its methods). */
+function under(model: Model): (id: string) => Set<string> {
+  const kids = new Map<string, string[]>();
+  for (const n of model.nodes) if (n.parent && n.parent !== n.id) (kids.get(n.parent) ?? kids.set(n.parent, []).get(n.parent)!).push(n.id);
+  const memo = new Map<string, Set<string>>();
+  return (id) => {
+    let out = memo.get(id);
+    if (out) return out;
+    out = new Set([id]);
+    for (const q = [id]; q.length;) for (const c of kids.get(q.pop()!) ?? []) if (!out.has(c)) { out.add(c); q.push(c); }
+    memo.set(id, out);
+    return out;
+  };
+}
+
+/** The wires of a step's small diagram among its cards (`ids`), one per ordered pair: the model's relationships between
+ *  them, and for a card that stands for parts (a type whose methods fold into it on the board) its parts' relationships,
+ *  rolled up onto it. Each end of a relationship goes to the closest card that holds it (itself, else its parent, …),
+ *  so a step naming two types draws the calls between their methods, and one naming a method draws that method's. */
+export function stepWires(model: Model, ids: readonly string[]): { key: string; from: string; to: string }[] {
+  const set = new Set(ids);
+  const byId = new Map(model.nodes.map((n) => [n.id, n]));
+  const holder = (id: string): string | null => {
+    for (let cur: string | undefined = id, k = 0; cur && k < 32; cur = byId.get(cur)?.parent, k++) if (set.has(cur)) return cur;
+    return null;
+  };
+  const out = new Map<string, { key: string; from: string; to: string }>();
+  for (const e of relations(model)) {
+    const a = holder(e.from), b = holder(e.to);
+    if (!a || !b || a === b) continue;
+    const key = pairKey(a, b);
+    if (!out.has(key)) out.set(key, { key, from: a, to: b });
+  }
+  return [...out.values()];
+}
+
 // ---------------------------------------------------------------- resolution
 
 const isExpand = (s: AuthoredStep | ExpandStep): s is ExpandStep => typeof (s as ExpandStep).expand === 'string';
@@ -239,6 +278,7 @@ export function resolveTours(model: Model, tours: AuthoredTour[], readFile: Read
   const checks: MCheck[] = [];
   const built: BuiltTour[] = [];
   const nodes = new Map(model.nodes.map((n) => [n.id, n]));
+  const parts = under(model);
   const files = new Map<string, string | undefined>();
   const read = (f: string) => (files.has(f) ? files.get(f) : (files.set(f, readFile(f)), files.get(f)));
 
@@ -255,7 +295,7 @@ export function resolveTours(model: Model, tours: AuthoredTour[], readFile: Read
       flow = model.flows.find((f) => f.id === t.flow);
       if (!flow) warn('*', `flow "${t.flow}" is not in the model (recorded flows: ${model.flows.map((f) => f.id).join(', ') || 'none'}); steps have no timings.`);
     }
-    const spans = flow ? new Spans(flow) : undefined;
+    const spans = flow ? new Spans(flow, parts, (id) => nodes.get(id)?.kind) : undefined;
 
     const out: BuiltTour = { id: t.id, title: t.title, ...(t.summary ? { summary: t.summary } : {}), ...(t.flow ? { flow: t.flow } : {}), steps: [] };
     const ids = new Set<string>();
@@ -381,9 +421,13 @@ export function resolveTours(model: Model, tours: AuthoredTour[], readFile: Read
 class Spans {
   readonly roots: MSpan[];
   private byId: Map<string, MSpan>;
-  constructor(readonly flow: MFlow) {
+  /** `parts(id)`: a node and the nodes under it (a type's methods): a step or selector naming a type card is timed by its methods' spans. */
+  constructor(readonly flow: MFlow, private parts: (id: string) => Set<string> = (id) => new Set([id]), kind: (id: string) => string | undefined = () => undefined) {
     this.byId = new Map(flow.spans.map((s) => [s.id, s]));
-    this.roots = flow.spans.filter((s) => !s.parent || !this.byId.has(s.parent)).sort((a, b) => a.start - b.start);
+    // the requests: root spans, but not a bare construction (a span of a type with nothing under it: a test building
+    // the app object or a record before it calls in), which is no request
+    const parents = new Set(flow.spans.map((s) => s.parent).filter((p): p is string => !!p));
+    this.roots = flow.spans.filter((s) => (!s.parent || !this.byId.has(s.parent)) && !(kind(s.node) === 'type' && !parents.has(s.id))).sort((a, b) => a.start - b.start);
   }
   private ancestors(s: MSpan): MSpan[] {
     const out: MSpan[] = [];
@@ -409,10 +453,11 @@ class Spans {
       if (typeof pool === 'string') return { error: pool };
       let m: MSpan[];
       if (q.label !== undefined || q.node !== undefined) {
-        m = pool.filter((s) => (q.label === undefined || s.label === q.label) && (q.node === undefined || s.node === q.node));
-        // a label names a request and the calls it made under the same name: prefer the step's own node
-        if (q.node === undefined && stepNode) { const own = m.filter((s) => s.node === stepNode); if (own.length) m = own; }
-      } else if (stepNode) m = pool.filter((s) => s.node === stepNode);
+        const qn = q.node !== undefined ? this.parts(q.node) : null;
+        m = pool.filter((s) => (q.label === undefined || s.label === q.label) && (qn === null || qn.has(s.node)));
+        // a label names a request and the calls it made under the same name: prefer the step's own node (and its parts)
+        if (q.node === undefined && stepNode) { const sn = this.parts(stepNode), own = m.filter((s) => sn.has(s.node)); if (own.length) m = own; }
+      } else if (stepNode) { const sn = this.parts(stepNode); m = pool.filter((s) => sn.has(s.node)); }
       else if (q.request ?? request) m = [this.roots[(q.request ?? request)! - 1]!];
       else return { error: 'span selector is empty: give "label", "node" or "request".' };
       if (!m.length) return { error: `no recorded span in flow "${this.flow.id}" matches ${JSON.stringify(q)}${request && !q.request ? ` in request ${request}` : ''}.` };

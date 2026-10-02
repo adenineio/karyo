@@ -93,6 +93,8 @@ export interface ExplainerSpec {
   id: string;
   title: string;
   summary?: string;
+  /** A short line in the footer on every step (markdown-lite inline), e.g. "Names and files here are made-up examples." */
+  note?: string;
   size?: { w: number; h: number };
   narration?: 'side' | 'bottom' | 'none';
   timeline?: boolean;

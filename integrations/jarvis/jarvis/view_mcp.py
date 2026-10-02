@@ -93,15 +93,24 @@ def build(url: str = DEFAULT_URL, transport: httpx.AsyncBaseTransport | None = N
         return await act("close")
 
     @server.tool(title="Drill into a group", annotations=ACT)
-    async def drill(group: Annotated[str, Field(min_length=1, description="A group: its id or label.")]) -> ActionResult:
-        """Go inside a group: show its members as the plate (where the plate supports drilling). On a sequence diagram,
-        expand a folded lane into its members' lanes (group: its name, e.g. "stages"); group "out" folds it back."""
+    async def drill(group: Annotated[str, Field(min_length=1, description="A group: its id or label; 'out' goes up a level, 'top' to the overview of all groups.")]) -> ActionResult:
+        """Go inside a group. On a structure board in its groups view (state.level.view 'groups'), this slides into the
+        group's own scene: its cards, its subgroups as group cards, and its neighbours as stubs at the edges; 'out' goes
+        up a level, 'top' back to the overview of all groups. In the cards view, the group's cards fill the board. On a
+        sequence diagram, expand a folded lane into its members' lanes (group: its name, e.g. "stages"); 'out' folds it back."""
         return await act("drill", group=group)
 
     @server.tool(title="Back", annotations=ACT)
     async def back() -> ActionResult:
-        """Go back one level (out of a drilled group, or to the previous view; on a sequence diagram, fold expanded lanes back)."""
+        """Go back one level: close what is open first, then up a level (out of an entered or drilled group); on a
+        sequence diagram, fold expanded lanes back."""
         return await act("back")
+
+    @server.tool(title="Groups or every card", annotations=ACT)
+    async def groups(on: Annotated[bool | None, Field(description="True: the groups view (one card per group, starting at the overview); false: every card on one board. Omit to toggle.")] = None) -> ActionResult:
+        """Switch a structure board between its groups view (one card per group; enter one with drill) and every card.
+        state.level says which view it is in, the group entered and its path."""
+        return await act("groups", on=on)
 
     @server.tool(title="Highlight", annotations=ACT)
     async def highlight(
@@ -201,12 +210,15 @@ def build(url: str = DEFAULT_URL, transport: httpx.AsyncBaseTransport | None = N
     @server.tool(title="Open a splice", annotations=ACT)
     async def splice_open(
         name: Annotated[str | None, Field(description="The splice's name. A saved splice with this name opens over the current picture; otherwise a new splice gets this name.")] = None,
-        new: Annotated[bool | None, Field(description="true: always start a new splice from the current view (e.g. 'open this view in a new splice called …'), even if a saved one has the name.")] = None,
+        new: Annotated[bool | None, Field(description="true: always start a new splice from the current view (e.g. 'splice this', 'open this view in a new splice called …'), even if a saved one has the name.")] = None,
+        group: Annotated[str | None, Field(description="Go into this group first and open the splice there ('splice the X group'); 'top' for the overview. Omit for the view on screen.")] = None,
     ) -> ActionResult:
         """Open a splice: a sandbox over exactly the current view where changes are only proposed. The real picture is
-        never changed. The plate shows a tinted frame and a 'Splice' banner. Use it for 'open this view in a new splice
-        (called X)' (new: true) or 'open the X splice'. The state's `splice` reports it (title, ops, last change, dirty)."""
-        return await act("splice_open", name=name, new=new)
+        never changed. The plate shows a tinted frame and a 'Splice' banner that says where you are. The splice
+        remembers this view (the group you are in): reopening it later slides back there. Use it for 'splice this' (new:
+        true, no name: the name is asked for on save), 'open this view in a new splice (called X)' (new: true) or 'open
+        the X splice'. The state's `splice` reports it (title, ops, last change, dirty, where, home, proposed groups)."""
+        return await act("splice_open", name=name, new=new, group=group)
 
     @server.tool(title="Propose a node", annotations=ACT)
     async def splice_add(
@@ -218,10 +230,27 @@ def build(url: str = DEFAULT_URL, transport: httpx.AsyncBaseTransport | None = N
         after: Annotated[str | None, Field(description="A node: the new node goes behind it (it calls the new node, which calls what it called).")] = None,
         attach: Annotated[dict[str, Any] | None, Field(description="{to: node, dir: 'out' (new → to) or 'in' (to → new), kind}: one relationship to an existing node.")] = None,
         summary: Annotated[str | None, Field(description="One sentence on what it would do.")] = None,
+        group: Annotated[str | None, Field(description="The group it goes in (a proposed one counts: 'put a Mailer card in it'). Omit inside a group: it joins the group you are in.")] = None,
     ) -> ActionResult:
         """Propose a new node in the open splice. Give at most one place: between two connected nodes, before or after a
         node, or attached to one; none places it on its own. Fails with the reason (and a did-you-mean) when it can't apply."""
-        return await act("splice_add", label=label, kind=kind, category=category, between=between, before=before, after=after, attach=attach, summary=summary)
+        return await act("splice_add", label=label, kind=kind, category=category, between=between, before=before, after=after, attach=attach, summary=summary, group=group)
+
+    @server.tool(title="Propose a group", annotations=ACT)
+    async def splice_group(
+        label: Annotated[str, Field(min_length=1, description="The new group's name, e.g. 'Notifications'.")],
+        parent: Annotated[str | None, Field(description="The group it goes inside ('add a group … under X'); 'top' for the top level. Omit: the group you are in now (the top level on the overview).")] = None,
+        outlet_of: Annotated[str | None, Field(description="A node that calls into the new group ('attach it to X as an outlet'): X → the group.")] = None,
+        inlet_of: Annotated[str | None, Field(description="A node the new group calls ('… as an inlet of X'): the group → X.")] = None,
+        kind: Annotated[Literal["calls", "reads", "writes", "publishes", "subscribes"] | None, Field(description="The relationship's kind; default calls.")] = None,
+        first: Annotated[str | None, Field(description="Its first card's name, if the user names one.")] = None,
+        show: Annotated[bool | None, Field(description="false: stay where you are. By default the view slides into the new group's scene.")] = None,
+    ) -> ActionResult:
+        """Propose a new group in the open splice (proposals only). Without a card it shows a 'No cards yet' empty state
+        that holds its relationship; the first card proposed into it (splice_add with group, or any splice_add while
+        inside it) takes that relationship over. By default the view then slides into the new group, and the state's
+        spliceNote says exactly what is on screen there; describe that, as a proposal."""
+        return await act("splice_group", label=label, parent=parent, outlet_of=outlet_of, inlet_of=inlet_of, kind=kind, first=first, show=show)
 
     @server.tool(title="Propose a relationship", annotations=ACT)
     async def splice_connect(
@@ -242,10 +271,15 @@ def build(url: str = DEFAULT_URL, transport: httpx.AsyncBaseTransport | None = N
         return await act("splice_disconnect", **{"from": from_node}, to=to_node)
 
     @server.tool(title="Propose removing a node", annotations=ACT)
-    async def splice_remove(node: Node) -> ActionResult:
+    async def splice_remove(
+        node: Annotated[str | None, Field(description="A node: its id or label (proposed nodes count).")] = None,
+        group: Annotated[str | None, Field(description="Instead: a group the splice proposes; it goes with every card in it.")] = None,
+    ) -> ActionResult:
         """Propose removing a node in the open splice: it stays drawn as a faint ghost with its relationships. Removing a
-        node the splice itself proposed takes the proposal back."""
-        return await act("splice_remove", node=node)
+        node the splice itself proposed takes the proposal back; removing a proposed group takes it back with its cards."""
+        if not node and not group:
+            raise ToolError("splice_remove needs a node or a group")
+        return await act("splice_remove", node=node, group=group)
 
     @server.tool(title="Propose a replacement", annotations=ACT)
     async def splice_replace(
@@ -261,9 +295,15 @@ def build(url: str = DEFAULT_URL, transport: httpx.AsyncBaseTransport | None = N
         return await act("splice_replace", node=node, **{"with": with_node}, existing=existing, kind=kind, summary=summary)
 
     @server.tool(title="Propose a new name", annotations=ACT)
-    async def splice_rename(node: Node, label: Annotated[str, Field(min_length=1, description="The new name.")]) -> ActionResult:
-        """Propose renaming a node in the open splice (the old name shows struck through)."""
-        return await act("splice_rename", node=node, label=label)
+    async def splice_rename(
+        label: Annotated[str, Field(min_length=1, description="The new name.")],
+        node: Annotated[str | None, Field(description="A node: its id or label (proposed nodes count).")] = None,
+        group: Annotated[str | None, Field(description="Instead: a group (a proposed one, or one of the model's).")] = None,
+    ) -> ActionResult:
+        """Propose renaming a node (the old name shows struck through) or a group in the open splice."""
+        if not node and not group:
+            raise ToolError("splice_rename needs a node or a group")
+        return await act("splice_rename", node=node, group=group, label=label)
 
     @server.tool(title="Propose moving a node", annotations=ACT)
     async def splice_move(node: Node, group: Annotated[str, Field(min_length=1, description="The group to move it into.")]) -> ActionResult:

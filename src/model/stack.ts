@@ -1040,8 +1040,9 @@ export function stackView(slices0: StackSlice[], o: StackOpts = {}): SceneClass 
         }
         const { at, avoid } = this.warnAnchor(wk);
         // never over what it was pointed at (its ⚠, to click it), then off its cards
-        // inside the visible part, clear of the chrome and at its fit size while zoomed (docs/ENGINE.md "Zoom and pan")
-        const view = this.stage.view, k = 1 / view.zoom;
+        // inside the visible part, clear of the chrome and at its fit size while zoomed (docs/ENGINE.md "Zoom and pan";
+        // at the chrome floor's size: "Chrome floor")
+        const view = this.stage.view, k = view.cardScale;
         const pos = view.overlay(at, WIRE_CARD_W, wc.offsetHeight || 220, avoid, (a, w, h, W, H, av) => placeCard(a, w, h, W, H, av, [{ x: a.x - 14 * k, y: a.y - 14 * k, w: 28 * k, h: 28 * k }]));
         this.$(wc).set(pos);
       }

@@ -1,3 +1,5 @@
+<img src="brand/karyo-mark.svg" width="72" alt="">
+
 # Karyo
 
 *Karyo* (from *karyotype*) is part of the Adenine dev-tooling family. One figure is a **plate**.
@@ -7,6 +9,27 @@ Karyo makes visual documentation: step-by-step explainers of any topic, and live
 Plates are built from **real HTML elements** — cards, code blocks, text, chips — plus a **three.js fx layer** for wires, self-drawing outlines, comets, soft light and 3D. Every frame is a pure function of time, so a plate can be scrubbed, stepped, looped, screenshotted or exported to video, and it always shows the same frame.
 
 Text stays text: selectable, searchable, styled by CSS, readable by screen readers, and themeable with CSS custom properties.
+
+## What it looks like
+
+**Explaining a concept, no code involved.** A step-through explainer of how noise-cancelling headphones work: each step brings in or moves only the parts it talks about, and every claim in it was checked against published sources.
+
+<picture><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/explainer-cancel-light.png"><img src="docs/images/readme/explainer-cancel.png" alt="Step 6 of an explainer on noise-cancelling headphones: the drone that leaks through the ear cup and the driver's flipped anti-noise add up to an almost flat line at the ear"></picture>
+
+<table><tr>
+<td width="50%"><img src="docs/images/readme/explainer-signal-path.png" alt="The signal path: outside mic and music into the chip, chip to driver, the inside mic feeding the leftover back"><br><sub>The real signal path, with the inside mic correcting what's left.</sub></td>
+<td width="50%"><img src="docs/images/readme/explainer-low-vs-high.png" alt="Which sounds cancel well: a steady low drone cancels, high hiss is left to the ear cup, sudden sounds are hard"><br><sub>Why steady low sounds cancel best.</sub></td>
+</tr></table>
+
+**Documenting a codebase.** Folio, an example project made for this README: a library-lending service in Python (catalogue, members, loans, holds, fines, notices), adopted with `karyo init`: automatic mode reads the code, three `# karyo:` comments add meaning where it helps, a recorded test run marks what actually ran, and a curation file groups it. No card was placed by hand.
+
+<picture><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/project-overview-light.png"><img src="docs/images/readme/project-overview.png" alt="The groups map of Folio, the example project: six groups (Entry points, Members, Circulation, Catalogue, Notices, Storage) with counted wires between them"></picture>
+
+<table><tr>
+<td width="33%"><img src="docs/images/readme/project-group.png" alt="Inside Circulation, Holds: the hold allocator, queue and shelf, with the cards that call in on the left and the groups they call on the right"><br><sub>Inside a group: what calls in, what it calls out to.</sub></td>
+<td width="33%"><img src="docs/images/readme/project-tour.png" alt="A tour step from a recorded test: the real allocate() source, its measured time and a small diagram of where it runs"><br><sub>A tour of a recorded run: real source, real timings.</sub></td>
+<td width="33%"><img src="docs/images/readme/project-splice.png" alt="A splice: a proposed Delivery fallback card between the notifier and the email and SMS senders"><br><sub>Splice: a what-if (an SMS fallback) drawn over the real code.</sub></td>
+</tr></table>
 
 ## Install (Claude Code plugin)
 
@@ -23,6 +46,8 @@ claude plugin install karyo@adenine
 - **"Set up Karyo here"**: the `karyo-adopt` skill runs `karyo init` (a plan you approve: a launcher, `.gitignore` entries, `karyo-*` recipes in an existing justfile or Makefile, an optional refresh hook and CI job), scans the code with no annotations, proposes a curation (`karyo/curation.json`), records the tests once and opens the board; later it keeps the curation in step with refactors. `karyo init --remove` takes it all out. The whole story: [`docs/ADOPT.md`](docs/ADOPT.md).
 - The skills `karyo-explain` (visual explainers of anything) and `docket` (decisions and come-back-tos) trigger on their own; `/karyo:jarvis` starts Jarvis mode.
 - The `karyo` MCP server and the `karyo` CLI are there too. `karyo setup` checks the tools and installs Karyo's dependencies into the plugin's data dir, never into your project.
+
+**Try the demo:** run `/karyo:demo` (or `karyo demo claude-code`). It builds "Claude Code, explained", a series of 21 explainers, and opens its map in your browser.
 
 Requirements, what the plugin contains, where it keeps its files, and updates: [`docs/PACKAGING.md`](docs/PACKAGING.md).
 
@@ -49,7 +74,7 @@ Every command lives in the `justfile`: `just --list` shows them (`just install`,
 
 ## Code that draws itself
 
-Karyo can also draw a project from a **model file the code produces**: Python and Go SDKs record declared structure (annotations), extracted structure (imports) and observed behaviour (traced runs, joined across processes and languages). A merge step reconciles them into warnings, and generic views draw any model with no hand layout. See [`docs/MODEL.md`](docs/MODEL.md), and `karyo view` (or `just view <dir>`) to open a project's model.
+Karyo can also draw a project from a **model file the code produces**: Python and Go SDKs record declared structure (annotations), extracted structure (imports) and observed behaviour (traced runs, joined across processes and languages), and Swift projects are described by `// karyo:` comment markers. A merge step reconciles them into warnings, and generic views draw any model with no hand layout. See [`docs/MODEL.md`](docs/MODEL.md), and `karyo view` (or `just view <dir>`) to open a project's model.
 
 | view | shows |
 |---|---|

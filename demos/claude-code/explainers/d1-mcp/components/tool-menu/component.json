@@ -1,0 +1,55 @@
+{
+  "name": "tool-menu",
+  "description": "An MCP server's tool menu: each tool's name and plain-words description; an open tool also shows its input form (the fields Claude fills in), and a picked tool is lit.",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": ["tools"],
+    "additionalProperties": false,
+    "properties": {
+      "title": { "type": "string", "description": "small label above the menu, e.g. `crm server · its tools`" },
+      "tools": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 6,
+        "items": {
+          "type": "object",
+          "required": ["name", "description"],
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string", "minLength": 1, "description": "the tool's name, e.g. `find_customer`" },
+            "description": { "type": "string", "description": "what it does, in plain words (what Claude reads to choose)" },
+            "open": { "type": "boolean", "description": "show the labelled parts: name, description, input form" },
+            "state": { "enum": ["plain", "picked", "dim"], "default": "plain", "description": "picked: the tool Claude chose; dim: not relevant now" },
+            "fields": {
+              "type": "array",
+              "maxItems": 4,
+              "description": "the input form (shown when open)",
+              "items": {
+                "type": "object",
+                "required": ["name"],
+                "additionalProperties": false,
+                "properties": {
+                  "name": { "type": "string", "minLength": 1 },
+                  "kind": { "type": "string", "description": "what goes in it, e.g. `text`, `yes / no`" },
+                  "required": { "type": "boolean" },
+                  "value": { "type": "string", "description": "what Claude filled in (empty: a blank box)" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "size": { "w": 400 },
+  "motion": ["appear", "emphasize"],
+  "example": {
+    "title": "crm · its tools",
+    "tools": [
+      { "name": "find_customer", "description": "Look up one customer by name.", "open": true, "state": "picked",
+        "fields": [ { "name": "name", "kind": "text", "required": true, "value": "Acme" } ] },
+      { "name": "list_deals", "description": "List a customer's open deals." }
+    ]
+  }
+}

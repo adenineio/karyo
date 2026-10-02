@@ -1,0 +1,409 @@
+{
+  "karyo": "explainer/1",
+  "id": "b5-permissions",
+  "title": "Permissions and undo",
+  "summary": "You choose what Claude may do without asking. Checkpoints undo its file edits, but not everything; git keeps the long-term history.",
+  "note": "Names, companies and files here are **made-up examples**.",
+  "narration": "side",
+  "uses": [
+    "mode-dial",
+    "undo-ledger",
+    "chat-turn",
+    "terminal",
+    "try-it"
+  ],
+  "layout": {
+    "kind": "free"
+  },
+  "categories": [
+    {
+      "id": "analogy",
+      "label": "the analogy"
+    },
+    {
+      "id": "you",
+      "label": "your controls"
+    },
+    {
+      "id": "claude",
+      "label": "Claude's work"
+    },
+    {
+      "id": "undo",
+      "label": "undo"
+    }
+  ],
+  "elements": [
+    {
+      "id": "sitter",
+      "type": "card",
+      "category": "analogy",
+      "props": {
+        "kicker": "The analogy",
+        "title": "A house-sitter's list",
+        "body": "Water the plants: **go ahead**.\n\nRepaint the kitchen: **call me first**."
+      },
+      "at": {
+        "x": 0,
+        "y": 0,
+        "w": 340
+      }
+    },
+    {
+      "id": "dial",
+      "type": "mode-dial",
+      "category": "you",
+      "label": "Permission modes",
+      "props": {
+        "hint": "Shift+Tab switches",
+        "modes": [
+          {
+            "name": "Manual",
+            "runs": "Reads only. Asks before edits and commands."
+          },
+          {
+            "name": "Accept edits",
+            "runs": "Reads, file edits and common file commands like mkdir and mv."
+          },
+          {
+            "name": "Plan",
+            "runs": "Explores and proposes a plan, without editing your files."
+          },
+          {
+            "name": "Auto",
+            "tag": "default",
+            "runs": "Everything, with background safety checks."
+          }
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 170,
+        "w": 340
+      }
+    },
+    {
+      "id": "auto",
+      "type": "card",
+      "category": "you",
+      "props": {
+        "kicker": "Auto mode · the default",
+        "title": "Background safety checks",
+        "body": "A second model, the **classifier**, reviews most of Claude's actions and blocks risky ones instead of asking you. It's a model too: a strong safety net, not a guarantee."
+      },
+      "at": {
+        "x": 365,
+        "y": 0,
+        "w": 365
+      }
+    },
+    {
+      "id": "turn",
+      "type": "chat-turn",
+      "category": "claude",
+      "label": "What Claude did",
+      "props": {
+        "who": "claude",
+        "text": "Done: I tidied the March report, moved your old notes and emailed the summary to Acme.",
+        "actions": [
+          "Edit: report.md",
+          "Bash: mv notes.txt old/",
+          "Email connector: send summary to Acme"
+        ]
+      },
+      "at": {
+        "x": 365,
+        "y": 200,
+        "w": 365
+      }
+    },
+    {
+      "id": "ledger",
+      "type": "undo-ledger",
+      "category": "undo",
+      "label": "What /rewind undoes",
+      "props": {
+        "rows": [
+          {
+            "what": "Edited `report.md`",
+            "via": "with its file-editing tool",
+            "undo": "yes"
+          }
+        ]
+      },
+      "at": {
+        "x": 755,
+        "y": 0,
+        "w": 410
+      }
+    },
+    {
+      "id": "git",
+      "type": "terminal",
+      "category": "undo",
+      "label": "git history",
+      "props": {
+        "title": "Terminal — zsh",
+        "badge": "run by Claude",
+        "prompt": "acme-reports %",
+        "lines": [
+          {
+            "kind": "cmd",
+            "text": "git log --oneline"
+          },
+          {
+            "kind": "out",
+            "text": "0fcb858 Fix March figures"
+          },
+          {
+            "kind": "out",
+            "text": "5722cee Add Acme totals"
+          },
+          {
+            "kind": "out",
+            "text": "5789857 First draft of the Q3 summary"
+          },
+          {
+            "kind": "note",
+            "text": "(one line per commit, newest first)"
+          }
+        ]
+      },
+      "at": {
+        "x": 755,
+        "y": 300,
+        "w": 410
+      }
+    },
+    {
+      "id": "try",
+      "type": "try-it",
+      "props": {
+        "title": "Turn the dial",
+        "expect": "In Claude Code, press **Shift+Tab** a few times and watch the mode's name change: manual, accept edits, plan, auto. Then type `/rewind` to see your checkpoints, and choose **Never mind** to leave without changing anything."
+      },
+      "at": {
+        "x": 365,
+        "y": 395,
+        "w": 365
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "title": "What needs a call",
+      "text": "A house-sitter has a list: some things they just do, others they call you about first. Claude Code's list is its **permission mode**: what Claude may do without asking you.",
+      "show": [
+        "sitter",
+        "dial"
+      ],
+      "emphasize": [
+        "dial"
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "Settings on a dial",
+      "text": "**Manual**: Claude asks before editing a file or running most commands. **Accept edits**: it edits files without asking. **Plan**: it reads and proposes a plan, changing nothing. Press **Shift+Tab** to switch.",
+      "emphasize": [
+        "dial"
+      ],
+      "dim": [
+        "sitter"
+      ],
+      "set": {
+        "dial": {
+          "modes": [
+            {
+              "name": "Manual",
+              "runs": "Reads only. Asks before edits and commands.",
+              "on": true
+            },
+            {
+              "name": "Accept edits",
+              "runs": "Reads, file edits and common file commands like mkdir and mv."
+            },
+            {
+              "name": "Plan",
+              "runs": "Explores and proposes a plan, without editing your files."
+            },
+            {
+              "name": "Auto",
+              "tag": "default",
+              "runs": "Everything, with background safety checks.",
+              "dim": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s3",
+      "title": "Auto is the default",
+      "text": "As of October 2026, new terminal sessions start in **auto** mode: instead of asking you, a second model checks most actions in the background. Like Claude, that checker is probabilistic.",
+      "add": [
+        "auto"
+      ],
+      "emphasize": [
+        "auto",
+        "dial"
+      ],
+      "dim": [
+        "sitter"
+      ],
+      "set": {
+        "dial": {
+          "modes": [
+            {
+              "name": "Manual",
+              "runs": "Reads only. Asks before edits and commands."
+            },
+            {
+              "name": "Accept edits",
+              "runs": "Reads, file edits and common file commands like mkdir and mv."
+            },
+            {
+              "name": "Plan",
+              "runs": "Explores and proposes a plan, without editing your files."
+            },
+            {
+              "name": "Auto",
+              "tag": "default",
+              "runs": "Everything, with background safety checks.",
+              "on": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s4",
+      "title": "You're still the reviewer",
+      "text": "Fewer questions doesn't mean less responsibility: Claude Code's documentation says you're responsible for reviewing what Claude proposes. Read the actions it lists, not just its summary.",
+      "add": [
+        "turn"
+      ],
+      "emphasize": [
+        "turn"
+      ],
+      "dim": [
+        "sitter",
+        "dial",
+        "auto"
+      ]
+    },
+    {
+      "id": "s5",
+      "title": "Every prompt, a checkpoint",
+      "text": "Each prompt you send saves a **checkpoint**: the files Claude is about to edit, as they were. Type `/rewind`, or press Esc twice, to go back and restore the files, the conversation, or both.",
+      "add": [
+        "ledger"
+      ],
+      "emphasize": [
+        "ledger"
+      ],
+      "dim": [
+        "sitter",
+        "dial",
+        "auto"
+      ],
+      "set": {
+        "ledger": {
+          "rows": [
+            {
+              "what": "Edited `report.md`",
+              "via": "with its file-editing tool",
+              "undo": "yes",
+              "mark": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s6",
+      "title": "What it can't undo",
+      "text": "Checkpoints track only edits made with Claude's own file-editing tools. A file changed by a command, like `mv` or `rm`, isn't tracked, and nobody can unsend an email: actions on outside systems are governed by your permission mode, not by undo.",
+      "emphasize": [
+        "ledger"
+      ],
+      "dim": [
+        "sitter",
+        "dial",
+        "auto"
+      ],
+      "set": {
+        "ledger": {
+          "rows": [
+            {
+              "what": "Edited `report.md`",
+              "via": "with its file-editing tool",
+              "undo": "yes"
+            },
+            {
+              "what": "Ran `mv notes.txt old/`",
+              "via": "a command (Bash)",
+              "undo": "no",
+              "why": "commands aren't tracked",
+              "mark": true
+            },
+            {
+              "what": "Emailed the summary to Acme",
+              "via": "a connector to your email",
+              "undo": "no",
+              "why": "it left your computer",
+              "mark": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s7",
+      "title": "Git: the long-term save",
+      "text": "Checkpoints are for quick undo inside a session. For lasting history, use **git**: each **commit** is a labelled snapshot of your folder, like a photo album of past versions. Ask Claude to commit when a piece of work is done.",
+      "add": [
+        "git"
+      ],
+      "emphasize": [
+        "git"
+      ],
+      "dim": [
+        "sitter",
+        "dial",
+        "auto",
+        "turn"
+      ],
+      "set": {
+        "ledger": {
+          "rows": [
+            {
+              "what": "Edited `report.md`",
+              "via": "with its file-editing tool",
+              "undo": "yes"
+            },
+            {
+              "what": "Ran `mv notes.txt old/`",
+              "via": "a command (Bash)",
+              "undo": "no",
+              "why": "commands aren't tracked"
+            },
+            {
+              "what": "Emailed the summary to Acme",
+              "via": "a connector to your email",
+              "undo": "no",
+              "why": "it left your computer"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s8",
+      "title": "The whole picture",
+      "text": "Your permission mode decides what happens without asking. Checkpoints undo Claude's file edits; git keeps every version you commit. Nothing undoes what has left your computer, so that's where to stay strict.",
+      "show": "*"
+    }
+  ]
+}

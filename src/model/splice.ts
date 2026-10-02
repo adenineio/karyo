@@ -7,7 +7,12 @@
 //
 // Identity is the model's (src/model/model.ts): a node is its id, a relationship its ordered pair
 // (`pairKey`); marks are keyed the same way.
-import { ID_RE, RELATION_KINDS, idFold, isImport, isProposed, kindsOf, nameFold, normalize, pairKey, type EdgeKind, type MEdge, type MNode, type Model, type NodeKind } from './model';
+//
+// A card can stand for parts: a structure board draws a type with its methods folded into it (docs/MODEL.md "Fold"),
+// so the wire between two type cards stands for the relationships between their methods. An op that names such a card
+// means what the board shows: `between`, `before`, `after`, `disconnect` and `connect` read the relationships of its
+// parts, `remove` and `replace` take its parts with it. `boardMarks` marks the board's folded wires.
+import { ID_RE, RELATION_KINDS, foldRep, idFold, isImport, isProposed, kindsOf, nameFold, normalize, pairKey, type EdgeKind, type MEdge, type MGroup, type MNode, type Model, type NodeKind } from './model';
 
 // ================================================================== format
 
@@ -28,18 +33,29 @@ export interface SpliceAttach { to: string; dir?: 'out' | 'in'; kind?: EdgeKind 
 /** Where an added node goes: at most one of these (none: a free node). */
 export type SplicePlace = { between: [string, string] } | { before: string } | { after: string } | { attach: SpliceAttach } | Record<string, never>;
 export interface SpliceAddOp { op: 'add'; node: SpliceNode; between?: [string, string]; before?: string; after?: string; attach?: SpliceAttach }
+/** `from` / `to` may also name a group this splice proposes: its entry card (its placeholder, else its first card). */
 export interface SpliceConnectOp { op: 'connect'; from: string; to: string; kind?: EdgeKind; label?: string }
 export interface SpliceDisconnectOp { op: 'disconnect'; from: string; to: string }
-export interface SpliceRemoveOp { op: 'remove'; node: string }
-export interface SpliceRenameOp { op: 'rename'; node: string; label: string }
+/** Remove a node, or (`group`) a group this splice proposes, with every card in it. */
+export type SpliceRemoveOp = { op: 'remove' } & ({ node: string; group?: undefined } | { group: string; node?: undefined });
+/** Rename a node, or (`group`) a group. */
+export type SpliceRenameOp = { op: 'rename'; label: string } & ({ node: string; group?: undefined } | { group: string; node?: undefined });
+/** Move a node into a group (its id or label; an unknown name is a new group with that id). */
 export interface SpliceMoveOp { op: 'move'; node: string; group: string }
 /** Swap X for Y: Y (a new node, or an existing one named by a ref) takes over every relationship of X, in and out; X
  *  stays as a removed ghost and its old relationships as rerouted ghosts. Later ops (and other splices combined after
  *  it) that name X follow the replacement to Y. */
 export interface SpliceReplaceOp { op: 'replace'; node: string; with: SpliceNode | string }
-export type SpliceOp = SpliceAddOp | SpliceConnectOp | SpliceDisconnectOp | SpliceRemoveOp | SpliceRenameOp | SpliceMoveOp | SpliceReplaceOp;
+/** A proposed group: `id` is `splice.<slug>` unless given; `parent` the group it sits in (an id or label; none: the top). */
+export interface SpliceGroup { id?: string; label: string; parent?: string; summary?: string }
+/** Propose a new group (docs/MODEL.md "Splices"): optionally its first card, and one relationship between the group and
+ *  a node (`attach`: `in` = to → the group, the group is an outlet of `to`; `out` = the group → to). The relationship
+ *  goes to the group's entry: its first card, else a placeholder card that stands for the group until a card is proposed
+ *  into it (the first one takes over its relationships). */
+export interface SpliceGroupOp { op: 'group'; group: SpliceGroup; first?: SpliceNode; attach?: SpliceAttach }
+export type SpliceOp = SpliceAddOp | SpliceConnectOp | SpliceDisconnectOp | SpliceRemoveOp | SpliceRenameOp | SpliceMoveOp | SpliceReplaceOp | SpliceGroupOp;
 export type SpliceOpName = SpliceOp['op'];
-export const SPLICE_OPS: readonly SpliceOpName[] = ['add', 'connect', 'disconnect', 'remove', 'rename', 'move', 'replace'];
+export const SPLICE_OPS: readonly SpliceOpName[] = ['add', 'connect', 'disconnect', 'remove', 'rename', 'move', 'replace', 'group'];
 
 /** The model the splice was made against: its repo-relative path, the commit it was at (null: unknown or
  *  uncommitted), and the scene it was drawn on. */
@@ -73,11 +89,16 @@ export interface SpliceMarks {
    *  or retires (sorted). Deleting op j breaks every op whose `byOp` lists j. */
   byOp: number[][];
   /** Per op (same index): the node ids and pair keys it proposed, retired, restored or changed, and that are still in
-   *  the spliced model. Empty for a skipped op. */
-  touched: { nodes: string[]; edges: string[] }[];
+   *  the spliced model (and `groups`, when it proposed, renamed or removed one). Empty for a skipped op. */
+  touched: { nodes: string[]; edges: string[]; groups?: string[] }[];
   /** Nodes a `replace` swapped out, by id: the node that took over (a removed node here is a replaced one). */
   replaced: Record<string, string>;
+  /** Groups the splice proposes or renames, by group id. */
+  groups: Record<string, GroupMark>;
+  /** Placeholder cards (a proposed group with no card yet: it holds the group's relationships), by node id: their group. */
+  placeholders: Record<string, string>;
 }
+export type GroupMark = 'proposed' | 'renamed';
 /** A reference an op made to a node that an earlier op replaced (followed to the replacement) or renamed (named by its
  *  old label): `ref` as written, the node it named, the node it now means. */
 export interface SpliceFollow { op: number; ref: string; from: string; to: string; why: 'replaced' | 'renamed' }
@@ -136,6 +157,29 @@ export function slugId(label: string, taken: Iterable<string> | ((id: string) =>
 }
 /** A readable name for an id nothing labels: `splice.read-cache` → "read cache". */
 const humanize = (id: string) => (id.startsWith('splice.') ? id.slice(7).replace(/-\d+$/, '').replace(/-/g, ' ') : id);
+/** Every group id a model knows: its named groups and the ones its nodes name. */
+export const groupIds = (m: Model): string[] => [...new Set([...(m.groups ?? []).map((g) => g.id), ...(m.nodes ?? []).map((n) => n.group).filter((g): g is string => !!g)])];
+/** The placeholder card of a proposed group with no card yet: `<group id>.entry`. */
+export const entryId = (groupId: string) => `${groupId}.entry`;
+
+export interface GroupRefResult { id: string | null; match: 'id' | 'label' | 'none' | 'ambiguous'; suggestions: { id: string; label: string }[] }
+/** The group a person means by `ref`: its id, or its label (case, spacing, punctuation and a leading "the" ignored; a
+ *  trailing "group" too). Close spellings are only suggested. */
+export function resolveGroupRef(model: Pick<Model, 'groups' | 'nodes'>, ref: string): GroupRefResult {
+  const named = new Map((model.groups ?? []).map((g) => [g.id, g.label ?? g.id]));
+  for (const id of groupIds(model as Model)) if (!named.has(id)) named.set(id, id);
+  const all = [...named].map(([id, label]) => ({ id, label }));
+  if (!isStr(ref) || !ref.trim()) return { id: null, match: 'none', suggestions: [] };
+  if (named.has(ref)) return { id: ref, match: 'id', suggestions: [] };
+  const f = fold(ref.replace(/\s+group\s*$/i, ''));
+  const byLabel = all.filter((g) => fold(g.label) === f && f);
+  if (byLabel.length === 1) return { id: byLabel[0]!.id, match: 'label', suggestions: [] };
+  if (byLabel.length > 1) return { id: null, match: 'ambiguous', suggestions: byLabel.slice(0, 3) };
+  const byId = all.filter((g) => fold(g.id) === f && f);
+  if (byId.length === 1) return { id: byId[0]!.id, match: 'id', suggestions: [] };
+  const near = all.map((g) => ({ g, s: Math.max(sim(f, fold(g.label)), sim(f, fold(g.id))) })).filter((x) => x.s >= 0.5).sort((a, b) => b.s - a.s).map((x) => x.g);
+  return { id: null, match: 'none', suggestions: near.slice(0, 3) };
+}
 
 // ================================================================== resolving a node reference
 
@@ -196,6 +240,18 @@ export const spliceOp = {
   remove: (node: string): SpliceRemoveOp => ({ op: 'remove', node }),
   rename: (node: string, label: string): SpliceRenameOp => ({ op: 'rename', node, label }),
   move: (node: string, group: string): SpliceMoveOp => ({ op: 'move', node, group }),
+  /** A new group (`label`; `opts.parent` nests it), with its first card and one relationship to a node (`attach`). Its id
+   *  is `opts.id`, else one derived from the label that isn't one of `opts.taken`'s groups. */
+  group(label: string, opts: { id?: string; parent?: string; summary?: string; first?: string | SpliceNode; attach?: SpliceAttach; taken?: Model | Iterable<string> } = {}): SpliceGroupOp {
+    const ids = opts.taken === undefined ? [] : Array.isArray((opts.taken as Model).nodes) ? groupIds(opts.taken as Model) : (opts.taken as Iterable<string>);
+    const g: SpliceGroup = { id: opts.id ?? slugId(label, ids), label };
+    if (opts.parent) g.parent = opts.parent;
+    if (opts.summary) g.summary = opts.summary;
+    const first = typeof opts.first === 'string' ? { id: slugId(opts.first, opts.taken !== undefined && Array.isArray((opts.taken as Model).nodes) ? (opts.taken as Model).nodes.map((n) => n.id) : []), label: opts.first } : opts.first;
+    return { op: 'group', group: g, ...(first ? { first } : {}), ...(opts.attach ? { attach: opts.attach } : {}) };
+  },
+  removeGroup: (group: string): SpliceRemoveOp => ({ op: 'remove', group }),
+  renameGroup: (group: string, label: string): SpliceRenameOp => ({ op: 'rename', group, label }),
   /** Swap `node` for a new node (`with` a label, and options as for add) or for an existing one (`{ ref }`). */
   replace(node: string, w: string | { ref: string }, opts: Partial<Omit<SpliceNode, 'label'>> & { taken?: Model | Iterable<string> } = {}): SpliceReplaceOp {
     if (typeof w === 'object') return { op: 'replace', node, with: w.ref };
@@ -237,8 +293,21 @@ class Work {
   placed: Record<number, SplicePlacement> = {};
   warnings: SpliceWarning[] = [];
   deps: Set<number>[] = [];
-  touched: { nodes: Set<string>; edges: Set<string> }[] = [];
+  touched: { nodes: Set<string>; edges: Set<string>; groups: Set<string> }[] = [];
   i = 0;
+  /** Named groups (labels, nesting), by id; a splice adds the ones it proposes. */
+  groups = new Map<string, MGroup>();
+  gmark = new Map<string, GroupMark>();
+  /** Placeholder cards: a proposed group's stand-in until a card is proposed into it, by node id → its group. */
+  ph = new Map<string, string>();
+  /** Each node's group in the input (a removed proposed group gives back the real cards moved into it). */
+  baseGroup = new Map<string, string | undefined>();
+  /** Labels a group had before an op renamed it. */
+  oldGroupLabels = new Map<string, string[]>();
+  hadGroups: boolean;
+  /** The nodes drawn folded into each card (a type's methods): the parts an op naming the card stands for. */
+  kids = new Map<string, string[]>();
+  card: (id: string) => string;
 
   constructor(m: Model) {
     for (const n of m.nodes) this.nodes.set(n.id, { ...n, sources: [...(n.sources ?? [])], ...(n.tags ? { tags: [...n.tags] } : {}) });
@@ -246,14 +315,126 @@ class Work {
       if (isImport(e)) { this.imports.push(e); continue; }
       this.edges.set(pairKey(e.from, e.to), { ...e, sources: [...e.sources], ...(e.kinds ? { kinds: [...e.kinds] } : {}) });
     }
-    for (const n of this.nodes.values()) if (isProposed(n)) this.nmark.set(n.id, 'proposed');
+    this.hadGroups = Array.isArray(m.groups);
+    for (const g of m.groups ?? []) { this.groups.set(g.id, { ...g, ...(g.sources ? { sources: [...g.sources] } : {}) }); if (isProposed(g)) this.gmark.set(g.id, 'proposed'); }
+    for (const n of this.nodes.values()) {
+      this.baseGroup.set(n.id, n.group);
+      if (isProposed(n)) { this.nmark.set(n.id, 'proposed'); if (n.group && this.gmark.get(n.group) === 'proposed' && n.id === entryId(n.group)) this.ph.set(n.id, n.group); }
+    }
     for (const [k, e] of this.edges) if (isProposed(e)) this.emark.set(k, 'proposed');
+    this.card = foldRep(m.nodes);
+    for (const n of m.nodes) { const c = this.card(n.id); if (c !== n.id) (this.kids.get(c) ?? this.kids.set(c, []).get(c)!).push(n.id); }
   }
-  begin(i: number) { this.i = i; this.deps[i] = new Set(); this.touched[i] = { nodes: new Set(), edges: new Set() }; }
+  /** A card and the nodes folded into it: what the card stands for on a board. */
+  parts(x: string): Set<string> { return new Set([x, ...(this.kids.get(x) ?? [])]); }
+  /** The relationships the board's wire a → b stands for: a → b itself, or, when a or b is a card with parts, every one
+   *  from a part of a to a part of b. Live ones only, unless `all`. */
+  wire(a: string, b: string, all = false): [string, MEdge][] {
+    const k = pairKey(a, b);
+    const pa = this.parts(a), pb = this.parts(b);
+    if ((pa.size === 1 && pb.size === 1) || pa.has(b) || pb.has(a)) { const e = all ? this.edges.get(k) : this.live(k); return e ? [[k, e]] : []; }
+    return [...this.edges.entries()].filter(([x, e]) => pa.has(e.from) && pb.has(e.to) && (all || !this.gone(x)));
+  }
+  /** Live relationships into (dir 'in') or out of a card's parts from outside them: its callers or callees on the board. */
+  across(x: string, dir: 'in' | 'out', skip?: string): MEdge[] {
+    const p = this.parts(x);
+    return this.liveEdges().map(([, e]) => e).filter((e) => (dir === 'in' ? p.has(e.to) && !p.has(e.from) && e.from !== skip : p.has(e.from) && !p.has(e.to) && e.to !== skip));
+  }
+  /** How many ends those relationships have, as cards (the board's count; a node with no parts counts its own). */
+  ends(x: string, es: MEdge[], dir: 'in' | 'out'): number {
+    const far = es.map((e) => (dir === 'in' ? e.from : e.to));
+    return new Set(this.parts(x).size > 1 ? far.map((f) => this.card(f)) : far).size;
+  }
+  begin(i: number) { this.i = i; this.deps[i] = new Set(); this.touched[i] = { nodes: new Set(), edges: new Set(), groups: new Set() }; }
   warn(message: string, hint?: string) { this.warnings.push({ op: this.i, message, ...(hint ? { hint } : {}) }); }
   dep(key: string) { const j = this.origin.get(key); if (j !== undefined && j !== this.i) this.deps[this.i]!.add(j); }
   tn(id: string) { this.touched[this.i]!.nodes.add(id); }
   te(k: string) { this.touched[this.i]!.edges.add(k); }
+  tg(id: string) { this.touched[this.i]!.groups.add(id); }
+  // ---- groups
+  glabel(id: string) { return this.groups.get(id)?.label ?? id; }
+  /** The group `ref` names (id or label), quietly: null when none or several. */
+  gquiet(ref: unknown): string | null {
+    if (!nonEmpty(ref)) return null;
+    const r = resolveGroupRef({ groups: [...this.groups.values()], nodes: this.liveNodes() }, ref);
+    if (r.id) { this.dep(`g:${r.id}`); return r.id; }
+    const f = fold(ref);
+    const was = [...this.oldGroupLabels].filter(([id, ls]) => this.groups.has(id) && ls.some((l) => fold(l) === f));
+    if (was.length === 1) { this.dep(`g:${was[0]![0]}`); return was[0]![0]; }
+    return null;
+  }
+  /** The group `ref` names, or null (warned, with a did-you-mean). */
+  gref(ref: unknown, role: string): string | null {
+    if (!nonEmpty(ref)) { this.warn(`${role} is missing.`); return null; }
+    const g = this.gquiet(ref);
+    if (g) return g;
+    const r = resolveGroupRef({ groups: [...this.groups.values()], nodes: this.liveNodes() }, ref);
+    const dym = r.suggestions.length ? `did you mean ${r.suggestions.map((s) => (s.label !== s.id ? `"${s.label}" (${s.id})` : s.id)).join(' or ')}?` : undefined;
+    this.warn(r.match === 'ambiguous' ? `${role} "${ref}" matches several groups.` : `${role} "${ref}" isn't a group in this model.`, dym);
+    return null;
+  }
+  liveNodes() { return [...this.nodes.values()].filter((n) => this.nmark.get(n.id) !== 'removed'); }
+  /** Live nodes whose own group is `g`. */
+  inGroup(g: string) { return this.liveNodes().filter((n) => n.group === g); }
+  /** A group named by `ref` where a node was expected: only an exact id or label, and only when no node has that name. */
+  groupInstead(ref: unknown): string | null {
+    if (!nonEmpty(ref)) return null;
+    const r = resolveNodeRef(this.liveNodes(), ref);
+    if (r.id && (r.match === 'id' || r.match === 'label')) return null;
+    if ([...this.nodes.keys()].includes(ref)) return null;
+    return resolveGroupRef({ groups: [...this.groups.values()], nodes: this.liveNodes() }, ref).id;
+  }
+  /** The card that stands for a proposed group on a relationship: its placeholder, else its first live card (made a
+   *  placeholder when it has none and `make`). Null for a group in the code (which of its cards would it be?). */
+  entryOf(g: string, make: boolean): string | null {
+    for (const [p, pg] of this.ph) if (pg === g && this.nodes.has(p)) { this.dep(`n:${p}`); return p; }
+    if (this.gmark.get(g) !== 'proposed') return null;
+    const first = this.inGroup(g)[0];
+    if (first) { this.dep(`n:${first.id}`); return first.id; }
+    return make ? this.placeholder(g) : null;
+  }
+  /** A node, or a proposed group (its entry card), for the end of a relationship. */
+  endRef(ref: unknown, role: string, make = true): string | null {
+    const g = this.groupInstead(ref);
+    if (g) {
+      const e = this.entryOf(g, make);
+      if (e) return e;
+      this.warn(`${role} "${String(ref)}" is a group in the code; name one of its cards.`, this.inGroup(g).slice(0, 3).map((n) => n.label ?? n.id).join(', ') || undefined);
+      return null;
+    }
+    return this.ref(ref, role);
+  }
+  /** A proposed group's placeholder card: it stands for the group (and holds its relationships) until it has a card. */
+  placeholder(g: string): string {
+    let id = entryId(g);
+    for (let n = 2; this.nodes.has(id); n++) id = `${entryId(g)}-${n}`;
+    this.nodes.set(id, { id, kind: 'service', label: `${this.glabel(g)} (no cards yet)`, group: g, sources: ['proposed'] });
+    this.nmark.set(id, 'proposed');
+    this.ph.set(id, g);
+    this.origin.set(`n:${id}`, this.i);
+    this.tn(id);
+    return id;
+  }
+  /** A card landed in group g: it takes over the group's placeholder (its relationships), which goes. */
+  takeOver(id: string, g: string | undefined) {
+    if (!g) return;
+    const p = [...this.ph].find(([x, pg]) => pg === g && x !== id && this.nodes.has(x))?.[0];
+    if (!p) return;
+    this.dep(`n:${p}`);
+    for (const [k, e] of [...this.edges]) {
+      if (e.from !== p && e.to !== p) continue;
+      const f = e.from === p ? id : e.from, t = e.to === p ? id : e.to;
+      if (!this.gone(k) && f !== t) this.propose(f, t, kindsOf(e), e.label);
+      this.retire(k, 'removed');
+    }
+    this.nodes.delete(p); this.nmark.delete(p); this.ph.delete(p);
+  }
+  /** A proposed group left with no live card gets its placeholder back (an entered group is never just empty). */
+  refill(g: string | undefined) {
+    if (!g || this.gmark.get(g) !== 'proposed' || !this.groups.has(g)) return;
+    if (this.inGroup(g).length) return;
+    this.placeholder(g);
+  }
   label(id: string) { return this.nodes.get(id)?.label ?? this.replacedLabel.get(id) ?? humanize(id); }
   gone(k: string) { const m = this.emark.get(k); return m === 'removed' || m === 'rerouted'; }
   /** A relationship the what-if still has. */
@@ -344,7 +525,8 @@ class Work {
       if (isNodeKind(nd.kind)) kind = nd.kind;
       else this.warn(`${what} "${label}": kind "${String(nd.kind)}" isn't a node kind; drawn as a ${kind}.`, `use one of ${NODE_KINDS.join(', ')}, or a kit's kind (a lowercase word)`);
     }
-    const group = nonEmpty(nd.group) ? nd.group : dflt.group || 'splice';
+    // a group named by its id or label (a proposed one included); a name no group has is a new group id, as before
+    const group = nonEmpty(nd.group) ? this.gquiet(nd.group) ?? nd.group : dflt.group || 'splice';
     const tags = Array.isArray(nd.tags) ? [...new Set(nd.tags.filter(nonEmpty))].sort() : [];
     const category = nonEmpty(nd.category) ? nd.category : dflt.category;
     const node: MNode = { id, kind, label, ...(nonEmpty(nd.summary) ? { summary: nd.summary } : {}), group, ...(nonEmpty(category) ? { category } : {}), ...(tags.length ? { tags } : {}), sources: ['proposed'] };
@@ -352,6 +534,8 @@ class Work {
     this.nmark.set(id, 'proposed');
     this.origin.set(`n:${id}`, this.i);
     this.tn(id);
+    // the first card proposed into a group that has none takes over its placeholder
+    this.takeOver(id, group);
     return id;
   }
 
@@ -367,51 +551,58 @@ class Work {
     if (keys.length > 1) return this.warn(`add "${label}" has ${keys.join(' and ')}; it can go only one place.`, `keep one of ${keys.join(', ')}`);
     let place: Place = { kind: 'free' };
     let rel: MEdge | undefined;
+    let under: [string, MEdge][] = [];
     if (keys[0] === 'between') {
       const bw = op.between;
       if (!Array.isArray(bw) || bw.length !== 2) return this.warn(`add "${label}": between needs two nodes.`, 'e.g. "between": ["a", "b"]');
       const a = this.ref(bw[0], 'between[0]'); if (!a) return;
       const b = this.ref(bw[1], 'between[1]'); if (!b) return;
       if (a === b) return this.warn(`add "${label}": between names ${this.label(a)} twice.`);
-      rel = this.live(pairKey(a, b)) ?? this.live(pairKey(b, a));
+      // the wire a → b (or b → a) as the board draws it: between two cards with parts, every relationship of their parts
+      const fw = this.wire(a, b);
+      under = fw.length ? fw : this.wire(b, a);
+      rel = under[0]?.[1];
       if (!rel) {
-        const was = this.edges.get(pairKey(a, b)) ?? this.edges.get(pairKey(b, a));
+        const was = this.wire(a, b, true).length || this.wire(b, a, true).length;
         if (was) return this.warn(`add "${label}": ${this.label(a)} and ${this.label(b)} are no longer connected (an earlier op retired it).`);
         const near = this.liveEdges().map(([, e]) => e).filter((e) => e.from === a || e.to === a).map((e) => (e.from === a ? e.to : e.from));
         const alt = resolveNodeRef(near.map((id) => this.nodes.get(id)!).filter(Boolean), bw[1] as string);
         return this.warn(`add "${label}": there is no relationship between ${this.label(a)} and ${this.label(b)} to insert into.`,
           alt.suggestions.length ? `${this.label(a)} is connected to ${alt.suggestions.map((s) => `"${s.label}" (${s.id})`).join(', ')}; or use "attach"` : 'use "connect", or "attach" the new node');
       }
-      place = { kind: 'between', a: rel.from, b: rel.to };
+      place = fw.length ? { kind: 'between', a, b } : { kind: 'between', a: b, b: a };
     } else if (keys[0] === 'before' || keys[0] === 'after') {
       const x = this.ref((op as any)[keys[0]], keys[0]); if (!x) return;
       place = { kind: keys[0], x };
     } else if (keys[0] === 'attach') {
       const at = op.attach as SpliceAttach;
       if (!at || typeof at !== 'object') return this.warn(`add "${label}": attach needs { "to": … }.`);
-      const to = this.ref(at.to, 'attach.to'); if (!to) return;
+      const to = this.endRef(at.to, 'attach.to'); if (!to) return;
       const dir = at.dir ?? 'out';
       if (dir !== 'out' && dir !== 'in') return this.warn(`add "${label}": attach.dir is "${String(dir)}".`, 'use "out" (new → to) or "in" (to → new)');
       const ek = at.kind ?? 'calls';
       if (!KIND_ORDER.has(ek)) return this.warn(`add "${label}": attach.kind "${String(ek)}" isn't a relationship kind.`, `use one of ${RELATION_KINDS.join(', ')}`);
       place = { kind: 'attach', to, dir, ek };
     }
+    // next to a placeholder (a proposed group with no card yet): the new card goes into that group and takes it over
+    const ends = place.kind === 'between' ? [place.a, place.b] : place.kind === 'before' || place.kind === 'after' ? [place.x] : place.kind === 'attach' ? [place.to] : [];
+    const intoGroup = ends.map((x) => this.ph.get(x)).find((g) => !!g);
+    if (intoGroup) place = { kind: 'free' };
     // the node: new (its id given or derived from the label), or the one another splice proposed
     const near = place.kind === 'between' ? place.b : place.kind === 'before' || place.kind === 'after' ? place.x : place.kind === 'attach' ? place.to : undefined;
-    const id = reuse ?? this.newNode(nd, label, 'add', { group: (near && this.nodes.get(near)?.group) || undefined });
+    const id = reuse ?? this.newNode(intoGroup && !nonEmpty(nd.group) ? { ...nd, group: intoGroup } : nd, label, 'add', { group: (near && this.nodes.get(near)?.group) || undefined });
     if (!id) return;
     if (reuse) { this.tn(id); this.dep(`n:${id}`); }
     // its relationships
     if (place.kind === 'between') {
-      const ks = kindsOf(rel!);
-      const k = pairKey(place.a, place.b);
+      const ks = sortKinds(under.flatMap(([, e]) => kindsOf(e)));
       this.propose(place.a, id, ks);
       this.propose(id, place.b, ks);
-      this.retire(k, 'rerouted', id);
+      for (const [k] of under) this.retire(k, 'rerouted', id);
     } else if (place.kind === 'before') {
       // one caller (or none): the new node goes in front of X; several: it is one more step that calls X
-      const callers = this.liveEdges().map(([, e]) => e).filter((e) => e.to === place.x && e.from !== id);
-      if (callers.length > 1) { this.placed[this.i] = 'also'; this.propose(id, place.x, ['calls']); }
+      const callers = this.across(place.x, 'in', id);
+      if (this.ends(place.x, callers, 'in') > 1) { this.placed[this.i] = 'also'; this.propose(id, place.x, ['calls']); }
       else {
         this.placed[this.i] = 'interpose';
         for (const e of callers) { this.propose(e.from, id, kindsOf(e)); this.retire(pairKey(e.from, e.to), 'rerouted', id); }
@@ -419,8 +610,8 @@ class Work {
       }
     } else if (place.kind === 'after') {
       // one callee (or none): the new node goes behind X; several (X fans out): it is one more step X calls
-      const outs = this.liveEdges().map(([, e]) => e).filter((e) => e.from === place.x && e.to !== id);
-      if (outs.length > 1) { this.placed[this.i] = 'also'; this.propose(place.x, id, ['calls']); }
+      const outs = this.across(place.x, 'out', id);
+      if (this.ends(place.x, outs, 'out') > 1) { this.placed[this.i] = 'also'; this.propose(place.x, id, ['calls']); }
       else {
         this.placed[this.i] = 'interpose';
         for (const e of outs) { this.propose(id, e.to, kindsOf(e)); this.retire(pairKey(e.from, e.to), 'rerouted', id); }
@@ -434,22 +625,37 @@ class Work {
   connect(op: SpliceConnectOp) {
     const kind = op.kind ?? 'calls';
     if (!KIND_ORDER.has(kind)) return this.warn(`connect: kind "${String(kind)}" isn't a relationship kind.`, `use one of ${RELATION_KINDS.join(', ')}`);
-    const a = this.ref(op.from, 'from'); if (!a) return;
-    const b = this.ref(op.to, 'to'); if (!b) return;
+    const a = this.endRef(op.from, 'from'); if (!a) return;
+    const b = this.endRef(op.to, 'to'); if (!b) return;
     if (a === b) return this.warn(`connect: ${this.label(a)} to itself.`);
+    // two cards whose parts are related already have that wire on the board
+    if (!this.edges.has(pairKey(a, b)) && (this.parts(a).size > 1 || this.parts(b).size > 1) && this.wire(a, b).length)
+      return this.warn(`connect: ${this.label(a)} → ${this.label(b)} is already a relationship (through ${this.wire(a, b).map(([, e]) => `${this.label(e.from)} → ${this.label(e.to)}`).slice(0, 2).join(', ')}); nothing to add.`);
     const r = this.propose(a, b, [kind], nonEmpty(op.label) ? op.label : undefined);
     if (r === 'exists') this.warn(`connect: ${this.label(a)} → ${this.label(b)} is already a relationship; nothing to add.`);
   }
   disconnect(op: SpliceDisconnectOp) {
-    const a = this.ref(op.from, 'from'); if (!a) return;
-    const b = this.ref(op.to, 'to'); if (!b) return;
+    const a = this.endRef(op.from, 'from', false); if (!a) return;
+    const b = this.endRef(op.to, 'to', false); if (!b) return;
     const k = pairKey(a, b);
     if (this.live(k)) { this.dep(`e:${k}`); return this.retire(k, 'removed'); }
-    if (this.edges.has(k)) return this.warn(`disconnect: ${this.label(a)} → ${this.label(b)} is already gone (an earlier op).`);
+    const under = this.wire(a, b);                // cards with parts: every relationship between them
+    if (under.length) { for (const [x] of under) { this.dep(`e:${x}`); this.retire(x, 'removed'); } return; }
+    if (this.edges.has(k) || this.wire(a, b, true).length) return this.warn(`disconnect: ${this.label(a)} → ${this.label(b)} is already gone (an earlier op).`);
     this.warn(`disconnect: there is no relationship ${this.label(a)} → ${this.label(b)}.`, this.live(pairKey(b, a)) ? `did you mean ${this.label(b)} → ${this.label(a)} (from "${b}" to "${a}")?` : undefined);
   }
   remove(op: SpliceRemoveOp) {
+    const g = op.group !== undefined ? op.group : this.groupInstead(op.node);
+    if (op.group !== undefined || g) return this.removeGroup(g, op.group !== undefined);
     const x = this.ref(op.node, 'node', false); if (!x) return;
+    const from = this.nodes.get(x)!.group;
+    const parts = this.parts(x);
+    this.removeNode(x);
+    // a card goes with what is folded into it (a type's methods)
+    for (const p of parts) if (p !== x && this.nodes.has(p) && this.nmark.get(p) !== 'removed') this.removeNode(p);
+    this.refill(from);
+  }
+  removeNode(x: string) {
     const n = this.nodes.get(x)!;
     this.tn(x);
     this.removedBy.set(x, this.i);
@@ -459,13 +665,29 @@ class Work {
       for (const [k, e] of [...this.edges]) if (e.from === x || e.to === x) this.retire(k, 'removed');
       for (const [k, by] of [...this.reroutedBy]) if (by === x) { this.reroutedBy.delete(k); this.emark.delete(k); this.te(k); }
       for (const [was, by] of [...this.replacedBy]) if (by === x) { this.replacedBy.delete(was); if (this.nodes.has(was) && this.nmark.get(was) === 'removed') { this.nmark.delete(was); this.tn(was); } }
-      this.nodes.delete(x); this.nmark.delete(x);
+      this.nodes.delete(x); this.nmark.delete(x); this.ph.delete(x);
       return;
     }
     this.nmark.set(x, 'removed');
     for (const [k, e] of [...this.edges]) if ((e.from === x || e.to === x) && !this.gone(k)) this.retire(k, 'removed');
   }
-  replace(op: SpliceReplaceOp) {
+  /** Remove a group this splice proposes: its proposed cards and subgroups go (they never existed); a card in the code
+   *  that was moved into it goes back to its own group. */
+  removeGroup(ref: unknown, named: boolean) {
+    const g = named ? this.gref(ref, 'group') : (ref as string);
+    if (!g) return;
+    if (this.gmark.get(g) !== 'proposed') return this.warn(`remove: ${this.glabel(g)} is a group in the code; only a group this splice proposes can be removed.`, 'remove its cards instead');
+    this.dep(`g:${g}`);
+    const sub = [...this.groups.values()].filter((x) => { for (let p: string | undefined = x.id, k = 0; p && k < 32; p = this.groups.get(p)?.parent, k++) if (p === g) return true; return false; }).map((x) => x.id);
+    for (const x of [...this.nodes.values()].filter((n) => n.group && sub.includes(n.group))) {
+      if (isProposed(x)) { this.removeNode(x.id); continue; }
+      const back = this.baseGroup.get(x.id);
+      if (back === undefined) delete x.group; else x.group = back;
+      if (this.nmark.get(x.id) === 'moved') this.nmark.delete(x.id);
+      this.tn(x.id);
+    }
+    for (const x of sub) { this.groups.delete(x); this.gmark.delete(x); this.tg(x); }
+  }  replace(op: SpliceReplaceOp) {
     const x = this.ref(op.node, 'node', false); if (!x) return;
     const xn = this.nodes.get(x)!;
     const w = op.with as unknown;
@@ -480,10 +702,11 @@ class Work {
       y = this.newNode(nd, label, 'replace', { kind: xn.kind, category: xn.category, group: xn.group });
       if (!y) return;
     } else return this.warn(`replace ${this.label(x)}: "with" is missing.`, 'give it "with": { "label": "…" } (a new node) or "with": "<node>" (one that exists)');
-    // Y takes over every relationship of X, in and out (X's old ones are rerouted through Y)
+    // Y takes over every relationship of X, in and out (X's old ones are rerouted through Y); a card's include its parts'
+    const px = this.parts(x);
     for (const [k, e] of this.liveEdges()) {
-      if (e.from !== x && e.to !== x) continue;
-      const f = e.from === x ? y : e.from, t = e.to === x ? y : e.to;
+      if (!px.has(e.from) && !px.has(e.to)) continue;
+      const f = px.has(e.from) ? y : e.from, t = px.has(e.to) ? y : e.to;
       if (f !== t) this.propose(f, t, kindsOf(e), e.label);
       this.retire(k, 'rerouted', y);
     }
@@ -493,9 +716,13 @@ class Work {
     this.replacedBy.set(x, y);
     if (isProposed(xn)) { this.dep(`n:${x}`); this.replacedLabel.set(x, xn.label ?? humanize(x)); this.nodes.delete(x); this.nmark.delete(x); }
     else { this.nmark.set(x, 'removed'); this.tn(x); }
+    for (const p of px) if (p !== x && this.nodes.has(p) && this.nmark.get(p) !== 'removed') { this.nmark.set(p, 'removed'); this.tn(p); }
   }
   rename(op: SpliceRenameOp) {
     if (!nonEmpty(op.label)) return this.warn('rename needs a new label.');
+    const g = op.group !== undefined ? this.gref(op.group, 'group') : this.groupInstead(op.node);
+    if (op.group !== undefined && !g) return;
+    if (g) return this.renameGroup(g, op.label.trim());
     const x = this.ref(op.node, 'node', false); if (!x) return;
     const n = this.nodes.get(x)!;
     if (n.label === op.label.trim()) return this.warn(`rename: ${x} is already called "${n.label}".`);
@@ -504,14 +731,82 @@ class Work {
     if (!isProposed(n) && this.nmark.get(x) !== 'removed') this.nmark.set(x, 'renamed');
     this.tn(x);
   }
+  renameGroup(g: string, label: string) {
+    const cur = this.groups.get(g);
+    const was = cur?.label ?? g;
+    if (was === label) return this.warn(`rename: the group ${g} is already called "${label}".`);
+    this.oldGroupLabels.set(g, [...(this.oldGroupLabels.get(g) ?? []), was]);
+    this.groups.set(g, { ...(cur ?? { id: g }), label });
+    if (this.gmark.get(g) !== 'proposed') this.gmark.set(g, 'renamed');
+    // a placeholder says its group's name
+    for (const [p, pg] of this.ph) if (pg === g && this.nodes.has(p)) { this.nodes.get(p)!.label = `${label} (no cards yet)`; this.tn(p); }
+    this.tg(g);
+  }
   move(op: SpliceMoveOp) {
     if (!nonEmpty(op.group)) return this.warn('move needs a group.');
     const x = this.ref(op.node, 'node', false); if (!x) return;
     const n = this.nodes.get(x)!;
-    if (n.group === op.group) return this.warn(`move: ${this.label(x)} is already in ${op.group}.`);
-    n.group = op.group;
+    const g = this.gquiet(op.group) ?? op.group;
+    if (n.group === g) return this.warn(`move: ${this.label(x)} is already in ${this.glabel(g)}.`);
+    const from = n.group;
+    n.group = g;
     if (!isProposed(n) && this.nmark.get(x) !== 'removed') this.nmark.set(x, 'moved');
     this.tn(x);
+    this.takeOver(x, g);
+    this.refill(from);
+  }
+  group(op: SpliceGroupOp) {
+    const gd = op.group as SpliceGroup | undefined;
+    if (!gd || typeof gd !== 'object') return this.warn('group has no group.', 'give it { "group": { "label": "…" } }');
+    const label = nonEmpty(gd.label) ? gd.label.trim() : nonEmpty(gd.id) ? humanize(gd.id) : '';
+    if (!label) return this.warn('group needs a label (or an id).', 'give it { "group": { "label": "…" } }');
+    // combining splices: a group another splice already proposed, used here too (the two are "the same")
+    const reuse = (op as { $reuse?: boolean }).$reuse === true && isStr(gd.id) && this.groups.has(gd.id) ? gd.id : null;
+    let parent: string | null = null;
+    if (!reuse && gd.parent !== undefined && gd.parent !== null && gd.parent !== '') { parent = this.gref(gd.parent, 'group.parent'); if (!parent) return; }
+    // the relationship first
+    let att: { to: string; dir: 'out' | 'in'; ek: EdgeKind } | null = null;
+    if (op.attach !== undefined && op.attach !== null) {
+      const at = op.attach as SpliceAttach;
+      if (!at || typeof at !== 'object') return this.warn(`group "${label}": attach needs { "to": … }.`);
+      const dir = at.dir ?? 'out';
+      if (dir !== 'out' && dir !== 'in') return this.warn(`group "${label}": attach.dir is "${String(dir)}".`, 'use "in" (to → the group: an outlet of it) or "out" (the group → to)');
+      const ek = at.kind ?? 'calls';
+      if (!KIND_ORDER.has(ek)) return this.warn(`group "${label}": attach.kind "${String(ek)}" isn't a relationship kind.`, `use one of ${RELATION_KINDS.join(', ')}`);
+      // (a node that isn't there: the group is still proposed, without the relationship, and says so)
+      const to = this.endRef(at.to, 'attach.to');
+      if (to) att = { to, dir, ek };
+    }
+    let gid: string;
+    if (reuse) gid = reuse;
+    else {
+      const all = resolveGroupRef({ groups: [...this.groups.values()], nodes: this.liveNodes() }, label);
+      if (all.id && all.match === 'label') return this.warn(`group "${label}": there is already a group called ${this.glabel(all.id)}.`, `put cards in it ("group": "${all.id}")`);
+      const taken = (x: string) => this.groups.has(x) || [...this.nodes.values()].some((n) => n.group === x);
+      if (gd.id !== undefined) {
+        if (!isStr(gd.id) || !ID_RE.test(gd.id)) return this.warn(`group "${label}": id ${JSON.stringify(gd.id)} isn't a valid id.`, `e.g. ${slugId(label, taken)}`);
+        if (taken(gd.id)) return this.warn(`group "${label}": ${gd.id} is already a group.`, `use another id, e.g. ${slugId(label, taken)}`);
+        gid = gd.id;
+      } else gid = slugId(label, taken);
+    }
+    // its first card, or a placeholder that holds the relationship until it has one
+    let entry: string | null = null;
+    if (op.first !== undefined && op.first !== null) {
+      const fd = op.first as SpliceNode;
+      const fl = fd && typeof fd === 'object' && nonEmpty(fd.label) ? fd.label.trim() : fd && typeof fd === 'object' && nonEmpty(fd.id) ? humanize(fd.id) : '';
+      if (!fl) return this.warn(`group "${label}": its first card needs a label.`, 'give it "first": { "label": "…" }');
+      if (!reuse) this.addGroup(gid, label, parent, gd.summary);
+      entry = this.newNode({ ...fd, group: gid }, fl, `group "${label}": first card`, { group: gid });
+      if (!entry) { if (!reuse) { this.groups.delete(gid); this.gmark.delete(gid); this.touched[this.i]!.groups.delete(gid); } return; }
+    } else if (!reuse) { this.addGroup(gid, label, parent, gd.summary); entry = this.placeholder(gid); }
+    else { this.tg(gid); this.dep(`g:${gid}`); entry = att ? this.entryOf(gid, true) : null; }
+    if (att && entry) { if (att.dir === 'out') this.propose(entry, att.to, [att.ek]); else this.propose(att.to, entry, [att.ek]); }
+  }
+  addGroup(id: string, label: string, parent: string | null, summary?: string) {
+    this.groups.set(id, { id, label, ...(parent ? { parent } : {}), ...(nonEmpty(summary) ? { summary } : {}), sources: ['proposed'] });
+    this.gmark.set(id, 'proposed');
+    this.origin.set(`g:${id}`, this.i);
+    this.tg(id);
   }
 
   run(ops: readonly unknown[], skip?: ReadonlySet<number>) {
@@ -528,20 +823,50 @@ class Work {
   }
   result(base: Model): SpliceResult {
     return {
-      model: { ...base, nodes: [...this.nodes.values()], edges: [...this.edges.values(), ...this.imports] },
+      model: { ...base, nodes: [...this.nodes.values()], edges: [...this.edges.values(), ...this.imports], ...(this.hadGroups || this.groups.size ? { groups: [...this.groups.values()] } : {}) },
       marks: {
         nodes: Object.fromEntries(this.nmark),
         edges: Object.fromEntries(this.emark),
         byOp: this.deps.map((d) => [...(d ?? [])].sort((a, b) => a - b)),
         // what is still there to point at (a proposed relationship an op took back again is gone)
-        touched: this.touched.map((t) => ({ nodes: [...(t?.nodes ?? [])].filter((id) => this.nodes.has(id)), edges: [...(t?.edges ?? [])].filter((k) => this.edges.has(k)) })),
+        touched: this.touched.map((t) => {
+          const groups = [...(t?.groups ?? [])].filter((g) => this.groups.has(g));
+          return { nodes: [...(t?.nodes ?? [])].filter((id) => this.nodes.has(id)), edges: [...(t?.edges ?? [])].filter((k) => this.edges.has(k)), ...(groups.length ? { groups } : {}) };
+        }),
         replaced: Object.fromEntries([...this.replacedBy].filter(([x]) => this.nodes.has(x))),
+        groups: Object.fromEntries([...this.gmark].filter(([g]) => this.groups.has(g))),
+        placeholders: Object.fromEntries([...this.ph].filter(([x]) => this.nodes.has(x))),
       },
       warnings: this.warnings,
       follows: this.follows,
       trace: { retired: Object.fromEntries(this.retiredBy), removed: Object.fromEntries(this.removedBy), placed: { ...this.placed } },
     };
   }
+}
+
+/** The marks a structure board draws with. The board folds parts into their cards (a type's methods into the type,
+ *  `foldView`), so one wire there can stand for several relationships of the model, and the marks (keyed by the
+ *  model's relationships) don't name it. This adds a mark for each such folded wire when everything it stands for has
+ *  one: proposed, or retired (rerouted when any of them was, else removed). Relationships of the model keep theirs. */
+export function boardMarks(r: SpliceResult): SpliceMarks {
+  const card = foldRep(r.model.nodes);
+  const own = new Set(r.model.edges.filter((e) => !isImport(e)).map((e) => pairKey(e.from, e.to)));
+  const folded = new Map<string, (EdgeMark | undefined)[]>();
+  for (const e of r.model.edges) {
+    if (isImport(e)) continue;
+    const a = card(e.from), b = card(e.to);
+    if (a === b || (a === e.from && b === e.to)) continue;
+    const k = pairKey(a, b);
+    if (own.has(k)) continue;
+    (folded.get(k) ?? folded.set(k, []).get(k)!).push(r.marks.edges[pairKey(e.from, e.to)]);
+  }
+  if (!folded.size) return r.marks;
+  const edges: Record<string, EdgeMark> = { ...r.marks.edges };
+  for (const [k, ms] of folded) {
+    if (ms.every((m) => m === 'proposed')) edges[k] = 'proposed';
+    else if (ms.every((m) => m === 'removed' || m === 'rerouted')) edges[k] = ms.includes('rerouted') ? 'rerouted' : 'removed';
+  }
+  return { ...r.marks, edges };
 }
 
 /** The model as the splice proposes it: a new model (the input is never touched) with proposed nodes and
@@ -561,11 +886,25 @@ export function applySplice(model: Model, splice: Splice): SpliceResult {
  *  so applying again proposes them afresh, in order, and the result is the same. Proposed items another
  *  splice put there stay (splices stack). */
 function withoutOwn(m: Model, ops: readonly SpliceOp[]): Model {
-  if (!m.nodes.some(isProposed) && !m.edges.some(isProposed)) return m;
+  if (!m.nodes.some(isProposed) && !m.edges.some(isProposed) && !(m.groups ?? []).some(isProposed)) return m;
   const byId = new Map(m.nodes.map((n) => [n.id, n]));
   const own = new Set<string>(), reserved = new Set<string>();
+  // the groups it proposes (and their placeholders and first cards)
+  const gById = new Map((m.groups ?? []).map((g) => [g.id, g]));
+  const ownG = new Set<string>(), reservedG = new Set<string>();
+  const firsts: SpliceNode[] = [];
   for (const op of ops) {
-    const nd = op?.op === 'add' ? op.node : op?.op === 'replace' ? op.with : null;
+    if (op?.op !== 'group' || !op.group || typeof op.group !== 'object') continue;
+    const label = nonEmpty(op.group.label) ? op.group.label.trim() : '';
+    let id: string | null = isStr(op.group.id) ? op.group.id : null;
+    const usedBy = (x: string) => gById.has(x) || m.nodes.some((n) => n.group === x);
+    if (id === null && label) id = slugId(label, (x) => reservedG.has(x) || (usedBy(x) && !(gById.has(x) && isProposed(gById.get(x)!) && fold(gById.get(x)!.label ?? '') === fold(label))));
+    if (id === null) continue;
+    reservedG.add(id);
+    if (gById.has(id) && isProposed(gById.get(id)!)) { ownG.add(id); if (byId.has(entryId(id)) && isProposed(byId.get(entryId(id))!)) own.add(entryId(id)); }
+    if (op.first && typeof op.first === 'object') firsts.push(op.first);
+  }
+  for (const nd of [...ops.map((op) => (op?.op === 'add' ? op.node : op?.op === 'replace' ? op.with : null)), ...firsts]) {
     if (!nd || typeof nd !== 'object') continue;
     const label = nonEmpty(nd.label) ? nd.label.trim() : '';
     let id: string | null = isStr(nd.id) ? nd.id : null;
@@ -581,8 +920,9 @@ function withoutOwn(m: Model, ops: readonly SpliceOp[]): Model {
   }
   return {
     ...m,
-    nodes: m.nodes.filter((n) => !own.has(n.id)),
-    edges: m.edges.filter((e) => !(isProposed(e) && (own.has(e.from) || own.has(e.to) || pairs.has(pairKey(e.from, e.to))))),
+    nodes: m.nodes.filter((n) => !own.has(n.id) && !(n.group && ownG.has(n.group) && isProposed(n))),
+    edges: m.edges.filter((e) => !(isProposed(e) && (own.has(e.from) || own.has(e.to) || pairs.has(pairKey(e.from, e.to)) || [e.from, e.to].some((x) => { const n = byId.get(x); return !!n?.group && ownG.has(n.group) && isProposed(n); })))),
+    ...(m.groups ? { groups: m.groups.filter((g) => !ownG.has(g.id)) } : {}),
   };
 }
 
@@ -594,6 +934,7 @@ const VERB: Record<EdgeKind, string> = { calls: 'calls', reads: 'reads', writes:
  *  retired don't count: "after X" when X fans out (or "before X" when several call it) says the new node is one more
  *  step ("Add Metrics, which Pipeline runner also calls"), as `applySplice` places it. */
 export function describeOp(model: Model, op: SpliceOp, marks?: { edges: Record<string, EdgeMark> }): string {
+  const glabel = (ref: unknown) => { if (!isStr(ref)) return '?'; const r = resolveGroupRef(model, ref); return r.id ? (model.groups ?? []).find((g) => g.id === r.id)?.label ?? r.id : ref; };
   const res = (ref: unknown) => {
     if (!isStr(ref)) return null;
     const r = resolveNodeRef(model, ref);
@@ -601,25 +942,49 @@ export function describeOp(model: Model, op: SpliceOp, marks?: { edges: Record<s
   };
   const lbl = (ref: unknown) => (isStr(ref) ? res(ref)?.label ?? humanize(ref) : '?');
   const live = (e: MEdge) => !isImport(e) && !(marks && (marks.edges[pairKey(e.from, e.to)] === 'removed' || marks.edges[pairKey(e.from, e.to)] === 'rerouted'));
+  // a card with parts (a type and its methods) counts its parts' relationships, by card, as applySplice places it
+  const card = foldRep(model.nodes);
   const fan = (ref: unknown, dir: 'in' | 'out') => {
     const x = res(ref)?.id;
-    return x ? new Set(model.edges.filter((e) => live(e) && (dir === 'in' ? e.to === x && e.from !== x : e.from === x && e.to !== x)).map((e) => (dir === 'in' ? e.from : e.to))).size : 0;
+    if (!x) return 0;
+    const parts = new Set(model.nodes.filter((n) => card(n.id) === x).map((n) => n.id).concat(x));
+    const far = model.edges.filter((e) => live(e) && (dir === 'in' ? parts.has(e.to) && !parts.has(e.from) : parts.has(e.from) && !parts.has(e.to))).map((e) => (dir === 'in' ? e.from : e.to));
+    return new Set(parts.size > 1 ? far.map(card) : far).size;
   };
   const nodeName = (nd: unknown) => { const n = nd as SpliceNode | undefined; return nonEmpty(n?.label) ? n!.label : isStr(n?.id) ? humanize(n!.id) : 'a node'; };
   switch (op?.op) {
     case 'add': {
       const name = nodeName(op.node);
+      // next to a proposed group's placeholder: the card goes into that group (applySplice puts it there)
+      const phG = (ref: unknown) => { const n = res(ref); return n && isProposed(n) && n.group && n.id === entryId(n.group) ? n.group : null; };
+      const intoG = [...(Array.isArray(op.between) ? op.between : []), op.before, op.after, op.attach?.to].map(phG).find((g) => !!g);
+      if (intoG && !isStr(op.node?.group)) return describeOp(model, { op: 'add', node: { ...op.node, group: intoG } }, marks);
       if (Array.isArray(op.between)) return `Insert ${name} between ${lbl(op.between[0])} and ${lbl(op.between[1])}`;
       if (op.before !== undefined) return fan(op.before, 'in') > 1 ? `Add ${name}, which also calls ${lbl(op.before)}` : `Insert ${name} before ${lbl(op.before)}`;
       if (op.after !== undefined) return fan(op.after, 'out') > 1 ? `Add ${name}, which ${lbl(op.after)} also calls` : `Insert ${name} after ${lbl(op.after)}`;
       if (op.attach) { const v = VERB[op.attach.kind ?? 'calls'] ?? 'calls'; return op.attach.dir === 'in' ? `Add ${name}, which ${lbl(op.attach.to)} ${v}` : `Add ${name}, which ${v} ${lbl(op.attach.to)}`; }
-      return `Add ${name}`;
+      const g = isStr(op.node?.group) ? resolveGroupRef(model, op.node.group).id : null;
+      if (!g) return `Add ${name}${isStr(op.node?.group) ? ` in ${op.node.group}` : ''}`;
+      // the first card into a group with a placeholder takes over its relationships: say which
+      const ph = model.nodes.find((n) => n.id === entryId(g) && isProposed(n));
+      const ins = ph ? model.edges.filter((e) => live(e) && e.to === ph.id).map((e) => lbl(e.from)) : [];
+      const outs = ph ? model.edges.filter((e) => live(e) && e.from === ph.id).map((e) => lbl(e.to)) : [];
+      const also = [...(ins.length ? [`which ${ins.join(' and ')} call${ins.length === 1 ? 's' : ''}`] : []), ...(outs.length ? [`which calls ${outs.join(' and ')}`] : [])];
+      return `Add ${name} in ${glabel(g)}${also.length ? `, ${also.join(', and ')}` : ''}`;
+    }
+    case 'group': {
+      const gd = (op.group ?? {}) as SpliceGroup, name = nonEmpty(gd.label) ? gd.label : isStr(gd.id) ? humanize(gd.id) : 'a group';
+      const where = isStr(gd.parent) && gd.parent ? ` in ${glabel(gd.parent)}` : '';
+      const first = op.first && typeof op.first === 'object' && nonEmpty(op.first.label) ? ` with ${op.first.label}` : '';
+      const v = VERB[op.attach?.kind ?? 'calls'] ?? 'calls', to = op.attach ? (resolveGroupRef(model, op.attach.to).id && !res(op.attach.to) ? glabel(op.attach.to) : lbl(op.attach.to)) : '';
+      const att = op.attach ? (op.attach.dir === 'in' ? `, which ${to} ${v}` : `, which ${v} ${to}`) : '';
+      return `Add group ${name}${where}${first}${att}`;
     }
     case 'connect': return `Connect ${lbl(op.from)} to ${lbl(op.to)}${op.kind && op.kind !== 'calls' ? ` (${op.kind})` : ''}${nonEmpty(op.label) ? `, labelled "${op.label}"` : ''}`;
     case 'disconnect': return `Disconnect ${lbl(op.from)} from ${lbl(op.to)}`;
-    case 'remove': return `Remove ${lbl(op.node)}`;
-    case 'rename': return `Rename ${lbl(op.node)} to ${op.label}`;
-    case 'move': return `Move ${lbl(op.node)} into ${op.group}`;
+    case 'remove': return op.group !== undefined || (!res(op.node) && resolveGroupRef(model, op.node ?? '').id) ? `Remove group ${glabel(op.group ?? op.node)}` : `Remove ${lbl(op.node)}`;
+    case 'rename': return op.group !== undefined || (!res(op.node) && resolveGroupRef(model, op.node ?? '').id) ? `Rename group ${glabel(op.group ?? op.node)} to ${op.label}` : `Rename ${lbl(op.node)} to ${op.label}`;
+    case 'move': return `Move ${lbl(op.node)} into ${glabel(op.group)}`;
     case 'replace': return `Replace ${lbl(op.node)} with ${isStr(op.with) ? lbl(op.with) : nodeName(op.with)}`;
     default: return `Unknown op ${JSON.stringify((op as any)?.op ?? null)}`;
   }
@@ -631,8 +996,10 @@ export interface SpliceIssue { level: 'error' | 'warn'; /** JSON pointer into th
 const PLACEMENTS = ['between', 'before', 'after', 'attach'] as const;
 const OP_KEYS: Record<SpliceOpName, string[]> = {
   add: ['op', 'node', ...PLACEMENTS], connect: ['op', 'from', 'to', 'kind', 'label'], disconnect: ['op', 'from', 'to'],
-  remove: ['op', 'node'], rename: ['op', 'node', 'label'], move: ['op', 'node', 'group'], replace: ['op', 'node', 'with'],
+  remove: ['op', 'node', 'group'], rename: ['op', 'node', 'group', 'label'], move: ['op', 'node', 'group'], replace: ['op', 'node', 'with'],
+  group: ['op', 'group', 'first', 'attach'],
 };
+const GROUP_KEYS = ['id', 'label', 'parent', 'summary'];
 const NODE_KEYS = ['id', 'label', 'kind', 'category', 'tags', 'group', 'summary'];
 const TOP_KEYS = ['$schema', 'karyo', 'id', 'title', 'note', 'base', 'view', 'created', 'updated', 'ops'];
 
@@ -661,11 +1028,11 @@ export function validateSplice(json: unknown, model?: Model): SpliceIssue[] {
     else if (Number.isNaN(Date.parse(s[k]))) warn(`/${k}`, `${k} isn't a date: ${JSON.stringify(s[k])}`);
   }
   if (!Array.isArray(s.ops)) { err('/ops', 'ops must be a list'); return out; }
-  const added = new Map<string, number>();
+  const added = new Map<string, number>(), addedGroups = new Map<string, number>();
   const refCheck = (path: string, ref: unknown, i: number) => {
     if (!nonEmpty(ref)) return err(path, 'must name a node (an id)');
-    if (ref.startsWith('splice.') && !added.has(ref)) {
-      const later = s.ops.findIndex((o: any, j: number) => j > i && ((o?.op === 'add' && o?.node?.id === ref) || (o?.op === 'replace' && o?.with?.id === ref)));
+    if (ref.startsWith('splice.') && !added.has(ref) && !addedGroups.has(ref)) {
+      const later = s.ops.findIndex((o: any, j: number) => j > i && ((o?.op === 'add' && o?.node?.id === ref) || (o?.op === 'replace' && o?.with?.id === ref) || (o?.op === 'group' && (o?.group?.id === ref || o?.first?.id === ref))));
       return err(path, `${ref} isn't added by an earlier op${later >= 0 ? ` (op ${later + 1} adds it: ops apply in order)` : ''}`);
     }
     if (!ID_RE.test(ref)) warn(path, `"${ref}" isn't an id; it will be matched by label, which breaks if the label changes`, 'save node ids');
@@ -720,8 +1087,37 @@ export function validateSplice(json: unknown, model?: Model): SpliceIssue[] {
         if (o.op === 'connect' && o.kind !== undefined && !KIND_ORDER.has(o.kind)) err(`${p}/kind`, `kind must be one of ${RELATION_KINDS.join(', ')}`);
         if (o.op === 'connect' && o.label !== undefined && !isStr(o.label)) err(`${p}/label`, 'label must be a string');
         break;
-      case 'remove': refCheck(`${p}/node`, o.node, i); break;
-      case 'rename': refCheck(`${p}/node`, o.node, i); if (!nonEmpty(o.label)) err(`${p}/label`, 'rename needs a new label'); break;
+      case 'remove': case 'rename': {
+        const both = o.node !== undefined && o.group !== undefined;
+        if (both) err(p, `${o.op} names a node or a group, not both`);
+        else if (o.group !== undefined) { if (!nonEmpty(o.group)) err(`${p}/group`, 'must name a group (an id)'); }
+        else refCheck(`${p}/node`, o.node, i);
+        if (o.op === 'rename' && !nonEmpty(o.label)) err(`${p}/label`, 'rename needs a new label');
+        break;
+      }
+      case 'group': {
+        const g = o.group;
+        if (!g || typeof g !== 'object' || Array.isArray(g)) { err(`${p}/group`, 'group needs { "label": … }'); break; }
+        for (const k of Object.keys(g)) if (!GROUP_KEYS.includes(k)) warn(`${p}/group/${k}`, `unknown group key "${k}"`);
+        if (!nonEmpty(g.label)) err(`${p}/group/label`, 'the group needs a label');
+        let gid: string | null = null;
+        if (g.id !== undefined) {
+          if (!isStr(g.id) || !ID_RE.test(g.id)) err(`${p}/group/id`, `not a valid group id: ${JSON.stringify(g.id)}`);
+          else { if (addedGroups.has(g.id)) err(`${p}/group/id`, `${g.id} is already added by op ${addedGroups.get(g.id)! + 1}`); gid = g.id; }
+        } else if (nonEmpty(g.label)) gid = slugId(g.label, addedGroups.keys());
+        if (gid) { addedGroups.set(gid, i); added.set(entryId(gid), i); }
+        for (const k of ['parent', 'summary']) if (g[k] !== undefined && !isStr(g[k])) err(`${p}/group/${k}`, `${k} must be a string`);
+        if (o.first !== undefined) newNode(o.first, `${p}/first`, 'first', i);
+        if (o.attach !== undefined) {
+          if (!o.attach || typeof o.attach !== 'object') err(`${p}/attach`, 'attach is { to, dir?, kind? }');
+          else {
+            refCheck(`${p}/attach/to`, o.attach.to, i);
+            if (o.attach.dir !== undefined && o.attach.dir !== 'in' && o.attach.dir !== 'out') err(`${p}/attach/dir`, 'dir is "in" (to → the group) or "out" (the group → to)');
+            if (o.attach.kind !== undefined && !KIND_ORDER.has(o.attach.kind)) err(`${p}/attach/kind`, `kind must be one of ${RELATION_KINDS.join(', ')}`);
+          }
+        }
+        break;
+      }
       case 'move': refCheck(`${p}/node`, o.node, i); if (!nonEmpty(o.group)) err(`${p}/group`, 'move needs a group'); break;
       case 'replace':
         refCheck(`${p}/node`, o.node, i);
@@ -748,7 +1144,10 @@ export function landedDetail(model: Model, splice: Splice): { status: SpliceOpSt
   const real: Model = normalize({ ...model, nodes: (model.nodes ?? []).filter((n) => !isProposed(n)), edges: (model.edges ?? []).filter((e) => !isProposed(e)), flows: model.flows ?? [] });
   const ops: SpliceOp[] = Array.isArray(splice?.ops) ? splice.ops : [];
   const rels = new Set(real.edges.filter((e) => !isImport(e)).map((e) => pairKey(e.from, e.to)));
-  const has = (a: string | null, b: string | null) => !!a && !!b && rels.has(pairKey(a, b));
+  // a card with parts (a type and its methods) has the relationships of its parts, as the board draws it
+  const card = foldRep(real.nodes);
+  const cardRels = new Set(real.edges.filter((e) => !isImport(e)).map((e) => pairKey(card(e.from), card(e.to))));
+  const has = (a: string | null, b: string | null) => !!a && !!b && (rels.has(pairKey(a, b)) || (card(a) === a && card(b) === b && cardRels.has(pairKey(a, b))));
   const map = new Map<string, string>(); // proposed id → the real node that landed it
   const addedBy = new Map<string, number>();
   const find = (ref: unknown): string | null => {
@@ -757,6 +1156,10 @@ export function landedDetail(model: Model, splice: Splice): { status: SpliceOpSt
     return r.id && (r.match === 'id' || r.match === 'label') ? r.id : null;
   };
   const unlanded = (ref: unknown) => isStr(ref) && addedBy.has(ref) && !map.has(ref);
+  // groups: the ones this splice adds (proposed id → the real group that landed it, or '' while it hasn't), and a group of
+  // the code by id or label
+  const gAdded = new Map<string, string>();
+  const realGroup = (ref: string) => { const r = resolveGroupRef(real, ref); return r.id ? (real.groups ?? []).find((g) => g.id === r.id) ?? { id: r.id } : null; };
   const out: ({ status: SpliceOpStatus; reason: string } | null)[] = ops.map(() => null);
   ops.forEach((op, i) => {
     const done = (reason: string) => { out[i] = { status: 'landed', reason }; };
@@ -785,8 +1188,30 @@ export function landedDetail(model: Model, splice: Splice): { status: SpliceOpSt
         if (!has(a, b)) done(`${op.from} → ${op.to} is not in the model`);
         return;
       }
-      case 'remove': { if (!unlanded(op.node) && !find(op.node)) done(`${op.node} is not in the model`); return; }
-      case 'rename': { const x = find(op.node); if (x && real.nodes.find((n) => n.id === x)?.label === op.label) done(`${x} is called "${op.label}"`); return; }
+      case 'remove': {
+        if (op.group !== undefined) { if (!gAdded.has(op.group) && !realGroup(op.group)) done(`the group ${op.group} is not in the model`); return; }
+        if (!unlanded(op.node) && !find(op.node)) done(`${op.node} is not in the model`);
+        return;
+      }
+      case 'rename': {
+        if (op.group !== undefined) { const g = realGroup(gAdded.get(op.group) ?? op.group); if (g && (g.label ?? g.id) === op.label) done(`the group ${g.id} is called "${op.label}"`); return; }
+        const x = find(op.node); if (x && real.nodes.find((n) => n.id === x)?.label === op.label) done(`${x} is called "${op.label}"`);
+        return;
+      }
+      case 'group': {
+        // landed: the code has the group (by the proposed id or its label) and, when attached, a relationship between it and `to`
+        const gd = op.group, label = gd?.label ?? '';
+        if (!gd || typeof gd !== 'object') return;
+        const id = isStr(gd.id) ? gd.id : slugId(label, gAdded.keys());
+        const g = realGroup(id) ?? realGroup(label);
+        if (op.first && typeof op.first === 'object') addedBy.set(isStr(op.first.id) ? op.first.id : slugId(op.first.label ?? ''), i);
+        if (!g) { gAdded.set(id, ''); return; }
+        gAdded.set(id, g.id);
+        if (!op.attach) return done(`the group ${g.label ?? g.id} is in the model`);
+        const t = find(op.attach.to), inside = real.nodes.filter((n) => n.group === g.id).map((n) => n.id);
+        if (inside.some((c) => (op.attach!.dir === 'in' ? has(t, c) : has(c, t)))) done(`the group ${g.label ?? g.id} is in the model, connected to ${op.attach.to}`);
+        return;
+      }
       case 'move': { const x = find(op.node); if (x && real.nodes.find((n) => n.id === x)?.group === op.group) done(`${x} is in ${op.group}`); return; }
       case 'replace': {
         // landed: X is gone and Y is there (by the proposed id, or a node with its label)
@@ -820,7 +1245,9 @@ export function mapRefs(op: SpliceOp, f: (ref: string) => string): SpliceOp {
   switch (op?.op) {
     case 'add': return { ...op, ...(Array.isArray(op.between) ? { between: [m(op.between[0]), m(op.between[1])] as [string, string] } : {}), ...(op.before !== undefined ? { before: m(op.before) } : {}), ...(op.after !== undefined ? { after: m(op.after) } : {}), ...(op.attach ? { attach: { ...op.attach, to: m(op.attach.to) } } : {}) };
     case 'connect': case 'disconnect': return { ...op, from: m(op.from), to: m(op.to) };
-    case 'remove': case 'rename': case 'move': return { ...op, node: m(op.node) };
+    case 'remove': case 'rename': return op.node === undefined ? op : ({ ...op, node: m(op.node) } as SpliceOp);
+    case 'move': return { ...op, node: m(op.node) };
+    case 'group': return op.attach ? { ...op, attach: { ...op.attach, to: m(op.attach.to) } } : op;
     case 'replace': return { ...op, node: m(op.node), with: isStr(op.with) ? m(op.with) : op.with };
     default: return op;
   }

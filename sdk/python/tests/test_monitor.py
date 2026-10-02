@@ -254,4 +254,100 @@ def test_generated_code_does_not_hide_its_module(tmp_path: Path):
                                                    "def make():\n    return total(Row(1))\n\n\ndef total(r):\n    return r.x\n")
     (tmp_path / "main.py").write_text("import app\nr = app.Row(2)\napp.make()\n")
     frag = _record(tmp_path, "--monitor")
-    assert sorted({s["node"] for f in frag["flows"] for s in f["spans"]}) == ["app.make", "app.total"]
+    assert sorted({s["node"] for f in frag["flows"] for s in f["spans"]}) == ["app.Row", "app.make", "app.total"]
+
+
+def test_generated_constructors_are_constructions(tmp_path: Path):
+    """A dataclass's __init__ is generated code (co_filename "<string>"): calling the class still constructs it, a call
+    of the class node, as a written __init__ is; a subclass that inherits it is the class built; a class with no
+    __init__ of its own is seen where node code constructs it (the CALL event); a class that is no node (private) is
+    not recorded. So the static construction wires count as seen when the run makes them."""
+    (tmp_path / "app").mkdir()
+    (tmp_path / "app" / "__init__.py").write_text(textwrap.dedent('''
+        from dataclasses import dataclass
+
+
+        @dataclass
+        class Row:
+            x: int
+
+
+        @dataclass
+        class Box:
+            rows: list
+
+            def __post_init__(self):
+                self.n = len(self.rows)
+
+
+        class Plain(Row):
+            pass
+
+
+        @dataclass
+        class _Hidden:
+            y: int
+
+
+        class Bare:                    # no __init__ of its own: object's
+            pass
+
+
+        class Refused(Exception):      # an exception's __init__ (C)
+            pass
+
+
+        def make():
+            _Hidden(1)
+            Plain(3)
+            for _ in range(2):
+                Bare()
+            try:
+                raise Refused("no")
+            except Refused:
+                pass
+            return total(Box([Row(1)]))
+
+
+        def total(b):
+            return b.n
+    '''))
+    (tmp_path / "main.py").write_text("import app\napp.make()\n")
+    frag = _record(tmp_path, "--monitor")
+    (flow,) = frag["flows"]
+    tree = _tree(flow)
+    assert ("app.Plain", "app.make") in tree and ("app.Row", "app.make") in tree and ("app.Box", "app.make") in tree
+    assert not any("Hidden" in n for n, _ in tree)
+    assert tree.count(("app.Bare", "app.make")) == 2 and ("app.Refused", "app.make") in tree   # seen where node code constructs them
+    assert [s["label"] for s in flow["spans"] if s["node"] == "app.Row"] == ["Row()"]
+    ran = {n["id"] for n in frag["nodes"] if "observed" in n["sources"]}
+    assert {"app.Row", "app.Box", "app.Plain", "app.make", "app.total"} <= ran
+
+
+def test_directives_refine_automatic_nodes_while_recording(tmp_path: Path):
+    """Automatic mode with directives (record --auto, what `karyo record` passes for a project in automatic mode): every
+    automatic node is recorded, and a declared node's record says what the scan says (the refined automatic node)."""
+    (tmp_path / "app").mkdir()
+    (tmp_path / "app" / "__init__.py").write_text(textwrap.dedent('''
+        # karyo:node label="The store" category=store
+        class Store:
+            def get(self, k):
+                return norm(k)
+
+
+        def norm(k):
+            return k
+
+
+        def handle(k):
+            return Store().get(k)
+    '''))
+    (tmp_path / "main.py").write_text("import app\napp.handle(1)\n")
+    frag = _record(tmp_path, "--monitor", "--auto")
+    assert {s["node"] for f in frag["flows"] for s in f["spans"]} == {"app.handle", "app.Store", "app.Store.get", "app.norm"}
+    store = next(n for n in frag["nodes"] if n["id"] == "app.Store" and "declared" in n["sources"])
+    assert store["label"] == "The store" and store["kind"] == "type" and store["group"] == "app" and store["category"] == "store"
+    r = subprocess.run([sys.executable, "-m", "karyo", "scan", "app", "--root", ".", "--auto"], cwd=tmp_path, capture_output=True, text=True,
+                       env=_env())
+    scanned = next(n for n in json.loads(r.stdout)["nodes"] if n["id"] == "app.Store")
+    assert {k: scanned[k] for k in ("label", "kind", "group", "category")} == {k: store[k] for k in ("label", "kind", "group", "category")}

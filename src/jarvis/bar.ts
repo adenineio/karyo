@@ -3,6 +3,7 @@
 // and the connection state. DOM only; main.ts decides what it shows.
 import type { MicState } from './protocol';
 import { currentTheme, pickTheme, themeOptionsHtml } from '../engine/theme-pick';
+import { UI_SIZES, uiSize, setUiSize, onUiSize } from '../engine/uisize';
 
 export interface PageSettings { wakeWord: string; wakeEnabled: boolean; deviceId: string; motion: boolean }
 export const DEFAULT_SETTINGS: PageSettings = { wakeWord: 'adenine', wakeEnabled: false, deviceId: '', motion: true };
@@ -17,7 +18,7 @@ export class Bar {
   private q: {
     label: HTMLElement; detail: HTMLElement; meter: HTMLElement; transcript: HTMLElement; caption: HTMLElement;
     activity: HTMLElement; input: HTMLInputElement; gear: HTMLButtonElement; pop: HTMLElement;
-    wake: HTMLInputElement; wakeOn: HTMLInputElement; device: HTMLSelectElement; motion: HTMLInputElement; theme: HTMLSelectElement;
+    wake: HTMLInputElement; wakeOn: HTMLInputElement; device: HTMLSelectElement; motion: HTMLInputElement; theme: HTMLSelectElement; ui: HTMLSelectElement;
   };
   mic: MicState = 'idle';
   conn: Conn = 'connecting';
@@ -61,6 +62,7 @@ export class Bar {
     pop.innerHTML = `
       <h2>Settings</h2>
       <label>Theme<select class="jv-theme">${themeOptionsHtml()}</select></label>
+      <label>Interface size<select class="jv-ui">${UI_SIZES.map((u) => `<option value="${u.id}">${u.id} · ${u.label} (${Math.round(u.k * 100)}%)</option>`).join('')}</select></label>
       <label>Wake word<input type="text" class="jv-wake" autocomplete="off" spellcheck="false"></label>
       <label class="jv-check"><input type="checkbox" class="jv-wake-on"> Listen for the wake word</label>
       <label>Input device<select class="jv-device"><option value="">System default</option></select></label>
@@ -72,7 +74,7 @@ export class Bar {
       label: $('.jv-label'), detail: $('.jv-detail'), meter: $('.jv-meter'), transcript: $('.jv-transcript'), caption: $('.jv-caption'),
       activity: $('.jv-activity'), input: $<HTMLInputElement>('.jv-input'), gear: $<HTMLButtonElement>('.jv-gear'), pop,
       wake: $<HTMLInputElement>('.jv-wake', pop), wakeOn: $<HTMLInputElement>('.jv-wake-on', pop), device: $<HTMLSelectElement>('.jv-device', pop), motion: $<HTMLInputElement>('.jv-motion', pop),
-      theme: $<HTMLSelectElement>('.jv-theme', pop),
+      theme: $<HTMLSelectElement>('.jv-theme', pop), ui: $<HTMLSelectElement>('.jv-ui', pop),
     };
     this.syncSettings();
     this.hint();
@@ -96,6 +98,9 @@ export class Bar {
     for (const x of [this.q.wakeOn, this.q.device, this.q.motion]) x.addEventListener('change', changed);
     // the theme is page-wide (src/engine/theme-pick.ts, localStorage karyo:theme), not a voice setting
     this.q.theme.addEventListener('change', () => pickTheme(this.q.theme.value));
+    // so is the interface size (src/engine/uisize.ts, localStorage karyo:ui-size; `[` / `]` on the plate)
+    this.q.ui.addEventListener('change', () => setUiSize(this.q.ui.value));
+    onUiSize((u) => { this.q.ui.value = u.id; });
   }
 
   get input() { return this.q.input; }
@@ -111,6 +116,7 @@ export class Bar {
     this.q.motion.checked = this.settings.motion;
     this.q.device.value = this.settings.deviceId;
     this.q.theme.value = currentTheme() ?? '';
+    this.q.ui.value = uiSize().id;
   }
   setSettings(s: PageSettings) { this.settings = { ...s }; this.syncSettings(); this.hint(); }
   setDevices(ds: { id: string; label: string }[]) {

@@ -18,7 +18,7 @@ import path from 'node:path';
 export const ROOT = path.resolve(path.dirname(realpathSync(import.meta.path)), '..');
 const BUN = process.execPath;
 /** Ports the plugin's servers use unless --port says otherwise (the dev checkout's `just dev` keeps 5180/5190). */
-export const PORTS = { from: 5781, to: 5799 };
+export const PORTS = { from: 5782, to: 5799 }   // never a port ending in 81 or 13;
 
 export class RuntimeError extends Error {}
 
@@ -272,8 +272,16 @@ function hasDirective(dir: string, depth = 0): boolean {
 }
 
 /** Scan Python packages' directives (sdk/python, standard library only) into <project>/.karyo/, then build the model. */
-export function modelScan(project: string, pkgs: string[], out: string, name: string, log: (s: string) => void): { fragments: string[]; model: string; output: string } {
+/** Scan Python packages into .karyo/ and build the model. `auto`: automatic mode with the directives on top (true),
+ *  directives only (false); undefined: the project's karyo/config.json mode when it has one, else the SDK's default
+ *  (automatic mode only for code with no directives). */
+export function modelScan(project: string, pkgs: string[], out: string, name: string, log: (s: string) => void, o: { auto?: boolean } = {}): { fragments: string[]; model: string; output: string } {
   const py = need('python3', 'scanning Python directives');
+  let auto = o.auto;
+  if (auto === undefined) {
+    try { const mode = JSON.parse(readFileSync(path.join(project, 'karyo/config.json'), 'utf8'))?.mode; if (mode === 'auto' || mode === 'directives') auto = mode === 'auto'; } catch {}
+  }
+  const mode = auto === undefined ? [] : [auto ? '--auto' : '--no-auto'];
   const frags = path.join(project, '.karyo');
   mkdirSync(frags, { recursive: true });
   const written: string[] = [];
@@ -281,7 +289,7 @@ export function modelScan(project: string, pkgs: string[], out: string, name: st
   for (const pkg of pkgs) {
     const abs = path.resolve(project, pkg);
     const f = path.join(frags, `python.${path.basename(abs)}.static.karyo.json`);
-    const r = spawnSync(py, ['-m', 'karyo', 'scan', abs, '-o', f, '--root', project], {
+    const r = spawnSync(py, ['-m', 'karyo', 'scan', abs, '-o', f, '--root', project, ...mode], {
       cwd: project, encoding: 'utf8', env: { ...process.env, PYTHONPYCACHEPREFIX: path.join(dataDir().dir, 'pycache'), PYTHONPATH: [path.join(ROOT, 'sdk/python'), process.env.PYTHONPATH].filter(Boolean).join(path.delimiter) },
     });
     output += (r.stdout ?? '') + (r.stderr ?? '');

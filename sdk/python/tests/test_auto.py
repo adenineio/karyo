@@ -268,6 +268,75 @@ def test_directives_turn_automatic_mode_off_unless_asked(tmp_path: Path):
     assert off == {**off, "nodes": plain["nodes"]}
 
 
+REFINED = {"p/__init__.py": "", "p/mail.py": '''
+# karyo:external id=ext.smtp label="SMTP relay" category=outside
+
+
+# karyo:node label="Mail sender" category=adapter tags=network calls=ext.smtp
+class Mailer:
+    """Sends mail."""
+
+    def send(self, to):
+        return self._wire(to)
+
+    def _wire(self, to):
+        return to
+
+
+class Notifier:
+    def __init__(self):
+        self.mail = Mailer()
+
+    # karyo:node id=p.notify label="Notify" category=service
+    def notify(self, who):
+        return self.mail.send(who)
+
+    def other(self):
+        return self.notify("x")
+''', "p/deco.py": '''
+import karyo
+
+
+@karyo.node("p.worker", category="job")
+def work():
+    return helper()
+
+
+def helper():
+    return 1
+'''}
+
+
+def test_directives_refine_automatic_nodes_without_duplicates(tmp_path: Path):
+    """Automatic mode with directives: every automatic node stays, and a directive on a def refines that def's
+    node (its label, category, tags, extra relationships) instead of adding one. Without id= it keeps the
+    automatic id; with one it renames it. What it doesn't say (kind, group, the class a method folds into)
+    stays automatic."""
+    _write(tmp_path, REFINED)
+    frag = _scan(tmp_path, "p", "--auto")
+    nodes = {n["id"]: n for n in frag["nodes"]}
+    m = nodes["p.mail.Mailer"]                                   # no id=: the automatic id
+    assert m["label"] == "Mail sender" and m["category"] == "adapter" and m["tags"] == ["network"]
+    assert m["kind"] == "type" and m["group"] == "p" and m["summary"] == "Sends mail." and sorted(m["sources"]) == ["declared"]
+    assert nodes["p.mail.Mailer.send"]["parent"] == "p.mail.Mailer"   # its methods still fold into it
+    n = nodes["p.notify"]                                          # id= renames the method's node
+    assert "p.mail.Notifier.notify" not in nodes and n["label"] == "Notify" and n["category"] == "service"
+    assert n["parent"] == "p.mail.Notifier" and n["fold"] is True and n["kind"] == "function"
+    assert nodes["p.worker"]["category"] == "job" and "p.deco.work" not in nodes   # the decorator form too
+    assert nodes["p.worker"]["label"] == "work" and nodes["p.worker"]["group"] == "p"
+    assert {"p.mail.Notifier", "p.mail.Notifier.other", "p.deco.helper", "ext.smtp"} <= set(nodes)
+    calls = {(e["from"], e["to"]): e["sources"] for e in frag["edges"] if e["kind"] == "calls"}
+    assert calls[("p.mail.Mailer", "ext.smtp")] == ["declared"]
+    assert calls[("p.notify", "p.mail.Mailer.send")] == ["extracted"]
+    assert calls[("p.mail.Notifier.other", "p.notify")] == ["extracted"]
+    assert calls[("p.worker", "p.deco.helper")] == ["extracted"]
+    assert "checks" not in frag
+    # directives only: no automatic nodes; the id-less directive still names its def (module.qualname)
+    plain = _scan(tmp_path, "p", "--no-auto")
+    ids = {x["id"] for x in plain["nodes"] if x["kind"] != "module"}
+    assert ids == {"p.mail.Mailer", "p.notify", "p.worker", "ext.smtp"}
+
+
 def test_ids_that_differ_only_in_case_are_kept_apart(tmp_path: Path):
     # `Chunk` the class and `chunk` the function would be one name to a reader (the model refuses that):
     # the one defined later is written module:qualname, and calls still land on the right one
@@ -319,3 +388,31 @@ def test_a_name_rebound_from_itself_does_not_recurse(tmp_path: Path):
     assert {"rb.style.Font", "rb.style.Style"} <= ids
     calls = _calls(frag)
     assert ("rb.style.Style", "rb.style.Font") in calls          # __init__ builds a Font: still resolved
+
+
+def test_reading_comments_in_worker_processes_changes_nothing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """A big project's comments (where directives live) are read in worker processes while the scan parses
+    (the CLI's `scan(parallel=True)`, from PARALLEL_MIN_BYTES of source): the fragment is the same, problems
+    included, and so it is when no worker process can be started."""
+    from karyo import __main__ as cli
+    _write(tmp_path, {"proj/__init__.py": INIT, "proj/store.py": STORE, "proj/api.py": API,
+                      "proj/broken.py": "def f(:\n", "proj/marked.py": "x = 1  # karyo:node id=a.b\n"})
+
+    def fragment(parallel: bool) -> str:
+        frag = cli.scan([str(tmp_path / "proj")], str(tmp_path), None, parallel=parallel)
+        frag["producers"][0].pop("at")
+        return json.dumps(frag, indent=1)
+
+    serial = fragment(False)
+    assert "not valid Python" in serial and "must be a comment on its own line" in serial
+    pools = []
+    real_pool = cli.ProcessPoolExecutor
+    monkeypatch.setattr(cli, "PARALLEL_MIN_BYTES", 0)
+    monkeypatch.setattr(cli, "ProcessPoolExecutor", lambda **kw: pools.append(kw) or real_pool(**kw))
+    assert fragment(True) == serial
+    assert pools, "the comments were not read in worker processes"
+
+    def no_processes(**kw):
+        raise OSError("no processes here")
+    monkeypatch.setattr(cli, "ProcessPoolExecutor", no_processes)
+    assert fragment(True) == serial

@@ -18,8 +18,12 @@ export interface ViewSelection {
   /** Item names wholly visible, partly visible, and out of view; and whether there is more to scroll to. */
   items?: { shown: string[]; partly: string[]; hidden: string[] };
   more?: { above: boolean; below: boolean };
-  /** Board: the group drilled into. */
+  /** Board: the group drilled into (the groups view: the group entered). */
   drill?: string | null;
+  /** Board: group navigation (docs/ENGINE.md "Group navigation"): `groups` (one card per group, entered level by level) or
+   *  `cards`; the group entered (null: the overview), the path from the top, the level's group cards and its stubs
+   *  (neighbours at the edges: they call in, or are called). Absent on a board with no groups to show. */
+  level?: { view: 'groups' | 'cards'; at: string | null; path: string[]; groups: string[]; stubs: string[]; cards?: string[]; proposed?: boolean };
   /** Pinned legend entry ids (`highlight` is the ad-hoc highlight). */
   pins?: string[];
   /** The cards the ad-hoc highlight lights (when `pins` has `highlight`). */
@@ -86,6 +90,12 @@ export interface SpliceState {
   file: string | null;
   /** How many of its changes the code already has. */
   landed: number;
+  /** Where you are in it now (the breadcrumb's words), and where it lives (the view it was opened or saved in, which
+   *  reopening restores). Changes are over the whole model; the view is only where you are. */
+  where?: string;
+  home?: string | null;
+  /** The groups it proposes: id, name, the path to it, how many cards so far. */
+  groups?: { id: string; label: string; path: string; cards: number }[];
 }
 export interface ViewSnapshot {
   plate: PlateKind;
@@ -97,11 +107,11 @@ export interface ViewSnapshot {
   selection: ViewSelection;
 }
 
-export type SpliceActionName = 'splice_open' | 'splice_add' | 'splice_connect' | 'splice_disconnect' | 'splice_remove' | 'splice_replace' | 'splice_rename' | 'splice_move' | 'splice_undo' | 'splice_redo' | 'splice_save' | 'splice_discard' | 'splice_leave' | 'splice_list'
+export type SpliceActionName = 'splice_open' | 'splice_add' | 'splice_group' | 'splice_connect' | 'splice_disconnect' | 'splice_remove' | 'splice_replace' | 'splice_rename' | 'splice_move' | 'splice_undo' | 'splice_redo' | 'splice_save' | 'splice_discard' | 'splice_leave' | 'splice_list'
   | 'splice_stack' | 'splice_stack_open' | 'splice_stack_return' | 'splice_stack_leave' | 'splice_stack_conflict' | 'splice_stack_swap' | 'splice_stack_same';
-export type ActionName = 'focus' | 'open' | 'close' | 'drill' | 'back' | 'highlight' | 'clear' | 'show_details' | 'scroll' | 'step' | 'select' | 'theater' | 'fan' | 'bench' | 'pin_inspector' | 'zoom' | 'pan' | SpliceActionName;
-export const ACTIONS: readonly ActionName[] = ['focus', 'open', 'close', 'drill', 'back', 'highlight', 'clear', 'show_details', 'scroll', 'step', 'select', 'theater', 'fan', 'bench', 'pin_inspector', 'zoom', 'pan',
-  'splice_open', 'splice_add', 'splice_connect', 'splice_disconnect', 'splice_remove', 'splice_replace', 'splice_rename', 'splice_move', 'splice_undo', 'splice_redo', 'splice_save', 'splice_discard', 'splice_leave', 'splice_list',
+export type ActionName = 'focus' | 'open' | 'close' | 'drill' | 'back' | 'groups' | 'highlight' | 'clear' | 'show_details' | 'scroll' | 'step' | 'select' | 'theater' | 'fan' | 'bench' | 'pin_inspector' | 'zoom' | 'pan' | SpliceActionName;
+export const ACTIONS: readonly ActionName[] = ['focus', 'open', 'close', 'drill', 'back', 'groups', 'highlight', 'clear', 'show_details', 'scroll', 'step', 'select', 'theater', 'fan', 'bench', 'pin_inspector', 'zoom', 'pan',
+  'splice_open', 'splice_add', 'splice_group', 'splice_connect', 'splice_disconnect', 'splice_remove', 'splice_replace', 'splice_rename', 'splice_move', 'splice_undo', 'splice_redo', 'splice_save', 'splice_discard', 'splice_leave', 'splice_list',
   'splice_stack', 'splice_stack_open', 'splice_stack_return', 'splice_stack_leave', 'splice_stack_conflict', 'splice_stack_swap', 'splice_stack_same'];
 
 export type PageMsg =

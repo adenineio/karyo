@@ -68,6 +68,8 @@ def test_skeleton():
     ("zoom to fit please", "zoom", {"to": "fit"}), ("pan left", "pan", {"direction": "left"}), ("Pan down.", "pan", {"direction": "down"}),
     ("clear", "clear", {}),
     ("Swap the order.", "splice_stack_swap", {}), ("try the other order", "splice_stack_swap", {}),
+    ("Splice this.", "splice_open", {"new": True}), ("splice this view please", "splice_open", {"new": True}),
+    ("Open this view in a new splice", "splice_open", {"new": True}),
 ])
 def test_fast_path(text, name, args):
     hit = fastpath.lookup(text)

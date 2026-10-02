@@ -22,10 +22,13 @@ export interface Curation {
   groups?: Record<string, CurationGroup>;
   /** Per node (an id or a selector): what to show instead of what the code says. Tags add to the code's. */
   nodes?: Record<string, CurationNode>;
+  /** What a structure board starts on (docs/ENGINE.md "Group navigation"): one card per group, or every card. Default: groups
+   *  when the board is big. */
+  start?: 'groups' | 'cards';
 }
 
 const KINDS: NodeKind[] = ['service', 'function', 'type', 'store', 'queue', 'external', 'actor'];
-const TOP_KEYS = ['karyo', 'note', 'top', 'fold', 'hide', 'groups', 'nodes', '$schema'];
+const TOP_KEYS = ['karyo', 'note', 'top', 'fold', 'hide', 'groups', 'nodes', 'start', '$schema'];
 const NODE_KEYS = ['label', 'summary', 'kind', 'category', 'tags', 'group'];
 const GROUP_KEYS = ['label', 'parent', 'summary', 'members'];
 const WORD_RE = /^[A-Za-z0-9_][A-Za-z0-9_.:/-]*$/;
@@ -59,6 +62,7 @@ export function validateCuration(c: unknown): { path: string; message: string }[
   for (const k of Object.keys(o)) if (!TOP_KEYS.includes(k)) out.push({ path: k, message: `unknown key (keys: ${TOP_KEYS.filter((x) => x !== '$schema').join(', ')})` });
   for (const k of ['top', 'fold', 'hide'] as const)
     if (o[k] !== undefined && (!Array.isArray(o[k]) || !(o[k] as unknown[]).every((x) => typeof x === 'string' && x))) out.push({ path: k, message: 'a list of node ids or selectors' });
+  if (o.start !== undefined && o.start !== 'groups' && o.start !== 'cards') out.push({ path: 'start', message: '"groups" or "cards"' });
   const nodes = o.nodes as Record<string, Record<string, unknown>> | undefined;
   if (nodes !== undefined && (typeof nodes !== 'object' || Array.isArray(nodes))) out.push({ path: 'nodes', message: 'an object: node id (or selector) → what to show' });
   else for (const [id, v] of Object.entries(nodes ?? {})) {
@@ -128,18 +132,32 @@ export function applyCuration(m: Model, c: Curation, file = 'karyo/curation.json
     groups.push({ id, ...(g.label ? { label: g.label } : {}), ...(g.parent ? { parent: g.parent } : {}), ...(g.summary ? { summary: g.summary } : {}) });
   }
   if (groups.length) m.groups = [...(m.groups ?? []).filter((g) => !groups.some((x) => x.id === g.id)), ...groups].sort((a, b) => (a.id < b.id ? -1 : 1));
+  // where a board starts: one card per group, or every card
+  if (c.start && !bad.has('start')) m.start = c.start;
   // folding: fold first, top wins
   if (!bad.has('fold')) for (const sel of c.fold ?? []) for (const n of match('fold', sel)) {
     if (n.parent && byId.has(n.parent)) n.fold = true;
     else if (!sel.includes('*')) checks.push({ level: 'warn', code: 'curation-invalid', subject: `curation:fold:${sel}`, message: `${file} fold names ${sel}, which has no parent to fold into; hide it, or move it to a group.` });
   }
   if (!bad.has('top')) for (const sel of c.top ?? []) for (const n of match('top', sel)) delete n.fold;
-  // hiding: left out with its relationships, unless a recorded run reached it (then it stays, and the check says so)
+  // hiding: left out with its relationships, unless a recorded run reached it (then it stays, and the check says so).
+  // A type whose recorded calls are only constructions that called nothing recorded (a record, a reply or an exception
+  // built along the way) is hidden all the same: its constructions leave the flows with it, and no other call goes missing
   if (!bad.has('hide')) {
-    const hide = new Set<string>();
+    const hide = new Set<string>(), built = new Set<string>();
+    const callsOut = new Set(m.edges.filter((e) => e.sources.includes('observed')).map((e) => e.from));
     for (const sel of c.hide ?? []) for (const n of match('hide', sel)) {
-      if (n.sources.includes('observed')) checks.push({ level: 'info', code: 'curation-kept', subject: n.id, message: `${file} hides ${n.id}, but a recorded run reached it: kept, so no recorded call goes missing.` });
+      if (n.sources.includes('observed') && n.kind === 'type' && !callsOut.has(n.id)) { hide.add(n.id); built.add(n.id); }
+      else if (n.sources.includes('observed')) checks.push({ level: 'info', code: 'curation-kept', subject: n.id, message: `${file} hides ${n.id}, but a recorded run reached it: kept, so no recorded call goes missing.` });
       else hide.add(n.id);
+    }
+    if (built.size) {
+      m.flows = m.flows.map((f) => {
+        if (!f.spans.some((sp) => built.has(sp.node))) return f;
+        const gone = new Map(f.spans.filter((sp) => built.has(sp.node)).map((sp) => [sp.id, sp.parent]));
+        const up = (p: string | null | undefined) => { for (let k = 0; p && gone.has(p) && k < 64; k++) p = gone.get(p); return p ?? null; };
+        return { ...f, spans: f.spans.filter((sp) => !gone.has(sp.id)).map((sp) => (sp.parent && gone.has(sp.parent) ? { ...sp, parent: up(sp.parent) } : sp)) };
+      }).filter((f) => f.spans.length);
     }
     if (hide.size) {
       m.nodes = m.nodes.filter((n) => !hide.has(n.id));

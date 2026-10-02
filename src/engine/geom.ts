@@ -168,24 +168,38 @@ export function pickPath<K>(paths: Iterable<readonly [K, Path]>, p: P, tol = 6):
 }
 /** Does the segment a–b pass through the rectangle's interior? */
 export function segHitsRect(a: P, b: P, r: Rect): boolean {
-  // Liang–Barsky clip against the open box
-  let t0 = 0, t1 = 1;
+  // Liang–Barsky clip against the open box, edge by edge (left, right, top, bottom). Unrolled so it allocates nothing:
+  // a board's router runs it for every segment of every candidate route against every card.
+  let t0 = 0, t1 = 1, pp: number, q: number, t: number;
   const dx = b.x - a.x, dy = b.y - a.y;
-  const edges: [number, number][] = [[-dx, a.x - r.x], [dx, r.x + r.w - a.x], [-dy, a.y - r.y], [dy, r.y + r.h - a.y]];
-  for (const [pp, q] of edges) {
-    if (pp === 0) { if (q <= 0) return false; continue; }
-    const t = q / pp;
-    if (pp < 0) { if (t > t0) t0 = t; } else if (t < t1) t1 = t;
-    if (t0 >= t1) return false;
-  }
+  pp = -dx; q = a.x - r.x;
+  if (pp === 0) { if (q <= 0) return false; } else { t = q / pp; if (pp < 0) { if (t > t0) t0 = t; } else if (t < t1) t1 = t; if (t0 >= t1) return false; }
+  pp = dx; q = r.x + r.w - a.x;
+  if (pp === 0) { if (q <= 0) return false; } else { t = q / pp; if (pp < 0) { if (t > t0) t0 = t; } else if (t < t1) t1 = t; if (t0 >= t1) return false; }
+  pp = -dy; q = a.y - r.y;
+  if (pp === 0) { if (q <= 0) return false; } else { t = q / pp; if (pp < 0) { if (t > t0) t0 = t; } else if (t < t1) t1 = t; if (t0 >= t1) return false; }
+  pp = dy; q = r.y + r.h - a.y;
+  if (pp === 0) { if (q <= 0) return false; } else { t = q / pp; if (pp < 0) { if (t > t0) t0 = t; } else if (t < t1) t1 = t; if (t0 >= t1) return false; }
   return t1 - t0 > 1e-6;
 }
+/** Is the box x0..x1 × y0..y1 (closed) clear of the rectangle's open interior? Then no segment inside it passes through
+ *  the rectangle: `segHitsRect` clips it to nothing (t ≥ 1 or ≤ 0 on that edge, with rounding on the same side), so the
+ *  test can be skipped and the answer is the same. */
+const clearOf = (x0: number, x1: number, y0: number, y1: number, r: Rect) => x1 <= r.x || x0 >= r.x + r.w || y1 <= r.y || y0 >= r.y + r.h;
 /** How many of the rectangles a path runs through (a wire behind a card). */
 export function pathCrossings(path: Path, rects: Rect[]): number {
+  const pts = path.pts;
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const p of pts) { if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x; if (p.y < y0) y0 = p.y; if (p.y > y1) y1 = p.y; }
   let n = 0;
   for (const r of rects) {
-    const pts = path.pts;
-    for (let i = 1; i < pts.length; i++) if (segHitsRect(pts[i - 1]!, pts[i]!, r)) { n++; break; }
+    // most cards are nowhere near a given wire: one test against the path's bounds, then one per segment's
+    if (clearOf(x0, x1, y0, y1, r)) continue;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1]!, b = pts[i]!;
+      if (clearOf(Math.min(a.x, b.x), Math.max(a.x, b.x), Math.min(a.y, b.y), Math.max(a.y, b.y), r)) continue;
+      if (segHitsRect(a, b, r)) { n++; break; }
+    }
   }
   return n;
 }

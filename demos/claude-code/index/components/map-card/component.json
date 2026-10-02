@@ -1,0 +1,25 @@
+{
+  "name": "map-card",
+  "description": "One explainer on the series map: its code (e.g. A4), its title, its one-line aha and the file to open (a relative link). Compact mode hides the aha.",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": ["code", "title", "file"],
+    "additionalProperties": false,
+    "properties": {
+      "code": { "type": "string", "minLength": 1, "description": "the explainer's short code, e.g. `A4`" },
+      "title": { "type": "string", "minLength": 1 },
+      "aha": { "type": "string", "description": "the one idea it teaches, in one line" },
+      "file": { "type": "string", "pattern": "^[a-z0-9-]+\\.html$", "description": "the built file to open, relative, e.g. `a4-grep.html`" },
+      "compact": { "type": "boolean", "description": "hide the aha (for the whole-map view)" }
+    }
+  },
+  "size": { "w": 240 },
+  "motion": ["appear", "emphasize"],
+  "example": {
+    "code": "A4",
+    "title": "grep: finding the needle",
+    "aha": "grep returns only the matching lines and where they came from.",
+    "file": "a4-grep.html"
+  }
+}

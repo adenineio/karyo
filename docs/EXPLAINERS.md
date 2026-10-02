@@ -23,6 +23,7 @@ Dev preview: `just dev`, then `http://localhost:5180/explain.html?spec=<absolute
   "id": "compound-interest",            // required: letters, digits, _ . : -
   "title": "Compound interest",         // required
   "summary": "One line, **markdown-lite** inline",
+  "note": "Optional: a short footer line on every step, e.g. **Names and files here are made-up examples.**",
   "size": { "w": 1600, "h": 900 },      // logical stage px (default 1600×900); the plate scales to fit
   "narration": "side",                  // side (default) | bottom | none: where each step's prose goes
   "timeline": true,                     // stations strip, one per step (default: true when > 1 step)
@@ -126,7 +127,7 @@ Keys on a focused plate: ←/→ or j/k and Enter step, Home/End, 1–9 jump, `p
 
 A component is a folder `<name>/` with three files:
 
-- **`component.json`**: `{ "name", "description", "version", "props": <JSON Schema object>, "size"?: { "w", "h"? }, "motion"?: ["appear","emphasize","count","draw"], "example"?: { …props } }`. `props` is how the validator checks elements, so give it `required`, `additionalProperties: false` and `default`s. `example` must validate: tests and the CLI render it.
+- **`component.json`**: `{ "name", "description", "version", "props": <JSON Schema object>, "size"?: { "w", "h"? }, "motion"?: ["appear","emphasize","count","draw"], "example"?: { …props } }`. `props` is how the validator checks elements, so give it `required`, `additionalProperties: false` and `default`s. `example` must validate: tests and the CLI render it. A prop that holds a picture is marked `"format": "image"` (as `image` and `figure` mark `src`): only those are inlined as data: URIs when the spec is bundled, so text that happens to end in `.png`, such as a file name in a file tree, stays text. A prop named `src` with no `format` is treated as an image too.
 - **`template.html`**: real HTML in the template language below. Start from the engine classes (`pl-card`, `pl-label`, `pl-title`, `pl-chip`, `pl-code`, `pl-mono`, `pl-muted`) so every theme works.
 - **`style.css`**: scoped by the loader (see below). Theme tokens only (`var(--pl-bg|fg|muted|line|accent|accent-2|ok|card|card-border|radius|font|font-display|font-mono)`, `color-mix()` of them). **No transitions or animations**: the engine owns time. The validator warns about them, about hard-coded colours and about remote `url()`s.
 

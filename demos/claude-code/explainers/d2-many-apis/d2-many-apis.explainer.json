@@ -1,0 +1,616 @@
+{
+  "karyo": "explainer/1",
+  "id": "d2-many-apis",
+  "title": "One tool, many APIs, one result",
+  "summary": "A server can fold several APIs behind one outcome tool. Thin tools are flexible; outcome tools are dependable and lighter on Claude's desk. Our design advice: offer both.",
+  "note": "Names, companies and files here are **made-up examples**.",
+  "narration": "side",
+  "uses": [
+    "chat-turn",
+    "context-meter",
+    "try-it",
+    "tool-card"
+  ],
+  "layout": {
+    "kind": "free"
+  },
+  "categories": [
+    {
+      "id": "you",
+      "label": "you"
+    },
+    {
+      "id": "claude",
+      "label": "Claude"
+    },
+    {
+      "id": "thin",
+      "label": "thin tools"
+    },
+    {
+      "id": "outcome",
+      "label": "outcome tool"
+    },
+    {
+      "id": "result",
+      "label": "what comes back"
+    }
+  ],
+  "elements": [
+    {
+      "id": "you",
+      "type": "chat-turn",
+      "category": "you",
+      "label": "Your request",
+      "props": {
+        "who": "you",
+        "text": "Prepare my account brief for Acme."
+      },
+      "at": {
+        "x": 0,
+        "y": 0,
+        "w": 380
+      }
+    },
+    {
+      "id": "claude",
+      "type": "chat-turn",
+      "category": "claude",
+      "label": "Claude's tool calls",
+      "props": {
+        "who": "claude",
+        "text": "I'll need the CRM, the reporting tool and the document store."
+      },
+      "at": {
+        "x": 0,
+        "y": 92,
+        "w": 380
+      }
+    },
+    {
+      "id": "meter",
+      "type": "context-meter",
+      "category": "result",
+      "label": "Claude's desk",
+      "props": {
+        "title": "Claude's desk (context window)",
+        "used": 3,
+        "caption": "illustrative",
+        "items": [
+          {
+            "label": "CLAUDE.md",
+            "share": "2%",
+            "tone": "brief"
+          },
+          {
+            "label": "your request",
+            "share": "1%",
+            "tone": "chat"
+          }
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 330,
+        "w": 380
+      }
+    },
+    {
+      "id": "t1",
+      "type": "tool-card",
+      "category": "thin",
+      "props": {
+        "kicker": "thin tool",
+        "name": "get_account",
+        "description": "One account's CRM record, every field.",
+        "api": "CRM API"
+      },
+      "at": {
+        "x": 960,
+        "y": 0,
+        "w": 320
+      }
+    },
+    {
+      "id": "t2",
+      "type": "tool-card",
+      "category": "thin",
+      "props": {
+        "kicker": "thin tool",
+        "name": "get_revenue",
+        "description": "Revenue for one account, month by month.",
+        "api": "reporting API"
+      },
+      "at": {
+        "x": 960,
+        "y": 170,
+        "w": 320
+      }
+    },
+    {
+      "id": "t3",
+      "type": "tool-card",
+      "category": "thin",
+      "props": {
+        "kicker": "thin tool",
+        "name": "search_documents",
+        "description": "Files in the document store that match a word.",
+        "api": "document store API"
+      },
+      "at": {
+        "x": 960,
+        "y": 340,
+        "w": 320
+      }
+    },
+    {
+      "id": "outcome",
+      "type": "tool-card",
+      "category": "outcome",
+      "props": {
+        "kicker": "outcome tool",
+        "kind": "outcome",
+        "name": "prepare_account_brief",
+        "description": "Fetches the record, revenue and recent files for one account, and returns a one-page brief.",
+        "inputs": [
+          "account: Acme"
+        ]
+      },
+      "at": {
+        "x": 490,
+        "y": 100,
+        "w": 340
+      }
+    },
+    {
+      "id": "brief",
+      "type": "card",
+      "category": "result",
+      "label": "The brief",
+      "props": {
+        "kicker": "the result · one page",
+        "title": "Acme: account brief",
+        "body": "- Owner: Sam Lee · renews 15 Nov\n- 12-month revenue: $412,000, up 8%\n- Open deals: 2\n- Recent files: renewal proposal, meeting notes"
+      },
+      "at": {
+        "x": 490,
+        "y": 330,
+        "w": 340
+      }
+    },
+    {
+      "id": "tradeoff",
+      "type": "table",
+      "props": {
+        "columns": [
+          "",
+          "thin tools",
+          "outcome tools"
+        ],
+        "rows": [
+          [
+            "one tool does",
+            "one API call",
+            "a whole job"
+          ],
+          [
+            "best for",
+            "new, odd questions",
+            "jobs you repeat"
+          ],
+          [
+            "calls per job",
+            "several",
+            "one"
+          ],
+          [
+            "who picks the steps",
+            "Claude: very likely right",
+            "the server's code: fixed"
+          ],
+          [
+            "lands on the desk",
+            "raw replies",
+            "a short result"
+          ]
+        ],
+        "caption": "Design advice, not part of the MCP standard."
+      },
+      "at": {
+        "x": 0,
+        "y": 820,
+        "w": 620
+      }
+    },
+    {
+      "id": "spec-note",
+      "type": "callout",
+      "props": {
+        "tone": "note",
+        "title": "What MCP itself says",
+        "md": "MCP defines how a server offers tools and how Claude calls them. How much each tool does is the server designer's choice."
+      },
+      "at": {
+        "x": 680,
+        "y": 820,
+        "w": 320
+      }
+    },
+    {
+      "id": "ask",
+      "type": "list",
+      "props": {
+        "title": "When you commission a server, ask for",
+        "frame": true,
+        "items": [
+          "An **outcome tool** for each job you repeat: the account brief, the weekly report.",
+          "**Thin tools** too, for questions nobody planned.",
+          "**Short results**, not every field the API has.",
+          "**Honest gaps**: say what failed, never fill it in.",
+          "**Clear descriptions**: Claude picks tools by reading them."
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 820,
+        "w": 520
+      }
+    },
+    {
+      "id": "try",
+      "type": "try-it",
+      "props": {
+        "title": "Name your outcome tool",
+        "expect": "Think of a task you do across three systems. Write the one line you'd like to say instead, like `prepare_account_brief(account)`, then list the three systems it would call."
+      },
+      "at": {
+        "x": 0,
+        "y": 330,
+        "w": 380
+      }
+    }
+  ],
+  "links": [
+    {
+      "id": "c1",
+      "from": "claude",
+      "to": "t1",
+      "label": "call 1"
+    },
+    {
+      "id": "c2",
+      "from": "claude",
+      "to": "t2",
+      "label": "call 2"
+    },
+    {
+      "id": "c3",
+      "from": "claude",
+      "to": "t3",
+      "label": "call 3"
+    },
+    {
+      "id": "co",
+      "from": "claude",
+      "to": "outcome",
+      "label": "one call",
+      "style": "accent"
+    },
+    {
+      "id": "o1",
+      "from": "outcome",
+      "to": "t1",
+      "label": "code"
+    },
+    {
+      "id": "o2",
+      "from": "outcome",
+      "to": "t2",
+      "label": "code"
+    },
+    {
+      "id": "o3",
+      "from": "outcome",
+      "to": "t3",
+      "label": "code"
+    },
+    {
+      "id": "ob",
+      "from": "outcome",
+      "to": "brief",
+      "label": "returns"
+    }
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "title": "Three systems, three tools",
+      "text": "Your account brief needs three systems: the CRM, the reporting tool and the document store. Here each one offers a **thin tool**: one tool per API call, like phoning the airline, the hotel and the car hire yourself.",
+      "show": [
+        "you",
+        "claude",
+        "t1",
+        "t2",
+        "t3"
+      ],
+      "connect": [],
+      "emphasize": [
+        "t1",
+        "t2",
+        "t3"
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "Claude chains three calls",
+      "text": "Claude calls each tool in turn, carrying the account number from the first reply into the second. Every reply comes back raw, every field the API has, and lands on the desk. Three choices, each very likely right, none guaranteed.",
+      "add": [
+        "meter"
+      ],
+      "connect": [
+        "c1",
+        "c2",
+        "c3"
+      ],
+      "emphasize": [
+        "claude",
+        "meter"
+      ],
+      "set": {
+        "claude": {
+          "text": "Calling the three tools in turn.",
+          "actions": [
+            "get_account  name: \"Acme\"",
+            "get_revenue  account: 4471  months: 12",
+            "search_documents  query: \"Acme\""
+          ]
+        },
+        "meter": {
+          "used": 37,
+          "items": [
+            {
+              "label": "CLAUDE.md",
+              "share": "2%",
+              "tone": "brief"
+            },
+            {
+              "label": "account record: 80 raw fields",
+              "share": "9%",
+              "tone": "waste"
+            },
+            {
+              "label": "12 months of revenue rows",
+              "share": "14%",
+              "tone": "waste"
+            },
+            {
+              "label": "25 document matches",
+              "share": "11%",
+              "tone": "waste"
+            },
+            {
+              "label": "your request",
+              "share": "1%",
+              "tone": "chat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s3",
+      "title": "Fold them behind one tool",
+      "text": "A travel agent books the flight, hotel and car for you. An **outcome tool** does the same: one call, and the server's own code makes the three API calls in a fixed order, the same way every time. (A design choice, not something MCP requires.)",
+      "show": [
+        "you",
+        "claude",
+        "outcome",
+        "t1",
+        "t2",
+        "t3"
+      ],
+      "connect": [
+        "co",
+        "o1",
+        "o2",
+        "o3"
+      ],
+      "emphasize": [
+        "outcome"
+      ],
+      "dim": [
+        "t1",
+        "t2",
+        "t3"
+      ],
+      "set": {
+        "claude": {
+          "text": "One call does it.",
+          "actions": [
+            "prepare_account_brief  account: \"Acme\""
+          ]
+        },
+        "t1": {
+          "kicker": "run by the server's code"
+        },
+        "t2": {
+          "kicker": "run by the server's code"
+        },
+        "t3": {
+          "kicker": "run by the server's code"
+        }
+      }
+    },
+    {
+      "id": "s4",
+      "title": "One call, one compact result",
+      "text": "Back comes one short brief instead of three raw replies, so the desk stays clear for what only Claude does well: reading it and writing to Acme.",
+      "show": [
+        "claude",
+        "outcome",
+        "t1",
+        "t2",
+        "t3",
+        "brief",
+        "meter"
+      ],
+      "connect": [
+        "co",
+        "o1",
+        "o2",
+        "o3",
+        "ob"
+      ],
+      "emphasize": [
+        "brief",
+        "meter"
+      ],
+      "dim": [
+        "t1",
+        "t2",
+        "t3"
+      ],
+      "set": {
+        "t1": {
+          "state": "ok",
+          "note": "fetched"
+        },
+        "t2": {
+          "state": "ok",
+          "note": "fetched"
+        },
+        "t3": {
+          "state": "ok",
+          "note": "fetched"
+        },
+        "meter": {
+          "used": 6,
+          "items": [
+            {
+              "label": "CLAUDE.md",
+              "share": "2%",
+              "tone": "brief"
+            },
+            {
+              "label": "the brief: one page",
+              "share": "3%",
+              "tone": "file"
+            },
+            {
+              "label": "your request",
+              "share": "1%",
+              "tone": "chat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s5",
+      "title": "When one service fails",
+      "text": "The reporting system times out. A good outcome tool says so plainly: the CRM and the documents came back, revenue didn't. MCP lets a tool report a failure in its reply, so Claude can tell you, not guess a number.",
+      "show": [
+        "claude",
+        "outcome",
+        "t1",
+        "t2",
+        "t3",
+        "brief"
+      ],
+      "connect": [
+        "co",
+        "o1",
+        "o2",
+        "o3",
+        "ob"
+      ],
+      "emphasize": [
+        "t2",
+        "brief"
+      ],
+      "dim": [
+        "t1",
+        "t3"
+      ],
+      "set": {
+        "t2": {
+          "state": "fail",
+          "note": "timed out"
+        },
+        "brief": {
+          "kicker": "the result · partial",
+          "body": "- CRM and documents fetched; **reporting unavailable (timeout)**\n- Owner: Sam Lee · renews 15 Nov\n- 12-month revenue: not available\n- Recent files: renewal proposal, meeting notes"
+        },
+        "claude": {
+          "text": "Here's the brief. Revenue is missing: the reporting system timed out. Shall I try again later?",
+          "actions": [
+            "prepare_account_brief  account: \"Acme\""
+          ]
+        }
+      }
+    },
+    {
+      "id": "s6",
+      "title": "Thin or outcome?",
+      "text": "Thin tools are flexible; outcome tools are dependable and light on the desk. Our design advice, not an MCP rule: offer both, outcome tools for the jobs you repeat, thin ones for everything else.",
+      "show": [
+        "tradeoff",
+        "spec-note"
+      ],
+      "emphasize": [
+        "tradeoff"
+      ]
+    },
+    {
+      "id": "s7",
+      "title": "What to ask for",
+      "text": "When you commission a server, or choose one, ask for these. None of them needs code from you.",
+      "show": [
+        "ask"
+      ],
+      "emphasize": [
+        "ask"
+      ]
+    },
+    {
+      "id": "s8",
+      "title": "The whole picture",
+      "text": "One request, one outcome tool, three APIs behind it, one honest result. Claude brings the judgment; the server's code does the fetching, the same way every time.",
+      "show": [
+        "claude",
+        "outcome",
+        "t1",
+        "t2",
+        "t3",
+        "brief",
+        "try"
+      ],
+      "connect": [
+        "co",
+        "o1",
+        "o2",
+        "o3",
+        "ob"
+      ],
+      "emphasize": [
+        "outcome"
+      ],
+      "set": {
+        "t2": {
+          "state": "ok",
+          "note": "fetched"
+        },
+        "brief": {
+          "kicker": "the result · one page",
+          "body": "- Owner: Sam Lee · renews 15 Nov\n- 12-month revenue: $412,000, up 8%\n- Open deals: 2\n- Recent files: renewal proposal, meeting notes"
+        },
+        "claude": {
+          "text": "Here's Acme's brief. Revenue is up 8%; the renewal is due 15 Nov.",
+          "actions": [
+            "prepare_account_brief  account: \"Acme\""
+          ]
+        }
+      }
+    }
+  ]
+}

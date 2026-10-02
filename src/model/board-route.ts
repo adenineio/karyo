@@ -24,18 +24,31 @@ const elbowH = (pa: P, pb: P, xTurn: number) =>
 const elbowV = (pa: P, pb: P, yTurn: number) =>
   Math.abs(pb.x - pa.x) < 2 ? wire(pa, { x: pa.x, y: pb.y }, { kind: 'straight' }) : new Path(roundCorners([pa, { x: pa.x, y: yTurn }, { x: pb.x, y: yTurn }, pb], R));
 
-/** A wire from box A (caller) to box B (callee). Pass `grid` (both cards' auto-layout slots, shifted
+/** A wire from box A (caller) to box B (callee). `floor`: how low a wire may run (the top of a legend under the cards);
+ *  with `grid`, `obstacles` are what a back edge kept above it runs under. Pass `grid` (both cards' auto-layout slots, shifted
  *  by their shared offset) when the two cards keep their auto arrangement: the map's router is used.
  *  Pass `obstacles` (the other cards' boxes) for free routing that keeps out from behind cards: of the
  *  candidate routes, the one running behind the fewest cards wins, then the shortest. */
-export function boardRoute(A: Rect, B: Rect, grid?: { a: Slot; b: Slot }, obstacles?: Rect[]): Path {
+export function boardRoute(A: Rect, B: Rect, grid?: { a: Slot; b: Slot }, obstacles?: Rect[], floor?: number): Path {
   if (grid) {
     const fwd = grid.b.layer > grid.a.layer;
     const pa = fwd ? { x: A.x + A.w + 3, y: A.y + A.h / 2 } : { x: A.x + A.w / 2, y: A.y + A.h + 3 };
     const pb = fwd ? { x: B.x - 3, y: B.y + B.h / 2 } : { x: B.x + B.w / 2, y: B.y + B.h + 3 };
+    // a back edge loops underneath (the map's curve). Where that curve would dip below `floor` (into the legend), it
+    // runs as a bracket instead: down, along under the cards between its ends (`obstacles`), and up, above the floor
+    if (!fwd && floor !== undefined) {
+      const d = Math.hypot(pb.x - pa.x, pb.y - pa.y), low = Math.max(pa.y, pb.y);
+      // (the curve's control points sit 0.8 d below its ends, so it dips 0.75 of that below the lower one)
+      if (low + 0.75 * 0.8 * d > floor) {
+        const lo = Math.min(pa.x, pb.x) - R, hi = Math.max(pa.x, pb.x) + R;
+        const under = (obstacles ?? []).filter((r) => r.x < hi && r.x + r.w > lo && r.y + r.h > low - 3).map((r) => r.y + r.h);
+        const y = Math.min(floor, Math.max(low, ...under) + 12);
+        return new Path(roundCorners([pa, { x: pa.x, y }, { x: pb.x, y }, pb], R));
+      }
+    }
     return route(grid.a, grid.b, pa, pb);
   }
-  const cands = freeCandidates(A, B, obstacles);
+  const cands = freeCandidates(A, B, obstacles, floor);
   if (!obstacles?.length || cands.length === 1) return cands[0]!.p;
   let best = cands[0]!.p, bestS = Infinity;
   cands.forEach(({ p, extra }, i) => {
@@ -46,7 +59,7 @@ export function boardRoute(A: Rect, B: Rect, grid?: { a: Slot; b: Slot }, obstac
 }
 
 /** Horizontal lanes free of obstacles between x0 and x1, cheapest first (nearest to `ys`, see `extra`). */
-function lanes(obstacles: Rect[], x0: number, x1: number, ys: number[], skip: Rect[]): { y: number; extra: number }[] {
+function lanes(obstacles: Rect[], x0: number, x1: number, ys: number[], skip: Rect[], floor = Infinity): { y: number; extra: number }[] {
   const lo = Math.min(x0, x1), hi = Math.max(x0, x1);
   const rs = obstacles.filter((r) => !skip.includes(r) && r.x < hi && r.x + r.w > lo).map((r) => [r.y - 5, r.y + r.h + 5] as const).sort((a, b) => a[0] - b[0]);
   // a lane between rows of cards; squeezed ones (a wire there reads as touching them) and the ones outside
@@ -56,18 +69,18 @@ function lanes(obstacles: Rect[], x0: number, x1: number, ys: number[], skip: Re
   for (const [a, b] of rs) { if (a > top && Number.isFinite(top)) out.push({ y: Math.round((top + a) / 2), extra: a - top < 20 ? 600 : 0 }); top = Math.max(top, b); }
   if (rs.length) out.push({ y: Math.round(rs[0]![0] - 8), extra: 400 }, { y: Math.round(top + 8), extra: 400 });
   const cost = (l: { y: number; extra: number }) => ys.reduce((s, v) => s + Math.abs(l.y - v), 0) + l.extra;
-  return out.filter((l, i) => out.findIndex((m) => m.y === l.y) === i).sort((a, b) => cost(a) - cost(b)).slice(0, 4);
+  return out.filter((l, i) => l.y <= floor && out.findIndex((m) => m.y === l.y) === i).sort((a, b) => cost(a) - cost(b)).slice(0, 4);
 }
 
 /** Candidate routes between two free boxes, the plain one first (the route when nothing is in the way). */
-function freeCandidates(A: Rect, B: Rect, obstacles?: Rect[]): { p: Path; extra: number }[] {
+function freeCandidates(A: Rect, B: Rect, obstacles?: Rect[], floor?: number): { p: Path; extra: number }[] {
   const turn = COL_GAP / 2 - 3;
   const out: { p: Path; extra: number }[] = [];
   const push = (p: Path, extra = 0) => out.push({ p, extra });
   const skip = obstacles?.filter((r) => same(r, A) || same(r, B)) ?? [];
   const lanePaths = (pa: P, pb: P, x1: number, x2: number) => {
     if (!obstacles?.length) return;
-    for (const { y, extra } of lanes(obstacles, x1, x2, [pa.y, pb.y], skip)) push(new Path(roundCorners([pa, { x: x1, y: pa.y }, { x: x1, y }, { x: x2, y }, { x: x2, y: pb.y }, pb], R)), extra);
+    for (const { y, extra } of lanes(obstacles, x1, x2, [pa.y, pb.y], skip, floor)) push(new Path(roundCorners([pa, { x: x1, y: pa.y }, { x: x1, y }, { x: x2, y }, { x: x2, y: pb.y }, pb], R)), extra);
   };
   if (B.x >= A.x + A.w + CLEAR) {
     const pa = { x: A.x + A.w + 3, y: A.y + A.h / 2 }, pb = { x: B.x - 3, y: B.y + B.h / 2 };

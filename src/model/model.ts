@@ -37,12 +37,16 @@ export interface MFlow { id: string; title?: string; trace: string; entry?: stri
 export type CheckLevel = 'error' | 'warn' | 'info';
 export interface MCheck { level: CheckLevel; code: string; message: string; subject?: string }
 /** A named group (nodes name theirs in `group`): its label, and the group it sits in (`parent`), from a curation file. */
-export interface MGroup { id: string; label?: string; parent?: string; summary?: string }
+export interface MGroup { id: string; label?: string; parent?: string; summary?: string;
+  /** `['proposed']` only on a group a splice proposes (docs/MODEL.md "Splices"); never in a model file. */
+  sources?: Source[] }
 /** A recording that watched every call inside `scope` (module / package / id prefixes, dotted), e.g. Python's sys.monitoring
  *  recorder: what lets the model say a node or relationship in scope was "not exercised". `sample` < 1: only that share of
  *  flows was recorded. */
 export interface MCoverage { scope: string[]; by?: string; sample?: number }
-export interface Model { karyo: 1; project?: string; producers?: { name: string; lang: string; version?: string; at?: string }[]; nodes: MNode[]; edges: MEdge[]; flows: MFlow[]; groups?: MGroup[]; coverage?: MCoverage[]; checks?: MCheck[]; tours?: BuiltTour[] }
+export interface Model { karyo: 1; project?: string; producers?: { name: string; lang: string; version?: string; at?: string }[]; nodes: MNode[]; edges: MEdge[]; flows: MFlow[]; groups?: MGroup[]; coverage?: MCoverage[]; checks?: MCheck[]; tours?: BuiltTour[];
+  /** What a structure board starts on (docs/ENGINE.md "Group navigation"): one card per group, or every card. From a curation file. */
+  start?: 'groups' | 'cards' }
 
 // ---- tours (docs/MODEL.md "Tours"): authored walkthroughs, resolved against the code and the recorded flows at build time (src/model/tours.ts).
 // Same shapes as src/model/tour-types.ts (the tour plate's contract): keep them in sync.
@@ -217,19 +221,29 @@ export function verdict(e: MEdge, kindOf: (id: string) => NodeKind | undefined):
   if (e.sources.includes('proposed')) return 'proposed';
   return 'possible';
 }
+/** Whether the model holds a recorded run: a flow with spans, a relationship or node seen running, or coverage. With
+ *  none, "not seen running" says nothing (nothing ran): views draw relationships the code has (declared or found by
+ *  static analysis) plainly, solid, and leave the "not seen" words out of their keys and tags. */
+export function hasRuns(m: Pick<Model, 'nodes' | 'edges'> & Partial<Pick<Model, 'flows' | 'coverage'>>): boolean {
+  return (m.flows ?? []).some((f) => f.spans?.length > 0) || (m.coverage?.length ?? 0) > 0
+    || (m.edges ?? []).some((e) => e.sources?.includes('observed')) || (m.nodes ?? []).some((n) => n.sources?.includes('observed'));
+}
 /** How a wire is drawn. */
 export type WireStyle = 'solid' | 'dashed' | 'warn' | 'proposed' | 'idle';
 /** How every view draws a verdict: seen (solid), not seen (dashed), seen but not declared (warning colour),
  *  proposed by a splice (its own style: an intention, never mistaken for code), not exercised by recorded runs that watched
- *  it (`idle`: dotted and faint, so a partial run never reads as a complete one). */
-export const wireStyle = (v: Verdict): WireStyle => (v === 'undeclared' ? 'warn' : v === 'proposed' ? 'proposed' : v === 'unexercised' ? 'idle' : v === 'unseen' || v === 'possible' || v === 'extracted' ? 'dashed' : 'solid');
+ *  it (`idle`: dotted and faint, so a partial run never reads as a complete one). In a model with no recorded run
+ *  (`runs` false, see `hasRuns`) what the code has is drawn solid: "not seen" would say nothing there. */
+export const wireStyle = (v: Verdict, runs = true): WireStyle => (v === 'undeclared' ? 'warn' : v === 'proposed' ? 'proposed' : v === 'unexercised' ? 'idle' : (v === 'unseen' || v === 'extracted') && !runs ? 'solid' : v === 'unseen' || v === 'possible' || v === 'extracted' ? 'dashed' : 'solid');
 /** Only a splice says so: a node or relationship whose one source is `proposed`. */
 export const isProposed = (x: { sources?: Source[] }) => !!x.sources?.length && x.sources.every((s) => s === 'proposed');
 
 /** The words a wire legend uses: "declared …" for a model whose relationships all come from annotations, "in the code …"
- *  once static analysis (automatic mode) contributes some; `idle` only when a recording watched packages in full. */
-export function wireWords(m: Model): { solid: string; dashed: string; warn: string; idle: string | null } {
+ *  once static analysis (automatic mode) contributes some; `idle` only when a recording watched packages in full. With no
+ *  recorded run (`hasRuns`) every wire is solid and nothing can be "seen": one entry, what the code has. */
+export function wireWords(m: Model): { solid: string; dashed: string | null; warn: string | null; idle: string | null } {
   const statics = (m.edges ?? []).some((e) => !isImport(e) && e.sources.includes('extracted'));
+  if (!hasRuns(m)) return { solid: statics ? 'in the code' : 'declared in the code', dashed: null, warn: null, idle: null };
   const idle = m.coverage?.length ? `not exercised by the recorded runs${Math.min(...m.coverage.map((c) => c.sample ?? 1)) < 1 ? ' (sampled)' : ''}` : null;
   return statics
     ? { solid: 'in the code and seen running', dashed: 'in the code, not seen running', warn: 'seen running, not in the code', idle }
@@ -240,9 +254,10 @@ export function wireWords(m: Model): { solid: string; dashed: string; warn: stri
 export interface Wire { key: string; from: string; to: string; edge: MEdge; kinds: EdgeKind[]; count: number; verdict: Verdict; style: WireStyle; decl: boolean; seen: boolean }
 export function wiresOf(m: Model, keep?: (id: string) => boolean): Wire[] {
   const kind = new Map(m.nodes.map((n) => [n.id, n.kind]));
+  const runs = hasRuns(m);
   return relations(m).filter((e) => e.from !== e.to && (!keep || (keep(e.from) && keep(e.to)))).map((e) => {
     const v = verdict(e, (id) => kind.get(id));
-    return { key: pairKey(e.from, e.to), from: e.from, to: e.to, edge: e, kinds: kindsOf(e), count: e.count ?? 0, verdict: v, style: wireStyle(v), decl: e.sources.includes('declared'), seen: e.sources.includes('observed') };
+    return { key: pairKey(e.from, e.to), from: e.from, to: e.to, edge: e, kinds: kindsOf(e), count: e.count ?? 0, verdict: v, style: wireStyle(v, runs), decl: e.sources.includes('declared'), seen: e.sources.includes('observed') };
   });
 }
 
@@ -417,10 +432,12 @@ export function collapseSameNode(spans: MSpan[]): MSpan[] {
  *  each shown node folds (its own details can list them); `rep` maps any id to the node that shows it. The result is a
  *  valid model (the invariants hold). A node whose parent isn't in the model stays its own card. */
 export interface FoldedView { model: Model; parts: Map<string, MNode[]>; rep: (id: string) => string }
-export function foldView(m: Model): FoldedView {
-  const byId = new Map(m.nodes.map((n) => [n.id, n]));
+/** The card each node is drawn as in the fold view: itself, or the nearest ancestor it is folded into (`foldView`'s `rep`).
+ *  Splices and tours use it to read a card that stands for its parts (a type and its methods) as the board does. */
+export function foldRep(nodes: readonly MNode[]): (id: string) => string {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
   const memo = new Map<string, string>();
-  const rep = (id: string): string => {
+  return (id: string): string => {
     const hit = memo.get(id);
     if (hit !== undefined) return hit;
     let cur = id;
@@ -429,6 +446,11 @@ export function foldView(m: Model): FoldedView {
     memo.set(id, cur);
     return cur;
   };
+}
+
+export function foldView(m: Model): FoldedView {
+  const byId = new Map(m.nodes.map((n) => [n.id, n]));
+  const rep = foldRep(m.nodes);
   if (!m.nodes.some((n) => n.fold && n.parent && byId.has(n.parent) && byId.get(n.parent)!.kind !== 'module')) return { model: m, parts: new Map(), rep: (id) => id };
   const parts = new Map<string, MNode[]>();
   for (const n of m.nodes) { const r = rep(n.id); if (r !== n.id) (parts.get(r) ?? parts.set(r, []).get(r)!).push(n); }
@@ -487,21 +509,53 @@ export function reconcile(m: Model): MCheck[] {
   // A module that imports both ends (a composition root: `app.py` building a server from its
   // parts) makes an indirect call plausible — dependency injection, plugin registries — so that
   // is a note, not a warning.
+  // A module that imports one that imports B's (A takes a `Services` whose attributes are typed with B's classes, built
+  // by a composition root A never sees) reaches B through that module's types: a note too. And a relationship static
+  // analysis extracted was resolved through the names A's code uses (an annotation, an attribute of an imported type),
+  // so the import chain is there, however long: a note, never a warning.
   const scanned = new Set(importEdges.flatMap((e) => [e.from, e.to]));
   const importsOf = new Map<string, Set<string>>();
   for (const e of importEdges) (importsOf.get(e.from) ?? importsOf.set(e.from, new Set()).get(e.from)!).add(e.to);
-  const checked = new Set<string>();
+  /** The shortest chain of imports from module a to module b (a and b included), within `depth` steps, or null. */
+  const chain = (a: string, b: string, depth: number): string[] | null => {
+    const prev = new Map<string, string>([[a, '']]);
+    let front = [a];
+    for (let d = 0; d < depth && front.length; d++) {
+      const next: string[] = [];
+      for (const x of front) for (const y of [...(importsOf.get(x) ?? [])].sort(cmpStr)) {
+        if (prev.has(y)) continue;
+        prev.set(y, x);
+        if (y === b) { const out = [b]; for (let z = x; z; z = prev.get(z)!) out.unshift(z); return out; }
+        next.push(y);
+      }
+      front = next;
+    }
+    return null;
+  };
+  const byModules = new Map<string, MEdge[]>();
   for (const e of rel) {
     const a = nodes.get(e.from), b = nodes.get(e.to);
     if (!a?.module || !b?.module || a.module === b.module || a.lang !== b.lang || !scanned.has(a.module)) continue;
     const p = pairKey(a.module, b.module);
-    if (checked.has(p) || imports.has(p)) continue;
-    checked.add(p);
-    const root = [...importsOf].filter(([, to]) => to.has(a.module!) && to.has(b.module!)).map(([r]) => r).sort(cmpStr)[0];
+    if (imports.has(p)) continue;
+    (byModules.get(p) ?? byModules.set(p, []).get(p)!).push(e);
+  }
+  for (const es of byModules.values()) {
+    const e = es[0]!, am = nodes.get(e.from)!.module!, bm = nodes.get(e.to)!.module!;
+    const root = [...importsOf].filter(([, to]) => to.has(am) && to.has(bm)).map(([r]) => r).sort(cmpStr)[0];
+    const via = chain(am, bm, 2);
+    const extracted = es.every((x) => x.sources.includes('extracted'));
+    const path = !root && !via && extracted ? chain(am, bm, 64) : null;
     if (root)
-      out.push({ level: 'info', code: 'wired', subject: pairKey(e.from, e.to), message: `${lbl(e.from)} → ${lbl(e.to)} is indirect: ${a.module} doesn't import ${b.module}; ${root} wires them together.` });
-    else
-      out.push({ level: 'warn', code: 'no-import', subject: pairKey(e.from, e.to), message: `${lbl(e.from)} → ${lbl(e.to)}, but module ${a.module} never imports ${b.module}.` });
+      out.push({ level: 'info', code: 'wired', subject: pairKey(e.from, e.to), message: `${lbl(e.from)} → ${lbl(e.to)} is indirect: ${am} doesn't import ${bm}; ${root} wires them together.` });
+    else if (via)
+      out.push({ level: 'info', code: 'wired', subject: pairKey(e.from, e.to), message: `${lbl(e.from)} → ${lbl(e.to)} is indirect: ${am} doesn't import ${bm}; it reaches it through ${via[1]}, which it imports (a type of ${via[1]}'s, say, whose attributes are ${bm}'s).` });
+    else if (extracted)
+      out.push({ level: 'info', code: 'wired', subject: pairKey(e.from, e.to), message: `${lbl(e.from)} → ${lbl(e.to)} is indirect: ${am} doesn't import ${bm}, but static analysis resolved the call through the types its code names${path ? ` (imports ${path.join(' → ')})` : ''}.` });
+    else {
+      const x = es.find((y) => !y.sources.includes('extracted')) ?? e;
+      out.push({ level: 'warn', code: 'no-import', subject: pairKey(x.from, x.to), message: `${lbl(x.from)} → ${lbl(x.to)}, but module ${am} never imports ${bm}.` });
+    }
   }
   for (const n of m.nodes) {
     const src = n.sources ?? [];

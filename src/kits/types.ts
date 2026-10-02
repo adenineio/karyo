@@ -28,7 +28,7 @@ export interface PlateType {
   view: PlateView;
   from: PlateFrom;
   filter?: PlateFilter;
-  /** View options (sequence: durations, group, fold; board: bench; script: anything, handed to the script). */
+  /** View options (sequence: durations, group, fold; board: bench, start; script: anything, handed to the script). */
   options?: Record<string, unknown>;
   /** view `script`: the kit's JavaScript module that draws the plate, relative to the kit's folder (`plates/radial.js`).
    *  It runs in a sandboxed frame, and only once the user trusts this version of the kit (docs/KITS.md). */

@@ -8,7 +8,7 @@
     "anyOf": [{ "required": ["svg"] }, { "required": ["src"] }],
     "properties": {
       "svg": { "type": "string", "description": "an <svg>…</svg> string; use currentColor or var(--pl-*) for colours" },
-      "src": { "type": "string", "description": "data: URI, or a path relative to the spec file" },
+      "src": { "type": "string", "format": "image", "description": "data: URI, or a path relative to the spec file" },
       "alt": { "type": "string" },
       "caption": { "type": "string" }
     }

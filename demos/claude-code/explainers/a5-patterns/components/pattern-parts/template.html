@@ -1,0 +1,5 @@
+<div class="pl-card box">
+  {{#if title}}<div class="pl-label head">{{title}}</div>{{/if}}
+  <div class="parts">{{#each parts}}<div class="part t-{{tone}}"><span class="w">{{text}}</span><span class="lab">{{#if label}}{{label}}{{else}}&nbsp;{{/if}}</span></div>{{/each}}</div>
+  {{#if gloss}}<div class="gloss">{{{gloss}}}</div>{{/if}}
+</div>

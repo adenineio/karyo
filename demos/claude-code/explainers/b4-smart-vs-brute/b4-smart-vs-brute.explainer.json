@@ -1,0 +1,652 @@
+{
+  "karyo": "explainer/1",
+  "id": "b4-smart-vs-brute",
+  "title": "Working smart vs brute force",
+  "summary": "The same question can cost a whole desk or a few lines. Let exact tools do the finding and counting; let Claude do the judgment and the writing.",
+  "note": "Names, companies and files here are **made-up examples**.",
+  "narration": "side",
+  "uses": [
+    "file-grid",
+    "context-meter",
+    "chat-turn",
+    "terminal",
+    "try-it"
+  ],
+  "layout": {
+    "kind": "free"
+  },
+  "categories": [
+    {
+      "id": "files",
+      "label": "your files"
+    },
+    {
+      "id": "desk",
+      "label": "the context window"
+    },
+    {
+      "id": "claude",
+      "label": "Claude"
+    },
+    {
+      "id": "tools",
+      "label": "exact tools"
+    },
+    {
+      "id": "you",
+      "label": "you"
+    }
+  ],
+  "elements": [
+    {
+      "id": "task",
+      "type": "chat-turn",
+      "category": "you",
+      "label": "The task",
+      "props": {
+        "who": "you",
+        "text": "Find every invoice over **$10,000** in these 500 CSV files."
+      },
+      "at": {
+        "x": 0,
+        "y": 0,
+        "w": 380
+      }
+    },
+    {
+      "id": "grid",
+      "type": "file-grid",
+      "category": "files",
+      "label": "The 500 invoice files",
+      "props": {
+        "title": "invoices/ · 500 files · 50,000 rows",
+        "read": 0,
+        "faded": 0,
+        "stat": "of 500 files opened by Claude",
+        "legend": [
+          {
+            "tone": "plain",
+            "label": "one file: a day's 100 invoices"
+          }
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 100,
+        "w": 380
+      }
+    },
+    {
+      "id": "analogy",
+      "type": "card",
+      "category": "claude",
+      "label": "The archive analogy",
+      "props": {
+        "kicker": "Like an archive",
+        "title": "Photocopy it all, or ask the clerk",
+        "body": "Brute force copies every page onto your desk to look through. The clerk follows the filing rules and hands you only the pages that match. **Where it stops:** the clerk follows rules exactly but can't judge what the pages mean."
+      },
+      "at": {
+        "x": 0,
+        "y": 565,
+        "w": 380
+      }
+    },
+    {
+      "id": "meterB",
+      "type": "context-meter",
+      "category": "desk",
+      "label": "The desk, brute force",
+      "props": {
+        "title": "Context window: brute force",
+        "used": 3,
+        "caption": "illustrative estimate · a 1-million-token desk",
+        "items": [
+          {
+            "label": "Claude Code's own instructions and tools",
+            "share": "3%",
+            "tone": "brief"
+          }
+        ]
+      },
+      "at": {
+        "x": 420,
+        "y": 0,
+        "w": 380
+      }
+    },
+    {
+      "id": "claude",
+      "type": "chat-turn",
+      "category": "claude",
+      "label": "Claude at work",
+      "props": {
+        "who": "claude",
+        "name": "Claude, brute force",
+        "text": "Reading file **350** of 500…",
+        "actions": [
+          "Read: invoices/2025-01-01.csv",
+          "Read: invoices/2025-01-02.csv",
+          "Read: invoices/2025-01-03.csv",
+          "… one file at a time"
+        ]
+      },
+      "at": {
+        "x": 420,
+        "y": 205,
+        "w": 380
+      }
+    },
+    {
+      "id": "table",
+      "type": "table",
+      "label": "Brute force and smart, side by side",
+      "props": {
+        "columns": [
+          "",
+          "Brute force",
+          "Smart"
+        ],
+        "rows": [
+          [
+            "Tokens",
+            "≈ 1.1 million",
+            "≈ 160"
+          ],
+          [
+            "Files Claude opens",
+            "500",
+            "none"
+          ],
+          [
+            "Gets all 14",
+            "very likely",
+            "every time"
+          ],
+          [
+            "Run it again",
+            "may differ",
+            "same result"
+          ]
+        ],
+        "caption": "Rough estimates at about 3½ characters per token: illustrative, not measured."
+      },
+      "at": {
+        "x": 420,
+        "y": 420,
+        "w": 380
+      }
+    },
+    {
+      "id": "term",
+      "type": "terminal",
+      "category": "tools",
+      "label": "One awk command",
+      "props": {
+        "title": "Terminal — zsh",
+        "badge": "run by Claude",
+        "prompt": "~/Acme %",
+        "lines": [
+          {
+            "kind": "cmd",
+            "text": "awk -F, 'FNR>1 && $6>10000 {print $1, $3, $6, $7}' invoices/*.csv"
+          },
+          {
+            "kind": "out",
+            "text": "INV-24973 Acme 12450.00 unpaid"
+          },
+          {
+            "kind": "out",
+            "text": "INV-27542 Granite Labs 18200.00 paid"
+          },
+          {
+            "kind": "out",
+            "text": "INV-28575 Acme 10640.00 unpaid"
+          },
+          {
+            "kind": "out",
+            "text": "INV-38657 Harbor Health 24900.00 paid"
+          },
+          {
+            "kind": "out",
+            "text": "INV-39651 Corvid Ltd 11075.50 paid"
+          },
+          {
+            "kind": "out",
+            "text": "INV-41421 Acme 15300.00 paid"
+          },
+          {
+            "kind": "note",
+            "text": "(… 8 more: 14 lines in all)"
+          }
+        ]
+      },
+      "at": {
+        "x": 840,
+        "y": 0,
+        "w": 400
+      }
+    },
+    {
+      "id": "meterS",
+      "type": "context-meter",
+      "category": "desk",
+      "label": "The desk, smart",
+      "props": {
+        "title": "Context window: smart",
+        "used": 3,
+        "caption": "illustrative estimate · a 1-million-token desk",
+        "items": [
+          {
+            "label": "Claude Code's own instructions and tools",
+            "share": "3%",
+            "tone": "brief"
+          },
+          {
+            "label": "the command and its 14 lines",
+            "share": "≈ 160 tokens",
+            "tone": "output"
+          }
+        ]
+      },
+      "at": {
+        "x": 840,
+        "y": 318,
+        "w": 400
+      }
+    },
+    {
+      "id": "try",
+      "type": "try-it",
+      "category": "you",
+      "props": {
+        "title": "Ask for the smart way",
+        "ask": "Before reading any files, use command-line tools to find which ones mention Acme, then read only those.",
+        "expect": "Swap *Acme* for something in your own files. Watch for `grep` or `awk` first, then a handful of reads instead of dozens."
+      },
+      "at": {
+        "x": 840,
+        "y": 478,
+        "w": 400
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "title": "The task",
+      "text": "500 daily invoice exports, 100 rows each: 50,000 invoices. You want the ones over $10,000. There are two ways to find them, and one costs thousands of times more than the other.",
+      "show": [
+        "task",
+        "grid",
+        "analogy"
+      ],
+      "emphasize": [
+        "task",
+        "grid"
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "Brute force: read every file",
+      "text": "Claude could open the files one by one and read every row. Each file is about 2,250 tokens, so even on a 1-million-token desk, by file 350 it is 82% full, with 150 files to go.",
+      "add": [
+        "meterB",
+        "claude"
+      ],
+      "emphasize": [
+        "meterB",
+        "grid"
+      ],
+      "dim": [
+        "task",
+        "analogy"
+      ],
+      "set": {
+        "grid": {
+          "read": 350,
+          "legend": [
+            {
+              "tone": "read",
+              "label": "opened by Claude"
+            },
+            {
+              "tone": "plain",
+              "label": "not yet"
+            }
+          ]
+        },
+        "meterB": {
+          "used": 82,
+          "items": [
+            {
+              "label": "Claude Code's own instructions and tools",
+              "share": "3%",
+              "tone": "brief"
+            },
+            {
+              "label": "your request",
+              "share": "tiny",
+              "tone": "chat"
+            },
+            {
+              "label": "350 files, read one by one",
+              "share": "79%",
+              "tone": "waste"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s3",
+      "title": "The desk overflows",
+      "text": "At about file 425 the desk is full, and compaction boils the early files down to a summary. Checking 50,000 numbers by reading, Claude reports 12 here; the true count is 14. Another run might get it right: very likely, not guaranteed.",
+      "emphasize": [
+        "claude",
+        "grid",
+        "meterB"
+      ],
+      "dim": [
+        "task",
+        "analogy"
+      ],
+      "set": {
+        "grid": {
+          "read": 500,
+          "faded": 425,
+          "hits": [
+            {
+              "c": 24,
+              "r": 1,
+              "state": "found"
+            },
+            {
+              "c": 0,
+              "r": 3,
+              "state": "found"
+            },
+            {
+              "c": 10,
+              "r": 3,
+              "state": "found"
+            },
+            {
+              "c": 11,
+              "r": 7,
+              "state": "found"
+            },
+            {
+              "c": 21,
+              "r": 7,
+              "state": "missed"
+            },
+            {
+              "c": 14,
+              "r": 8,
+              "state": "found"
+            },
+            {
+              "c": 12,
+              "r": 11,
+              "state": "missed"
+            },
+            {
+              "c": 19,
+              "r": 13,
+              "state": "found"
+            },
+            {
+              "c": 8,
+              "r": 14,
+              "state": "found"
+            },
+            {
+              "c": 20,
+              "r": 14,
+              "state": "found"
+            },
+            {
+              "c": 6,
+              "r": 18,
+              "state": "found"
+            },
+            {
+              "c": 24,
+              "r": 18,
+              "state": "found"
+            },
+            {
+              "c": 7,
+              "r": 19,
+              "state": "found"
+            },
+            {
+              "c": 9,
+              "r": 19,
+              "state": "found"
+            }
+          ],
+          "legend": [
+            {
+              "tone": "faded",
+              "label": "boiled down to a summary"
+            },
+            {
+              "tone": "read",
+              "label": "still on the desk"
+            },
+            {
+              "tone": "found",
+              "label": "match reported"
+            },
+            {
+              "tone": "missed",
+              "label": "match missed"
+            }
+          ]
+        },
+        "meterB": {
+          "used": 22,
+          "items": [
+            {
+              "label": "Claude Code's own instructions and tools",
+              "share": "3%",
+              "tone": "brief"
+            },
+            {
+              "label": "summary of files 1–425",
+              "share": "2%",
+              "tone": "summary"
+            },
+            {
+              "label": "files 426–500",
+              "share": "17%",
+              "tone": "waste"
+            }
+          ]
+        },
+        "claude": {
+          "name": "Claude, brute force (one possible run)",
+          "text": "I found **12** invoices over $10,000.",
+          "actions": [
+            "Read: invoices/2025-01-01.csv",
+            "… 498 more reads, and a compaction",
+            "Read: invoices/2026-05-15.csv"
+          ]
+        }
+      }
+    },
+    {
+      "id": "s4",
+      "title": "Smart: one command",
+      "text": "Or Claude runs one command. `awk` checks column 6, the amount, in all 50,000 rows and prints only the matches: 14 lines, about 160 tokens. On a Mac it takes about a tenth of a second, and the desk barely notices.",
+      "add": [
+        "term",
+        "meterS"
+      ],
+      "hide": [
+        "task",
+        "analogy"
+      ],
+      "emphasize": [
+        "term",
+        "meterS",
+        "grid"
+      ],
+      "dim": [
+        "meterB",
+        "claude"
+      ],
+      "set": {
+        "grid": {
+          "read": 0,
+          "faded": 0,
+          "hits": [
+            {
+              "c": 24,
+              "r": 1,
+              "state": "found"
+            },
+            {
+              "c": 0,
+              "r": 3,
+              "state": "found"
+            },
+            {
+              "c": 10,
+              "r": 3,
+              "state": "found"
+            },
+            {
+              "c": 11,
+              "r": 7,
+              "state": "found"
+            },
+            {
+              "c": 21,
+              "r": 7,
+              "state": "found"
+            },
+            {
+              "c": 14,
+              "r": 8,
+              "state": "found"
+            },
+            {
+              "c": 12,
+              "r": 11,
+              "state": "found"
+            },
+            {
+              "c": 19,
+              "r": 13,
+              "state": "found"
+            },
+            {
+              "c": 8,
+              "r": 14,
+              "state": "found"
+            },
+            {
+              "c": 20,
+              "r": 14,
+              "state": "found"
+            },
+            {
+              "c": 6,
+              "r": 18,
+              "state": "found"
+            },
+            {
+              "c": 24,
+              "r": 18,
+              "state": "found"
+            },
+            {
+              "c": 7,
+              "r": 19,
+              "state": "found"
+            },
+            {
+              "c": 9,
+              "r": 19,
+              "state": "found"
+            }
+          ],
+          "note": "`awk` read all 500 files, off the desk. Claude opened none.",
+          "legend": [
+            {
+              "tone": "plain",
+              "label": "not opened by Claude"
+            },
+            {
+              "tone": "found",
+              "label": "match: all 14"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s5",
+      "title": "Side by side",
+      "text": "Same question, two costs. The tool reads every row too, but outside the desk, exactly, and the same way every time: deterministic. Reading it all is probabilistic, and costs thousands of times more.",
+      "add": [
+        "table"
+      ],
+      "emphasize": [
+        "table",
+        "meterB",
+        "meterS"
+      ],
+      "dim": [
+        "claude",
+        "grid",
+        "term"
+      ]
+    },
+    {
+      "id": "s6",
+      "title": "Tools find, Claude judges",
+      "text": "The best of both: tools narrow 50,000 rows to 14 and do the sums; Claude reads the 14 lines and writes what matters, like who to chase first. Exact where it can be, judgment where it's needed.",
+      "emphasize": [
+        "claude",
+        "term"
+      ],
+      "dim": [
+        "grid",
+        "meterB",
+        "meterS",
+        "table"
+      ],
+      "set": {
+        "claude": {
+          "name": "Claude, smart",
+          "text": "**14 invoices** over $10,000, **$224,360.50** in all. Seven are unpaid ($107,455). Chase Granite Labs first: $32,750, unpaid since December.",
+          "actions": [
+            "Bash: awk … invoices/*.csv (find the 14)",
+            "Bash: awk … invoices/*.csv (add up the totals)"
+          ]
+        }
+      }
+    },
+    {
+      "id": "s7",
+      "title": "Ask for it",
+      "text": "You can ask for this directly: find with tools first, then read only the matches. Claude Code often works this way on its own; saying so makes it more likely.",
+      "show": [
+        "grid",
+        "meterB",
+        "claude",
+        "table",
+        "term",
+        "meterS",
+        "try"
+      ],
+      "emphasize": [
+        "try"
+      ]
+    }
+  ]
+}

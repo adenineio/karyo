@@ -116,7 +116,7 @@ A plate type is declarative: it picks one of the engine's **views**, what one pl
 
 | view | from | what it draws | options |
 |---|---|---|---|
-| `board` | `model` | the structure board (Bench, Splice, theater, pinned inspector) | `bench` (open in Bench) |
+| `board` | `model` | the structure board (Bench, Splice, theater, pinned inspector, group navigation) | `bench` (open in Bench), `start` (`groups` or `cards`: docs/ENGINE.md "Group navigation") |
 | `trace` | `flow` | a recorded flow on its map (trace board) | |
 | `tour` | `tour` | a tour's timeline | |
 | `sequence` | `flow` | a recorded flow as a sequence diagram (below) | `durations`, `group`, `fold` (`auto`, `none` or groups of node ids) |

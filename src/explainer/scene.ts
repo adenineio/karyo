@@ -290,6 +290,9 @@ export function explainerScene(bundle: ExplainerBundle, o: { title?: string } = 
     .kx-tools [hidden] { display: none; }
     ${hasLegend ? LEGEND_CSS : catSpecs.length ? CATEGORY_CSS : ''}
     .kx-mode { position: absolute; left: ${SIDE}px; bottom: 16px; font: 12px/1.2 var(--pl-font-mono); color: var(--pl-muted); white-space: nowrap; }
+    .kx-note { position: absolute; right: ${SIDE + 76}px; bottom: 15px; max-width: 44%; font-size: 12.5px; line-height: 1.2; color: var(--pl-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+    .kx-note code { font: 11.5px/1 var(--pl-font-mono); }
+    ${spec.note ? '.kx-mode { max-width: calc(56% - ' + (SIDE + 92) + 'px); overflow: hidden; text-overflow: ellipsis; }' : ''}
     ${els.some((e) => isKind(e.type)) ? `${MAP_CSS.replace(/^\s*\.mm-(head|group|foot|legend|warn|card)[^\n]*\n/gm, '')}
     .kx-el.kx-kind { box-sizing: border-box; padding: 9px 12px; display: grid; align-content: start; gap: 3px; overflow: hidden; }` : ''}
     ${compCss}
@@ -359,12 +362,13 @@ export function explainerScene(bundle: ExplainerBundle, o: { title?: string } = 
         </div></div>
         <div class="kx-narr${narration === 'bottom' ? ' is-bottom' : ''}" data-pl-clip data-pl-chrome aria-live="polite">${narr ? steps.map((_, i) => paneHTML(i)).join('') : ''}</div>
         ${hasLegend ? '<div class="kx-legend" id="kx-legend" data-pl-chrome></div>' : ''}
-        <div class="kx-mode" id="kx-mode" data-pl-chrome></div>`;
+        <div class="kx-mode" id="kx-mode" data-pl-chrome></div>${spec.note ? `<div class="kx-note" data-pl-chrome title="${esc(spec.note)}">${mdInline(spec.note)}</div>` : ''}`;
       if (hasLegend) {
         this.legend = new LegendStrip(dom.querySelector('#kx-legend')!, {
           onHover: (id) => { if (id !== this.lgHover) { this.lgHover = id; this.stage.redraw(); } },
           onToggle: (id) => this.togglePin(id),
           keyHints: false,   // 1–9 go to a step here
+          hideEmpty: true,   // only the rows the spec declares
         });
         this.legend.render(lgCats, lgTags);
       }

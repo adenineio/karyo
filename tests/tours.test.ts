@@ -2,7 +2,7 @@
 // Run: `just test`.
 import { expect, test } from 'bun:test';
 import type { Model } from '../src/model/model';
-import { findSymbol, resolveTours, type AuthoredTour } from '../src/model/tours';
+import { findSymbol, resolveTours, stepWires, type AuthoredTour } from '../src/model/tours';
 
 const PY = `"""Module doc.
 
@@ -152,4 +152,56 @@ test('drift: every unresolvable reference is a tour-unresolved warning, never a 
   for (const m of ['node "ghost"', 'Store.delete not found', 'focus "no such text"', 'matches {"label":"nope"}', 'no request 9', 'missing.py', 'node "nobody"', 'no longer matches the file'])
     expect(msgs.some((x) => x.includes(m))).toBe(true);
   expect(checks.every((c) => c.level === 'warn')).toBe(true);
+});
+
+// ---- type cards (a type with its methods folded into it, as automatic mode draws code)
+
+const CARDS: Model = {
+  karyo: 1,
+  nodes: [
+    { id: 'p.Alloc', kind: 'type', label: 'Alloc', sources: ['extracted'] },
+    { id: 'p.Alloc.allocate', kind: 'function', label: 'Alloc.allocate', parent: 'p.Alloc', fold: true, sources: ['extracted', 'observed'] },
+    { id: 'p.Notifier', kind: 'type', label: 'Notifier', sources: ['extracted'] },
+    { id: 'p.Notifier.ready', kind: 'function', label: 'Notifier.ready', parent: 'p.Notifier', fold: true, sources: ['extracted', 'observed'] },
+    { id: 'p.Queue', kind: 'type', label: 'Queue', sources: ['extracted'] },
+    { id: 'p.Queue.next', kind: 'function', label: 'Queue.next', parent: 'p.Queue', fold: true, sources: ['extracted', 'observed'] },
+  ],
+  edges: [
+    { from: 'p.Alloc.allocate', to: 'p.Notifier.ready', kind: 'calls', sources: ['extracted', 'observed'], count: 1 },
+    { from: 'p.Alloc.allocate', to: 'p.Queue.next', kind: 'calls', sources: ['extracted', 'observed'], count: 1 },
+  ],
+  flows: [{ id: 'f', trace: 't', spans: [
+    { id: 'a', parent: null, node: 'p.Alloc.allocate', label: 'allocate()', start: 0, end: 4_000_000 },
+    { id: 'b', parent: 'a', node: 'p.Queue.next', label: 'next()', start: 1_000_000, end: 2_000_000 },
+    { id: 'c', parent: 'a', node: 'p.Notifier.ready', label: 'ready()', start: 2_000_000, end: 3_000_000 },
+  ] }],
+};
+
+test("a step over type cards draws their methods' relationships, rolled up onto the cards", () => {
+  expect(stepWires(CARDS, ['p.Alloc', 'p.Notifier', 'p.Queue']).map((w) => w.key).sort()).toEqual(['p.Alloc->p.Notifier', 'p.Alloc->p.Queue']);
+  // a method shown beside the other type's card keeps its own end
+  expect(stepWires(CARDS, ['p.Alloc.allocate', 'p.Notifier']).map((w) => w.key)).toEqual(['p.Alloc.allocate->p.Notifier']);
+  // nothing between cards whose parts aren't related
+  expect(stepWires(CARDS, ['p.Notifier', 'p.Queue'])).toEqual([]);
+});
+
+test('a step naming a type card is timed by its methods\' spans', () => {
+  const tour: AuthoredTour = { id: 't', title: 'T', flow: 'f', steps: [
+    { id: 'alloc', title: 'Allocate', node: 'p.Alloc', show: ['p.Queue', 'p.Notifier'], span: { label: 'allocate()' } },
+    { id: 'notify', title: 'Notify', node: 'p.Notifier', span: { node: 'p.Notifier' } },
+  ] };
+  const r = resolveTours(CARDS, [tour], () => undefined);
+  expect(r.checks).toEqual([]);
+  expect(r.tours[0]!.steps.map((s) => s.timing?.ms)).toEqual([4, 1]);
+});
+
+test('a bare construction at the root (a type\'s span with nothing under it) is no request', () => {
+  const m: Model = { ...CARDS, flows: [{ id: 'f', trace: 't', spans: [
+    { id: 'z', parent: null, node: 'p.Alloc', label: 'Alloc()', start: 0, end: 0 },                  // the test builds the object first
+    ...CARDS.flows[0]!.spans.map((s) => ({ ...s, start: s.start + 10, end: (s.end ?? 0) + 10 })),
+  ] }] };
+  const tour: AuthoredTour = { id: 't', title: 'T', flow: 'f', request: 1, steps: [{ id: 'q', title: 'Q', node: 'p.Queue', span: { node: 'p.Queue.next' } }] };
+  const r = resolveTours(m, [tour], () => undefined);
+  expect(r.checks).toEqual([]);
+  expect(r.tours[0]!.steps[0]!.timing?.ms).toBe(1);
 });

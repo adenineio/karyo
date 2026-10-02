@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Karyo">
+  <title>Karyo</title>
+  <style>
+    .a { fill: #1b9aa5 } .b { stroke: #127a83 }
+    @media (prefers-color-scheme: dark) { .a { fill: #68d2d9 } .b { stroke: #3e9aa3 } }
+  </style>
+  <mask id="cut">
+    <rect width="64" height="64" fill="#fff"/>
+    <rect x="28.8" y="28.8" width="6.4" height="6.4" rx="1.4" transform="rotate(45 32 32)" fill="#000"/>
+  </mask>
+  <g mask="url(#cut)">
+    <path class="b" d="M12 8 32 32 52 56M52 8 32 32 12 56" fill="none" stroke-width="3.6" stroke-linecap="round"/>
+    <g class="a">
+      <rect x="5" y="2" width="13" height="13" rx="3"/><rect x="46" y="2" width="13" height="13" rx="3"/>
+      <rect x="5" y="49" width="13" height="13" rx="3"/><rect x="46" y="49" width="13" height="13" rx="3"/>
+      <rect x="24" y="24" width="16" height="16" rx="3.5" transform="rotate(45 32 32)"/>
+    </g>
+  </g>
+</svg>

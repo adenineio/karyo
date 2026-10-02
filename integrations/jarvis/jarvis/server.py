@@ -53,12 +53,12 @@ class TurnLog:
     def at(self) -> float:
         return time.monotonic() - self.t0
 
-SPLICE_ACTIONS = {"splice_open", "splice_add", "splice_connect", "splice_disconnect", "splice_remove", "splice_replace", "splice_rename",
+SPLICE_ACTIONS = {"splice_open", "splice_add", "splice_group", "splice_connect", "splice_disconnect", "splice_remove", "splice_replace", "splice_rename",
                   "splice_move", "splice_undo", "splice_redo", "splice_save", "splice_discard", "splice_leave", "splice_list",
                   "splice_stack", "splice_stack_open", "splice_stack_return", "splice_stack_leave", "splice_stack_conflict",
                   "splice_stack_swap", "splice_stack_same"}
 ACTIONS = {"focus", "open", "close", "drill", "back", "highlight", "clear", "show_details", "scroll", "step", "select",
-           "theater", "fan", "bench", "pin_inspector"} | SPLICE_ACTIONS
+           "theater", "fan", "bench", "pin_inspector", "zoom", "pan", "groups"} | SPLICE_ACTIONS
 ACTION_TIMEOUT = 10.0
 DEFAULT_SETTINGS = {"wakeWord": "adenine", "wakeEnabled": False}
 MIN_COMMAND_CHARS = 2
@@ -89,7 +89,14 @@ def describe(name: str, args: dict[str, Any]) -> str:
         case "close":
             return "closed the card"
         case "drill":
-            return f"drilled into {a.get('group', '?')}"
+            g = str(a.get("group", "?"))
+            if g.strip().lower() in ("out", "up", "back", "up a level"):
+                return "went up a level"
+            if g.strip().lower() in ("top", "all", "all groups", "overview", "the overview", "the top", "groups", "top level"):
+                return "went to all groups"
+            return f"went into {g}"
+        case "groups":
+            return "showed every card" if a.get("on") is False else "showed the groups"
         case "back":
             return "went back"
         case "highlight":
@@ -118,7 +125,12 @@ def describe(name: str, args: dict[str, Any]) -> str:
             lock = {True: " and locked it", False: " and unlocked it"}.get(a.get("lock"), "")
             return f"pinned the inspector{side}{lock}"
         case "splice_open":
-            return f"opened a splice{' ' + repr(a['name']) if a.get('name') else ''}"
+            where = f" in {a['group']}" if a.get("group") else ""
+            return f"opened a splice{' ' + repr(a['name']) if a.get('name') else ''}{where}"
+        case "splice_group":
+            att = (f", an outlet of {a['outlet_of']}" if a.get("outlet_of") else f", calling {a['inlet_of']}" if a.get("inlet_of") else "")
+            under = f" under {a['parent']}" if a.get("parent") else ""
+            return f"proposed the group {a.get('label', '?')}{under}{att}"
         case "splice_add":
             where = (f" between {a['between'][0]} and {a['between'][1]}" if isinstance(a.get("between"), list) and len(a["between"]) == 2
                      else f" before {a['before']}" if a.get("before") else f" after {a['after']}" if a.get("after")
@@ -129,11 +141,11 @@ def describe(name: str, args: dict[str, Any]) -> str:
         case "splice_disconnect":
             return f"proposed removing {a.get('from', '?')} → {a.get('to', '?')}"
         case "splice_remove":
-            return f"proposed removing {a.get('node', '?')}"
+            return f"proposed removing {a.get('node') or ('the group ' + str(a.get('group', '?')))}"
         case "splice_replace":
             return f"proposed replacing {a.get('node', '?')} with {a.get('with', '?')}"
         case "splice_rename":
-            return f"proposed renaming {a.get('node', '?')} to {a.get('label', '?')}"
+            return f"proposed renaming {a.get('node') or ('the group ' + str(a.get('group', '?')))} to {a.get('label', '?')}"
         case "splice_move":
             return f"proposed moving {a.get('node', '?')} into {a.get('group', '?')}"
         case "splice_undo":
@@ -209,6 +221,8 @@ class Hub:
         self.turns = 0          # brain turns in flight
         self._turn_logs: deque[TurnLog] = deque()   # the turns in flight, oldest first (the brain answers in order)
         self._turn_n = 0
+        # quick commands (the fast path) since the brain's last turn: it never saw them, so it is told what they did
+        self._quick: list[str] = []
         self._stt_took: float | None = None  # the last transcription's duration, for the transcript's log line
         self._send_lock = asyncio.Lock()
         self._tasks: set[asyncio.Task] = set()
@@ -416,7 +430,10 @@ class Hub:
             tlog.info("fast path %s → %s %s", _q(text), name, json.dumps(args))
             # the last turn's caption is about what was on screen then; the activity line says what this did
             await self.send({"type": "caption", "text": "", "final": True})
-            await self.perform(name, args)
+            res = await self.perform(name, args)
+            st = res.get("state") if isinstance(res, dict) and isinstance(res.get("state"), dict) else {}
+            did = (st.get("spliceNote") if res.get("ok") else None) or (describe(name, args) if res.get("ok") else f"failed: {res.get('error', '')}")
+            self._quick = [*self._quick, f"{_q(text)} → {did}"][-6:]
             return
         if self.brain is None:
             await self.send({"type": "error", "message": "no brain: only the fast-path commands work"})
@@ -439,7 +456,15 @@ class Hub:
             await self.idle_or_thinking()
 
     def page_line(self) -> str:
-        """Context for the brain: the view when it changed since the last message, else a note."""
+        """Context for the brain: quick commands run since its last turn, then the view when it changed since the last
+        message, else a note."""
+        quick = ""
+        if self._quick:
+            quick = f"[quick commands since your last turn, already done (not by you): {'; '.join(self._quick)}]\n"
+            self._quick = []
+        return quick + self._view_line()
+
+    def _view_line(self) -> str:
         snap = json.dumps(self.snapshot, separators=(",", ":"), ensure_ascii=False) if self.snapshot is not None else None
         head = f"[page · scene {self.scene or '?'}"
         if snap is None:

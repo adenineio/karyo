@@ -8,7 +8,7 @@
     "additionalProperties": false,
     "properties": {
       "code": { "type": "string" },
-      "lang": { "type": "string", "default": "ts", "description": "py | go | ts (js and others tint like ts)" },
+      "lang": { "type": "string", "default": "ts", "description": "py | go | ts (js and others tint like ts) | sh (bash, zsh, just, make) | text (no tint)" },
       "focus": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "description": "line numbers to light (as numbered, i.e. counting from start)" },
       "start": { "type": "integer", "minimum": 1, "default": 1, "description": "number of the first line" },
       "title": { "type": "string", "description": "file name or caption in the header" }

@@ -13,7 +13,10 @@ Same grammar as the Go SDK's `//karyo:` directives. A directive is a full-line c
     # karyo:edge from=browser to=api.checkout kind=calls label="HTTP"
 
 `node` and `span` go on the line(s) directly above a `def` / `class` (above its decorators, if
-any; other comment lines may sit between, a blank line may not). `external` and `edge` can go
+any; other comment lines may sit between, a blank line may not). A `node` directive on a def may leave
+out `id=` when the reader knows the module (a scan, a recorder): the node is then the def's automatic
+one, `module.qualname`, so a directive can refine automatic mode's node (a label, a category, tags,
+`calls=` to an external) without renaming it. `external` and `edge` can go
 anywhere. A following comment line of the form `#   key=value …` (a `#`, then three or more spaces)
 continues the directive above it. Values are bare words or "double-quoted"; lists are
 comma-separated, and a list key may repeat (its values add up).
@@ -31,7 +34,7 @@ import io
 import re
 import tokenize
 from dataclasses import dataclass, field
-from typing import Optional, Union
+from typing import Callable, Optional, Union
 
 KINDS = ("service", "function", "type", "store", "queue", "external", "actor", "module")
 EDGE_KINDS = ("calls", "reads", "writes", "publishes", "subscribes", "imports")
@@ -143,8 +146,9 @@ def _suggest(word: str, options: tuple[str, ...]) -> str:
     return f" (did you mean {close[0]!r}?)" if close else ""
 
 
-def validate(verb: str, raw: dict[str, str]) -> tuple[dict, list[str]]:
-    """Check one directive's keys and values. Returns (typed attrs, errors)."""
+def validate(verb: str, raw: dict[str, str], optional: tuple[str, ...] = ()) -> tuple[dict, list[str]]:
+    """Check one directive's keys and values. Returns (typed attrs, errors). `optional`: required keys the
+    caller fills in itself when missing (a node's id, from the def it sits on)."""
     errors: list[str] = []
     if verb not in KEYS:
         return {}, [f"unknown directive karyo:{verb}{_suggest(verb, tuple(KEYS))} (one of {', '.join(KEYS)})"]
@@ -185,7 +189,7 @@ def validate(verb: str, raw: dict[str, str]) -> tuple[dict, list[str]]:
                 errors.append(f"{k} is empty")
             attrs[k] = v
     for k in REQUIRED[verb]:
-        if k not in raw:
+        if k not in raw and k not in optional:
             errors.append(f"karyo:{verb} needs {k}=")
     return attrs, errors
 
@@ -207,8 +211,39 @@ def _defs(tree: ast.Module) -> dict[int, tuple[Def, str]]:
     return out
 
 
-def read(source: str, file: str) -> Parsed:
-    """All directives in one Python source file, attached to their defs and validated."""
+Comments = tuple[dict[int, str], list[tuple[int, str]]]
+
+
+def comments_of(source: str) -> Comments:
+    """A source's comments: the full-line ones by line, and the trailing ones as (line, text). Raises what
+    tokenize raises on source it can't read."""
+    lines = source.splitlines()
+    full: dict[int, str] = {}
+    trailing: list[tuple[int, str]] = []
+    for tok in tokenize.generate_tokens(io.StringIO(source).readline):
+        if tok.type == tokenize.COMMENT:
+            line = tok.start[0]
+            if lines[line - 1][: tok.start[1]].strip():
+                trailing.append((line, tok.string))
+            else:
+                full[line] = tok.string.strip()
+    return full, trailing
+
+
+def comments_or_error(source: str) -> Union[Comments, Exception]:
+    """`comments_of`, with what it raises returned instead (to read many files' comments in other processes)."""
+    try:
+        return comments_of(source)
+    except Exception as e:          # handed back: `read` raises it where it would have tokenized
+        return e
+
+
+def read(source: str, file: str, comments: Union[Comments, Exception, None] = None,
+         default_id: Optional[Callable[[str], Optional[str]]] = None) -> Parsed:
+    """All directives in one Python source file, attached to their defs and validated. `comments`: the
+    source's comments_or_error, when they have been read already. `default_id`: qualname -> the node id a
+    `node` directive without `id=` takes (the def's automatic id; given by readers that know the module),
+    else such a directive is a problem."""
     p = Parsed(lines=source.splitlines())
     try:
         p.tree = ast.parse(source, filename=file)
@@ -217,16 +252,12 @@ def read(source: str, file: str) -> Parsed:
         return p
 
     # full-line comments, by line
-    comments: dict[int, str] = {}
-    trailing: list[tuple[int, str]] = []
     try:
-        for tok in tokenize.generate_tokens(io.StringIO(source).readline):
-            if tok.type == tokenize.COMMENT:
-                line = tok.start[0]
-                if p.lines[line - 1][: tok.start[1]].strip():
-                    trailing.append((line, tok.string))
-                else:
-                    comments[line] = tok.string.strip()
+        if comments is None:
+            comments = comments_of(source)
+        elif isinstance(comments, Exception):
+            raise comments
+        comments, trailing = comments
     except (tokenize.TokenError, IndentationError) as e:
         p.problems.append(Problem(file, 1, f"can't tokenize: {e}"))
         return p
@@ -234,7 +265,7 @@ def read(source: str, file: str) -> Parsed:
         if _DIRECTIVE.match(text):
             p.problems.append(Problem(file, line, "a karyo: directive must be a comment on its own line"))
 
-    defs = _defs(p.tree)
+    defs = None                                  # the defs by first line, once a directive needs them
     line = 1
     total = len(p.lines)
     while line <= total:
@@ -248,13 +279,15 @@ def read(source: str, file: str) -> Parsed:
             rest += " " + c.group(1)
             end += 1
         raw, errors = parse_kv(rest)
-        attrs, verrors = validate(verb, raw)
+        attrs, verrors = validate(verb, raw, ("id",) if verb == "node" and default_id is not None else ())
         errors += verrors
         d = Directive(verb=verb, attrs=attrs, line=line, end=end)
         if verb in ATTACHED:
             nxt = end + 1
             while nxt in comments:               # other comment lines (more directives) may sit between
                 nxt += 1
+            if defs is None:
+                defs = _defs(p.tree)
             hit = defs.get(nxt)
             if hit is None:
                 errors.append(f"karyo:{verb} must be directly above a def or class (or its decorators), "
@@ -263,6 +296,12 @@ def read(source: str, file: str) -> Parsed:
                 d.target, d.qualname = hit
                 if verb == "span" and isinstance(d.target, ast.ClassDef):
                     errors.append("karyo:span goes above a def (a function or method), not a class")
+        if verb == "node" and "id" not in raw and default_id is not None:
+            nid = default_id(d.qualname) if d.qualname else None
+            if d.target is not None and not nid:
+                errors.append(f"karyo:node needs id= ({d.qualname} has no automatic id to take)")
+            elif nid:
+                attrs["id"] = d.attrs["id"] = nid
         for e in errors:
             p.problems.append(Problem(file, line, e))
         if not errors:

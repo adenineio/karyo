@@ -7,7 +7,7 @@
 // ordered pair. Every slice goes through `normalize` first, so a model that repeats a pair (a
 // declared `reads` and an observed `calls` as two edges) is one relationship, and a slice never draws
 // two wires for one pair.
-import { normalize, wiresOf, kindsOf, type Model, type MNode, type Source, type Wire } from './model';
+import { normalize, wiresOf, kindsOf, type Model, type MGroup, type MNode, type Source, type Wire } from './model';
 import { layout, type Layout } from './scenes';
 import { kitsFor, type KitSet } from '../kits/registry';
 import type { NodeMark, EdgeMark } from './splice';
@@ -137,7 +137,10 @@ export function unionModel(slices: StackSlice[]): Model {
   const nodes = new Map<string, MNode>();
   for (const s of slices) for (const n of s.model.nodes) nodes.set(n.id, n);
   const last = slices[slices.length - 1]?.model;
-  return normalize({ karyo: 1, project: last?.project, producers: last?.producers, nodes: [...nodes.values()], edges: slices.flatMap((s) => s.model.edges), flows: [] });
+  // named groups too (labels and nesting; a group a splice proposes), so the shared layout's frames say their names
+  const groups = new Map<string, MGroup>();
+  for (const s of slices) for (const g of s.model.groups ?? []) groups.set(g.id, g);
+  return normalize({ karyo: 1, project: last?.project, producers: last?.producers, nodes: [...nodes.values()], edges: slices.flatMap((s) => s.model.edges), flows: [], ...(groups.size ? { groups: [...groups.values()] } : {}) });
 }
 
 export interface SliceView {

@@ -31,6 +31,10 @@
       "$ref": "#/$defs/selectors",
       "description": "Nodes left out of the model with their relationships; what a recorded run reached is kept (curation-kept)"
     },
+    "start": {
+      "enum": ["groups", "cards"],
+      "description": "What a structure board starts on: one card per group (entered level by level), or every card; default: groups when the board is big (docs/ENGINE.md, Group navigation)"
+    },
     "groups": {
       "type": "object",
       "description": "Groups by id",

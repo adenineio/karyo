@@ -30,7 +30,7 @@
         "filter": { "$ref": "#/$defs/filter" },
         "options": {
           "type": "object",
-          "description": "View options. sequence: durations (bool, default true), group (bool, one band per top-level call, default true), fold ('auto', the default: fold lanes that belong together into one expandable lane when the flow has too many; 'none'; or explicit groups of node ids). board: bench (bool, open in Bench). script: anything; the script gets them.",
+          "description": "View options. sequence: durations (bool, default true), group (bool, one band per top-level call, default true), fold ('auto', the default: fold lanes that belong together into one expandable lane when the flow has too many; 'none'; or explicit groups of node ids). board: bench (bool, open in Bench), start ('groups' or 'cards': what it starts on, docs/ENGINE.md Group navigation). script: anything; the script gets them.",
           "properties": {
             "fold": { "oneOf": [{ "enum": ["auto", "none"] }, { "type": "array", "items": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 2 } }] }
           }

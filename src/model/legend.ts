@@ -59,6 +59,8 @@ export interface ModelLegendInput {
   groups: string[];
   /** Static analysis contributed relationships (automatic mode): "in the code" rather than "declared". */
   statics?: boolean;
+  /** The model holds a recorded run (model.ts `hasRuns`; default true). Without one there is no "declared, not seen". */
+  runs?: boolean;
   /** Cards that ran but fold parts that never did (a type some of whose methods ran). */
   partly?: Set<string>;
   /** A kit's node kind (docs/KITS.md): its legend entry's name and glyph; null for kinds no kit adds. */
@@ -81,7 +83,7 @@ export function modelLegend(inp: ModelLegendInput): { categories: LegendEntry[];
   const langs = uniq(inp.nodes.map((n) => n.lang).filter((l): l is string => !!l)).sort();
   const derived = ([
     { id: 'warnings', name: '⚠ warnings', kind: 'derived', hint: 'cards with a warning check', members: ids.filter((id) => inp.warned.has(id)) },
-    { id: 'unseen', name: 'declared, not seen', kind: 'derived', hint: 'cards on a declared call no recorded run exercised', members: ends((w) => w.verdict === 'unseen') },
+    { id: 'unseen', name: 'declared, not seen', kind: 'derived', hint: 'cards on a declared call no recorded run exercised', members: inp.runs === false ? [] : ends((w) => w.verdict === 'unseen') },
     { id: 'undeclared', name: inp.statics ? 'seen, not in the code' : 'seen, not declared', kind: 'derived', hint: inp.statics ? 'cards on a call a recorded run made that neither an annotation nor static analysis has' : 'cards on a call a recorded run made that no annotation declares', members: ends((w) => w.verdict === 'undeclared') },
     { id: 'unexercised', name: 'not exercised', kind: 'derived', hint: 'cards whose code never ran in recorded runs that watched it in full (a partial run is not a complete one)', members: inp.nodes.filter((n) => n.exercised === false).map((n) => n.id) },
     { id: 'partly-exercised', name: 'partly exercised', kind: 'derived', hint: 'cards that ran, but fold parts that never did in recorded runs that watched them', members: inp.nodes.filter((n) => inp.partly?.has(n.id)).map((n) => n.id) },
@@ -129,6 +131,7 @@ export const LEGEND_CSS = /* css */ `
   ${CATEGORY_CSS}
   .lg { display: grid; gap: 6px; min-width: 0; }
   .lg-row { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+  .lg-row[hidden] { display: none; }
   .lg-h { flex: none; width: 84px; padding-top: 7px; }
   .lg-list { flex: 0 1 auto; display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; max-height: var(--lg-max-h, 62px); overflow: hidden; padding: 1px; align-content: flex-start; }
   .lg-w { display: inline-flex; flex: none; align-items: center; }
@@ -169,6 +172,9 @@ export const LEGEND_CSS = /* css */ `
 `;
 
 export interface LegendOpts {
+  /** Leave out a row with nothing in it (no "none declared", no empty Tags heading): explainers, whose legend is
+   *  only what the spec declares. Boards keep both rows. */
+  hideEmpty?: boolean;
   /** Section titles (default Categories / Tags). */
   titles?: { categories?: string; tags?: string };
   onHover(id: string | null): void;
@@ -237,6 +243,10 @@ export class LegendStrip {
     this.tags.innerHTML = tags.map((e, i) => (i && band(e) !== band(tags[i - 1]!) ? '<i class="lg-sep" aria-hidden="true"></i>' : '') + chip(e, categories.length + i)).join('');
     // "+ tag" and its name field follow the last tag
     if (this.newBtn && this.name) this.tags.append(this.newBtn, this.name);
+    if (this.o.hideEmpty) {
+      this.cats.parentElement!.hidden = !categories.length;
+      this.tags.parentElement!.hidden = !tags.length && !this.newBtn;
+    }
   }
 
   /** Classes and attributes from the plate's state. `picked`: how many cards "+ tag" would take; `editable`: Bench. */

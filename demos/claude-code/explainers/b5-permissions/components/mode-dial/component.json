@@ -1,0 +1,42 @@
+{
+  "name": "mode-dial",
+  "description": "Claude Code's permission modes as a dial: one row per mode with what runs without asking, the active mode lit.",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": ["modes"],
+    "additionalProperties": false,
+    "properties": {
+      "title": { "type": "string", "default": "Permission mode" },
+      "hint": { "type": "string", "description": "a short line in the header, e.g. `Shift+Tab to switch`" },
+      "modes": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 6,
+        "items": {
+          "type": "object",
+          "required": ["name", "runs"],
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "runs": { "type": "string", "description": "what Claude may do in this mode without asking" },
+            "tag": { "type": "string", "description": "a small chip after the name, e.g. `default`" },
+            "on": { "type": "boolean", "description": "the active mode" },
+            "dim": { "type": "boolean", "description": "fade this row" }
+          }
+        }
+      }
+    }
+  },
+  "size": { "w": 380 },
+  "motion": ["appear", "emphasize"],
+  "example": {
+    "hint": "Shift+Tab to switch",
+    "modes": [
+      { "name": "Manual", "runs": "Reads only" },
+      { "name": "Accept edits", "runs": "Reads and file edits" },
+      { "name": "Plan", "runs": "Reads; proposes a plan" },
+      { "name": "Auto", "runs": "Everything, with background safety checks", "tag": "default", "on": true }
+    ]
+  }
+}

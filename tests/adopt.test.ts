@@ -216,8 +216,9 @@ describe('karyo init', () => {
     const dir = project();
     const r = karyo(dir, 'init', '--yes', '--hook', 'stop,git', '--ci');
     expect(r.code).toBe(0);
-    expect(r.out).toContain('Changed (6):');
-    for (const f of ['karyo/karyo.sh', '.github/workflows/karyo.yml', '.claude/settings.json', '.git/hooks/post-commit']) expect(existsSync(path.join(dir, f))).toBe(true);
+    expect(r.out).toContain('Changed (7):');
+    expect(JSON.parse(readFileSync(path.join(dir, 'karyo/config.json'), 'utf8')).mode).toBe('auto');
+    for (const f of ['karyo/karyo.sh', 'karyo/config.json', '.github/workflows/karyo.yml', '.claude/settings.json', '.git/hooks/post-commit']) expect(existsSync(path.join(dir, f))).toBe(true);
     expect(statSync(path.join(dir, 'karyo/karyo.sh')).mode & 0o111).toBeTruthy();
     expect(statSync(path.join(dir, '.git/hooks/post-commit')).mode & 0o111).toBeTruthy();
     expect(readFileSync(path.join(dir, '.karyo/cli-path'), 'utf8').trim()).toBe(path.join(ROOT, 'cli/karyo'));
@@ -300,6 +301,65 @@ describe('karyo refresh and record', () => {
     expect(m.nodes.some((x: any) => x.id === 'notes.pins.pinned')).toBe(true);
     expect(existsSync(path.join(dir, '.karyo/refresh.pending'))).toBe(false);
     expect(readFileSync(path.join(dir, '.karyo/refresh.log'), 'utf8')).toContain('refreshed');
+  });
+});
+
+describe('modes: automatic mode with directives on top, or directives only', () => {
+  // a directive on the service class, an id-less one: it refines the class's automatic node
+  const marked = (p: string) => {
+    const f = path.join(p, 'notes/service.py');
+    writeFileSync(f, readFileSync(f, 'utf8').replace(/^class NotesService\b/m, '# karyo:node label="Notes" category=service calls=ext.search\n# karyo:external id=ext.search label="Search index" category=outside\nclass NotesService'));
+  };
+  const nodesOf = (dir: string) => JSON.parse(readFileSync(path.join(dir, 'karyo.model.json'), 'utf8')).nodes as any[];
+
+  test('init records the mode; refresh keeps every automatic node and the directive refines its own', () => {
+    const plain = project();
+    expect(karyo(plain, 'init', '--yes').code).toBe(0);
+    expect(karyo(plain, 'refresh').code).toBe(0);
+    const ids = nodesOf(plain).map((n) => n.id);
+    const dir = project(marked);
+    const d = detect(dir);
+    expect(d.python.directives).toBe(true);
+    const cfg = planInit(d, opts).find((c) => c.path === 'karyo/config.json')!;
+    expect(cfg.action).toBe('create');
+    expect(cfg.why).toContain('before this setting, directives switched automatic mode off');
+    expect(karyo(dir, 'init', '--yes').code).toBe(0);
+    const r = karyo(dir, 'refresh');
+    expect(r.code).toBe(0);
+    expect(r.out).not.toContain('note: automatic mode');                      // the settings say so: nothing to warn about
+    const nodes = nodesOf(dir);
+    for (const id of ids) expect(nodes.some((n) => n.id === id)).toBe(true);   // every automatic node is still there
+    const svc = nodes.filter((n) => n.id === 'notes.service.NotesService');
+    expect(svc.length).toBe(1);                                                 // refined, not duplicated
+    expect([svc[0].label, svc[0].category, svc[0].kind]).toEqual(['Notes', 'service', 'type']);
+    expect(nodes.filter((n) => n.label === 'Notes').length).toBe(1);
+    const m = JSON.parse(readFileSync(path.join(dir, 'karyo.model.json'), 'utf8'));
+    expect(m.edges.some((e: any) => e.from === 'notes.service.NotesService' && e.to === 'ext.search')).toBe(true);
+  });
+
+  test('--mode directives reads only what directives declare; a project with no settings is told what changed', () => {
+    const dir = project(marked);
+    expect(karyo(dir, 'init', '--yes', '--mode', 'directives').code).toBe(0);
+    expect(JSON.parse(readFileSync(path.join(dir, 'karyo/config.json'), 'utf8')).mode).toBe('directives');
+    expect(karyo(dir, 'refresh').code).toBe(0);
+    expect(nodesOf(dir).filter((n) => n.kind !== 'module').map((n) => n.id).sort()).toEqual(['ext.search', 'notes.service.NotesService']);
+    // adopted before the setting existed: automatic mode, and it says so
+    rmSync(path.join(dir, 'karyo/config.json'));
+    const r = karyo(dir, 'refresh');
+    expect(r.out).toContain('note: automatic mode, with the `# karyo:` directives refining');
+    expect(nodesOf(dir).length).toBeGreaterThan(10);
+    expect(karyo(dir, 'init', '--yes', '--mode', 'sometimes').err).toContain('--mode takes auto or directives');
+  });
+
+  test('record follows the mode: automatic nodes are recorded with the directives on top', () => {
+    const dir = project(marked);
+    expect(karyo(dir, 'init', '--yes').code).toBe(0);
+    const r = karyo(dir, 'record', '--json', '--', 'python3', '-c', 'from notes import NotesService\ns = NotesService()\ns.create("Weekly plan", "call the plumber")\nassert s.find("plumber")');
+    expect(r.code).toBe(0);
+    const m = JSON.parse(readFileSync(path.join(dir, 'karyo.model.json'), 'utf8'));
+    const spans = m.flows.flatMap((f: any) => f.spans.map((s: any) => s.node));
+    expect(spans).toContain('notes.service.NotesService.create');              // an automatic node, recorded
+    expect(m.nodes.filter((n: any) => n.id === 'notes.service.NotesService')[0].label).toBe('Notes');
   });
 });
 

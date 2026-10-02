@@ -26,8 +26,8 @@ Reconciling them produces **warnings** (never failures, by default). The merge t
 |---|---|
 | `undeclared-call` | a run observed A → B, but no annotation declares it (and, in automatic mode, static analysis didn't find it: a dynamic call) |
 | `unobserved-call` | an annotation declares A → B, but no recorded run exercised it (info: may just be an untested path) |
-| `no-import` | A → B is declared or observed across modules of the same language, but A's module never imports B's, and no other module imports both |
-| `wired` | A → B crosses modules without an import, but some module imports both (a composition root: dependency injection, a plugin registry, an `app.py` that assembles the parts). Info: the call is plausibly indirect |
+| `no-import` | A → B is declared or observed across modules of the same language, but A's module never imports B's, no other module imports both, A's module imports none that imports B's, and static analysis didn't find the call |
+| `wired` | A → B crosses modules without an import, but the call is plausibly indirect. Some module imports both (a composition root: dependency injection, a plugin registry, an `app.py` that assembles the parts). Or A's module imports one that imports B's (a typed container: a handler given a `Services` whose attributes are typed with B's class). Or static analysis resolved the call through the types A's code names (the chain of imports is named). Info |
 | `unknown-node` | a span, an edge or a flow's `entry` names a node nobody declared (an edge's missing end becomes a stub node, drawn dashed, "declared nowhere") |
 | `orphan` | a declared node has no edges at all |
 | `tour-unresolved` | a [tour](#tours) no longer matches the code or the recorded runs: a symbol, file, line range, node, focus string or span it names can't be found, a flow it's bound to wasn't recorded, or a node's captured code differs from the file now |
@@ -123,7 +123,7 @@ Tests: `tests/model.test.ts`.
 
 ## Automatic mode
 
-A codebase can be drawn with no annotations at all. The scan makes every module, class and public function a node (ids are stable and derived from the code: `module.qualname`), its package the group, its code and ref as for a declared node, and adds the **static call graph** as `extracted` relationships (kind `calls`; imports stay the separate `imports` layer). Directives still come first: a directive on a def replaces that def's automatic node (its id, label, kind, category, tags), and its `calls=` are declared relationships next to the extracted ones. The model format is the same for any language; what a language's scan can resolve is up to its SDK (Python's: [below](#automatic-mode-in-python)).
+A codebase can be drawn with no annotations at all. The scan makes every module, class and public function a node (ids are stable and derived from the code: `module.qualname`), its package the group, its code and ref as for a declared node, and adds the **static call graph** as `extracted` relationships (kind `calls`; imports stay the separate `imports` layer). **Directives add meaning on top of it:** a directive on a def refines that def's automatic node. It doesn't add a second one: what the directive says wins (id, label, kind, category, tags), what it doesn't say stays automatic (kind, label, group, the type a method folds into), and its `calls=` are declared relationships next to the extracted ones (to an external, say). Without `id=` the node keeps its automatic id, so curation, tours and recordings keep naming it. The model format is the same for any language; what a language's scan can resolve is up to its SDK (Python's: [below](#automatic-mode-in-python)).
 
 ### Fold
 
@@ -155,8 +155,9 @@ A curation file (`karyo/curation.json` next to the model; schema [`spec/karyo-cu
 
 - `bun scripts/model.ts build … --curation <file>` applies it after the merge and before reconciling (without the flag, `karyo/curation.json` under `--root` is used when it exists; `--no-curation` skips it). Node fields first (label, summary, kind, category, tags added to the code's, group), then groups (members move in; labels and nesting go into `model.groups`, and views label a nested group `Parent / Child`), then `fold` and `top`, then `hide`.
 - **Unresolved is never silent.** An entry that matches nothing is a `curation-unresolved` warning with a did-you-mean, so a refresh can fix it; a malformed entry is `curation-invalid` and skipped (a wrong version skips the whole file). `check` keeps these.
-- **Hiding never loses a recorded call.** A hidden node a recorded run reached is kept, with a `curation-kept` note.
+- **Hiding never loses a recorded call.** A hidden node a recorded run reached is kept, with a `curation-kept` note. There is one exception: a type whose recorded calls are all constructions that called nothing recorded (a record, a reply or an exception built along the way). Hiding it takes those construction spans out of the flows with it (a flow left empty goes), and no other call is lost.
 - The curation wins over the code for what it says (a directive's label, say); `check` re-reconciles the curated model.
+- `"start": "groups" | "cards"` says what a structure board starts on (docs/ENGINE.md "Group navigation"): one card per group, entered level by level, or every card; it goes into the model as `start`. Without it a big board starts on its groups.
 - API (`src/model/curation.ts`, pure): `applyCuration(model, curation, file?)` → checks (the model is changed in place), `validateCuration(json)`, `selector(pattern)`, `groupLabel(model, groupId)`.
 
 ## SDKs
@@ -194,7 +195,7 @@ class OrderStore:
 
 | directive | keys | on | while recording |
 |---|---|---|---|
-| `karyo:node` | `id` (required), `kind`, `label` (default: the def's name), `summary` (default: the docstring's first line), `group` (default: top-level package), `category`, `tags`, `calls`, `reads`, `writes`, `publishes`, `record=false` | a `def` or `class` | a function or method: every call is a span of the node, labeled `name()` (unless `record=false`). A class declares the node and is marked with it (`__karyo_node__`); its methods are wrapped only when they carry a directive of their own |
+| `karyo:node` | `id` (required, except where the reader knows the module, as the scan and the recorders do: then it defaults to the def's automatic id, `module.qualname`), `kind`, `label` (default: the def's name), `summary` (default: the docstring's first line), `group` (default: top-level package), `category`, `tags`, `calls`, `reads`, `writes`, `publishes`, `record=false` | a `def` or `class` | a function or method: every call is a span of the node, labeled `name()` (unless `record=false`). A class declares the node and is marked with it (`__karyo_node__`); its methods are wrapped only when they carry a directive of their own |
 | `karyo:span` | `node` (required: a declared node id), `label` (default `name()`) | a `def` | every call of this function is a span of that node: a store's operations (`create`, `get`, `close`), a client's request methods |
 | `karyo:external` | `id` (required), `kind` (default `external`), `label`, `summary`, `group`, `category`, `tags` | anywhere | declared once |
 | `karyo:edge` | `from`, `to` (required), `kind` (default `calls`), `label` | anywhere | declared once; the `label` is what the wire says when you hover it (docs/ENGINE.md "Wire hover"), in place of the sentence generated from its kinds and recorded operations |
@@ -203,7 +204,7 @@ Kinds are the model's (`service`, `function`, `store`, `queue`, `external`, `act
 
 #### Scan
 
-`python -m karyo scan <package-dir> -o .karyo/python.static.karyo.json [--root DIR] [--auto | --no-auto]` names modules as Python imports them (a scanned subpackage from its topmost package; a `src/` folder of packages as a path root), so they match the recorder's. It reads the directives (and the decorator form, below) plus the import edges between the package's modules, without importing or running anything, and prints any `directive-invalid` warnings. **Automatic mode** (`--auto`; the default when no scanned module has a `# karyo:` directive or `@karyo.node`, so a project with directives gets no automatic nodes unless asked) adds the automatic nodes and the static call graph (next).
+`python -m karyo scan <package-dir> -o .karyo/python.static.karyo.json [--root DIR] [--auto | --no-auto]` names modules as Python imports them (a scanned subpackage from its topmost package; a `src/` folder of packages as a path root), so they match the recorder's. It reads the directives (and the decorator form, below) plus the import edges between the package's modules, without importing or running anything, and prints any `directive-invalid` warnings. **Automatic mode** (`--auto`) adds the automatic nodes and the static call graph (next), with the directives refining the nodes of the defs they sit on; `--no-auto` reads directives only. Given neither, the SDK uses automatic mode when no scanned module has a `# karyo:` directive or `@karyo.node`. A project set up by `karyo init` says which in `karyo/config.json` (`"mode": "auto"`, the default, or `"directives"`; docs/ADOPT.md "Modes"), and `karyo refresh` / `karyo record` pass it.
 
 #### Automatic mode in Python
 
@@ -211,7 +212,7 @@ Kinds are the model's (`service`, `function`, `store`, `queue`, `external`, `act
 
 - a class, a module-level function, and a method (or `__call__`) of a class that is a node, whose name has no leading `_`, is a node;
 - `__init__`, `__new__` and `__post_init__` are the class: constructing it is a call of the class node, and their calls are the class's;
-- a def with `# karyo:node` is that node; a def with `# karyo:span node=X` is part of X;
+- a def with `# karyo:node` (or `@karyo.node`) is that node, the automatic one refined (`auto.refine`: without `id=` it keeps the automatic id; what the declaration doesn't say stays automatic, a method keeping its type as `parent`, folded); a def with `# karyo:span node=X` is part of X;
 - everything else (private helpers, other dunders, properties, overloads, nested functions, lambdas) is **transparent**: a private helper's calls are its caller's (statically they are inlined into every caller; at run time its frame is skipped), and a nested function's or lambda's are its enclosing node's.
 
 **The static call graph** resolves only what it can resolve soundly, and never guesses an edge:
@@ -233,7 +234,7 @@ python -m karyo record [--out .karyo] [--root .] [--hooks karyo_hooks.py] [--pac
                        [--monitor | --no-monitor] [--sample 0.01] [--auto | --no-auto] -- <command …>
 ```
 
-With **`--monitor`** (the default for an automatic-mode project, i.e. one with no directives; Python 3.12+) every Python process of the command records with `sys.monitoring` (next); otherwise, and on older Pythons, with the import-time instrumenter (below the next section). `--sample 0.01` records one flow in a hundred. Either way it runs the command with recording on: `KARYO_RECORD=1` (or the sampling rate), `KARYO_MONITOR`, `KARYO_OUT`, `KARYO_ROOT`, `KARYO_PACKAGES`, `KARYO_HOOKS`, `KARYO_PROJECT`, and `PYTHONPATH` prepended with `karyo/_boot`, whose `sitecustomize.py` (it runs any other `sitecustomize` first) starts the recorder in every Python process of the command. Child processes inherit the environment, so a server the command launches over stdio is recorded too. On POSIX the command replaces the `record` process (a client that launched it manages the real server). In each process the recorder
+With **`--monitor`** (the default with `--auto`, or for a project with no directives; Python 3.12+; `karyo record` always passes it, with the project's mode) every Python process of the command records with `sys.monitoring` (next); otherwise, and on older Pythons, with the import-time instrumenter (below the next section). `--sample 0.01` records one flow in a hundred. Either way it runs the command with recording on: `KARYO_RECORD=1` (or the sampling rate), `KARYO_MONITOR`, `KARYO_OUT`, `KARYO_ROOT`, `KARYO_PACKAGES`, `KARYO_HOOKS`, `KARYO_PROJECT`, and `PYTHONPATH` prepended with `karyo/_boot`, whose `sitecustomize.py` (it runs any other `sitecustomize` first) starts the recorder in every Python process of the command. Child processes inherit the environment, so a server the command launches over stdio is recorded too. On POSIX the command replaces the `record` process (a client that launched it manages the real server). In each process the recorder
 
 - instruments the listed packages as they are imported: their directives are parsed, the declared nodes and edges registered, and each marked `def` gets one decorator added to its AST before it's compiled, so it's wrapped at definition time (a list built at import time, like `STAGES = [normalize, chunk, …]`, holds the recorded functions). Instrumented bytecode is never cached, so a later normal run can't pick it up;
 - loads the hooks file and calls its `setup(karyo)`;
@@ -246,7 +247,8 @@ Tests can do the same in process: `karyo.instrument(["orders"], hooks="karyo_hoo
 
 `karyo/_monitor.py` (PEP 669). Nothing is wrapped or rewritten: a monitoring tool gets `PY_START` when a function starts and `PY_RETURN` / `PY_UNWIND` when it ends.
 
-- **Classified once, disabled if it isn't a node.** The first time a code object starts, it is classified with the scan's rule above (the module's file is parsed once; `code.co_qualname` and `co_firstlineno` name the def). Code outside the watched packages (the standard library, installed packages), code generated at run time (a dataclass's `__init__`), and code that isn't a node (a private helper) returns `sys.monitoring.DISABLE`: that code object never calls back again, so library code costs nothing after its first call. A node's code gets `PY_RETURN` turned on for it alone (`set_local_events`). `PY_UNWIND` (a call ending in an exception, recorded as `status: error`) is the only global event.
+- **Classified once, disabled if it isn't a node.** The first time a code object starts, it is classified with the scan's rule above (the module's file is parsed once; `code.co_qualname` and `co_firstlineno` name the def). Code outside the watched packages (the standard library, installed packages), code generated at run time other than a node's constructor (a dataclass's `__eq__`), and code that isn't a node (a private helper) returns `sys.monitoring.DISABLE`: that code object never calls back again, so library code costs nothing after its first call. A node's code gets `PY_RETURN` and `CALL` turned on for it alone (`set_local_events`; CALL for constructions, below). `PY_UNWIND` (a call ending in an exception, recorded as `status: error`) is the only global event.
+- **Constructions.** Constructing a class that is a node is a call of it, whatever runs it. Its own `__init__` (or `__new__`, `__post_init__`), hand-written or generated at run time (a dataclass's: `co_filename` `"<string>"`, classified by the class whose code it is, read from the receiver), starts as the class node. A class whose construction runs no project code (no `__init__` of its own: `object`'s, an exception's, a library base's) is caught where node code constructs it. The CALL event is on only in node code, and returns `DISABLE` at every call site after its first call unless that site constructs such a class; each such construction is a zero-length span. A class with no `__init__` of its own that is built only from outside the watched code (a test calling it directly) is not seen.
 - **The caller** of a node call is the nearest node frame below it on the stack (transparent frames skipped), else the node running in the same asyncio task (a context variable), else none: a root call. Generators and coroutines are timed from their start to their final return. An inherited `__init__` records the class being constructed (`type(self)`), not the base.
 - **Flows.** A root call made from outside the watched code starts an automatic flow, named after that caller (a test function, a request handler, a script), with the code that called it in the title (`call ← test_rate_limit`); other root calls from the same caller frame join it. Inside an explicit `karyo.flow(…)` they join that flow instead, and hooks, `karyo.context()` and child processes work as with the other recorder.
 - **Sampling** (`KARYO_RECORD=0.01`, `--sample`): the flow is the unit, so a sampled flow is recorded whole; a flow left out costs one callback per node call.
@@ -254,7 +256,7 @@ Tests can do the same in process: `karyo.instrument(["orders"], hooks="karyo_hoo
 - **Output**: the fragment at exit, with a `coverage` entry (the packages watched, the sampling rate), which is what lets the model mark code in them that never ran as [not exercised](#coverage).
 - **Three ways to turn it on**: `python -m karyo record --monitor -- pytest` (dev); `karyo.watch("pkg")` in app code, inert unless `KARYO_RECORD` is set (so production can sample: `KARYO_RECORD=0.01`); `KARYO_MONITOR=0` forces the import-time recorder, which is also what `watch()` uses on Python < 3.12.
 
-**What it costs** (measured on an Apple-silicon Mac, Python 3.14, tiny functions, so the overhead is all there is): off, nothing (no tool registered; a node call is the plain call, about 20 ns). Recording, about 1 µs per node call inside a flow; about 5 µs more per new flow (a two-call request: 0.1 µs off, 5.4 µs on); a flow the sampling leaves out, about 0.35 µs per node call (about 2 µs per tiny request). Library code costs nothing after its first call: a node calling ten pure-Python library functions costs 6.7 µs per call recording with `DISABLE`, 18 µs without it (about 1.1 µs per library call saved). Tests: `sdk/python/tests/test_monitor.py`.
+**What it costs** (measured on an Apple-silicon Mac, Python 3.14, tiny functions, so the overhead is all there is): off, nothing (no tool registered; a node call is the plain call, about 20 ns). Recording, about 1 µs per node call inside a flow; about 5 µs more per new flow (a two-call request: 0.1 µs off, 5.4 µs on); a flow the sampling leaves out, about 0.35 µs per node call (about 2 µs per tiny request). Library code costs nothing after its first call: a node calling ten pure-Python library functions costs 6.7 µs per call recording with `DISABLE`, 18 µs without it (about 1.1 µs per library call saved). Recording constructions costs nothing on calls that aren't constructions (a call site is disabled after its first call) and about 0.65 µs for each one recorded. Tests: `sdk/python/tests/test_monitor.py`.
 
 #### Hooks (`karyo_hooks.py`)
 
@@ -330,6 +332,35 @@ func main() {
 
 Static scan: `go run karyo.dev/model/cmd/karyo-scan ./... > .karyo/go.static.karyo.json` (directives parsed with `go/parser`; imports from `go list -json`). Keys: `id`, `kind`, `label`, `summary`, `group`, `category`, `tags`, `calls`, `reads`, `writes`, `publishes` (`external`: the node keys without edges; `edge`: `from`, `to`, `kind`, `label`). The grammar is Python's: `//   key=value` continues a directive, list keys may repeat, `// karyo:` works too. A malformed directive (an unknown directive, key, node or edge kind, a bad or missing id, a key given twice) is a `directive-invalid` warning and is ignored, as in Python; so is a node declared twice or named like a package. Go spans are explicit (`model.Span`); a Go process joins a trace through `KARYO_TRACE` / `KARYO_PARENT`, which a recorded Python parent passes to it automatically.
 
+### Comment markers: Swift and other `//` languages (`src/cli/markers.ts`)
+
+A language with no SDK declares itself with the same directives as Go, in `// karyo:` (or `//karyo:`) comments:
+
+```swift
+/// Where the app gets notes: the local cache first, the server when it must.
+// karyo:node id=notes.repository kind=service label="Note repository" category=service
+//   calls=notes.cache,notes.api
+struct NoteRepository { … }
+
+// karyo:external id=ext.keychain label="Keychain" category=outside
+```
+
+`karyo refresh` reads them in a Swift project (a `Package.swift`, `.xcodeproj` or `.xcworkspace`; docs/ADOPT.md)
+into one fragment, `.karyo/markers.static.karyo.json` (source `declared`, `lang` from the file's language). Nothing
+is compiled or run: each file is read line by line, telling code from comments and strings (a marker inside a string
+or a block comment doesn't count). Verbs, keys, kinds and checks are Go's: a malformed marker is a `directive-invalid`
+warning and is ignored; so is a node id declared twice (the first is kept). A `calls=` / `reads=` / `writes=` /
+`publishes=` or `edge` end that no marker declares is a `directive-unknown-target` warning with a did-you-mean.
+A `node` marker records the declaration directly below it (other comment lines and attribute lines such as
+`@MainActor` may sit between, a blank line may not) when the language's pattern finds one: Swift's `class`, `struct`,
+`enum`, `actor`, `protocol`, `extension`, `func`, `var`, `let`, `init`, `typealias`. Its name, qualified by the types
+around it, is the node's `ref.symbol` and default label; its line the `ref.line`; the comment block above it through
+its closing brace the node's `code`; the first `///` line its summary. A marker with no declaration under it is kept,
+with a ref to the marker's own line. `module` is the Swift package target (`Sources/<Target>/…`), else the file's
+folder; `group` defaults to the id's first segment. Markers are kept by hand (or by Claude): there is no automatic
+mode for Swift, and no recording. Another `//` language (Kotlin, Objective-C, TypeScript …) is one more entry in the
+scanner's language table: extensions, string delimiters, a declaration pattern.
+
 ## Build and view
 
 ```sh
@@ -377,7 +408,7 @@ One JSON file per tour, next to the code (e.g. `tours/first-order.tour.json`):
 
 Symbol lookup: Python finds `def name`, `async def name` or `class Name`, with its `# karyo:` directives (the comment block right above, from its topmost directive, as the SDK captures it), its decorators and its indented block; a dotted `Class.method` is the method inside that class. Go finds `func Name(`, a method `Type.Name` (`func (r *Type) Name(`) or `type Name`, with its leading comment, to the matching brace. Files are read relative to `--root`. Excerpts are capped at 80 lines like node code.
 
-**`span`**: a selector `{ "label", "node", "request" }` or a list of them. Every given field must match; `request` is 1-based among the flow's requests (root spans). When a selector names only a label and several spans carry it (a request and the handler it calls share a name), the step's own node wins. Spans nested in another matched span are dropped, so nothing is counted twice. Timing is the sum of the matched durations, with how many spans matched.
+**`span`**: a selector `{ "label", "node", "request" }` or a list of them. Every given field must match; `request` is 1-based among the flow's requests (root spans; a bare construction at the root, a span of a type with nothing under it, isn't one). A `node` that is a type card matches its methods' spans too, and so does a step's own node. When a selector names only a label and several spans carry it (a request and the handler it calls share a name), the step's own node wins. Spans nested in another matched span are dropped, so nothing is counted twice. Timing is the sum of the matched durations, with how many spans matched.
 
 **`expand`** is strict too: one step per **declared** `calls` edge of the node, in declared order. Each step's title is the callee's label, its text the callee's summary, its code the callee's code, its diagram the parent and the callee, and its timing the callee's spans under a span of the parent in the bound flow.
 
@@ -396,6 +427,8 @@ interface BuiltStep {
 }
 ```
 
+**Type cards.** A step may name a type card (a type whose methods fold into it on the board). Its small diagram ("where it runs") draws the relationships between its cards (`stepWires` in `src/model/tours.ts`), each end going to the closest card that holds it (itself, else its parent). So two type cards are joined by the calls between their methods, and a method shown beside them keeps its own end.
+
 Nothing in a tour can fail the build. A reference that no longer resolves drops that part of the step and adds a `tour-unresolved` warning naming the tour, the step and what's missing, so a renamed function or a changed recording shows up in the terminal the next time the model is built (`--strict` turns warnings into a failing exit code). Types and resolution: `src/model/model.ts`, `src/model/tours.ts`; tests: `tests/tours.test.ts` (`just test`).
 
 ## Splices
@@ -409,7 +442,7 @@ One JSON file per splice, in the project that owns the model: `<project>/karyo/s
 ```jsonc
 { "karyo": "splice/1", "id": "caching", "title": "Caching", "note": "optional prose",
   "base": { "model": "karyo.model.json", "commit": "<sha or null>", "scene": "orders-board" },
-  "view": { /* the plate state to reopen at: opaque JSON owned by the UI */ },
+  "view": { "nav": "groups", "at": "orders", "path": ["Orders"], "drill": null, "open": null, "section": null, "cursor": null, "positions": {} },
   "created": "<iso>", "updated": "<iso>",
   "ops": [
     { "op": "add", "node": { "id": "splice.read-cache", "label": "Read cache", "kind": "store", "category": "store", "tags": [], "group": "core", "summary": "…" },
@@ -419,9 +452,18 @@ One JSON file per splice, in the project that owns the model: `<project>/karyo/s
     { "op": "remove", "node": "X" },
     { "op": "rename", "node": "X", "label": "…" },
     { "op": "move", "node": "X", "group": "g" },
-    { "op": "replace", "node": "X", "with": { "id": "splice.y", "label": "Y", "kind": "store" } }   // or "with": "<a node that exists>"
+    { "op": "replace", "node": "X", "with": { "id": "splice.y", "label": "Y", "kind": "store" } },  // or "with": "<a node that exists>"
+    { "op": "group", "group": { "id": "splice.notifications", "label": "Notifications", "parent": "orders" },
+      "first": { "label": "Mailer" },                          // optional: its first card
+      "attach": { "to": "orders.api", "dir": "in" } },         // optional: in = to → the group (an outlet of it), out = the group → to
+    { "op": "rename", "group": "splice.notifications", "label": "Alerts" },   // rename and remove also take a group
+    { "op": "remove", "group": "splice.notifications" }
   ] }
 ```
+
+**The view a splice lives in.** `view` is where the splice was opened, and where it was last saved: the navigation level and group (`nav`: `groups` or `cards`; `at`: the group entered, null for the overview; `path`: the breadcrumb's group labels as they were, for words), the drill, the selection (`open`, `section`, `cursor`) and the splice's own arrangement (`positions`). A structure board writes these keys; other plates may write their own (the schema allows more). Reopening a splice restores the view: it slides into that group (a group the splice itself proposes counts) and reopens the card. A splice without a view, or one whose view doesn't say (an older splice), opens at the top level, as the board starts. The view is only where the user is: a splice's ops apply to the whole model, and moving to another group while in a splice stays in the splice.
+
+**Cards with parts.** A board folds a type's methods into the type's card (see [Fold](#fold)), so its wire between two type cards stands for the relationships between their methods. An op that names such a card means what the board shows. `between` inserts into every relationship from a part of a to a part of b. `before` and `after` read the card's callers or callees from outside it, counted as cards. `disconnect` retires them all, and `connect` warns that the wire is already there. `remove` and `replace` take the card's parts with it. Ops that name methods work on those methods only. `landed()` and `describeOp` read cards the same way. `boardMarks(result)` adds a mark for each folded wire whose relationships are all proposed or all retired; the board and the Stack view draw with it. The core's `marks` stay keyed by the model's own relationships.
 
 `id` is the file name's stem (the save endpoint refuses a mismatch). A node is named by its id (preferred) or its label (case, spacing, punctuation and a leading "the" ignored); a close spelling is never taken, only suggested.
 
@@ -439,9 +481,12 @@ Ops apply in order; a later op may name a node an earlier one adds.
 | `connect` | a proposed relationship (default `calls`). A pair that already exists is a warning (nothing to add); a real one an earlier op retired is restored instead |
 | `disconnect` | the relationship is marked `removed` (a ghost) |
 | `remove` | the node and all its relationships are marked `removed` (ghosts, never deleted) |
-| `rename`, `move` | the node's label or group changes; marked `renamed` / `moved` |
+| `rename`, `move` | the node's label or group changes; marked `renamed` / `moved`. `move`'s group is an id or a label (a proposed group counts); a name no group has is a new group id, as before |
+| `group` | a new group (`model.groups` gains `{id, label, parent?, sources: ['proposed']}`, `marks.groups[id] = 'proposed'`): `parent` (an id or label, a proposed one included) nests it, none puts it at the top. Its **entry** is its `first` card when it has one, else a **placeholder** card (`<group id>.entry`, labelled "<label> (no cards yet)", `marks.placeholders[id] = group`) that stands for the group until a card is proposed into it. `attach` is one relationship between `to` and the entry (`in`: to → entry, the group is an outlet of `to`; `out`: entry → to; default `calls`). A name another group has is a warning (put cards in that group instead); an `attach.to` that isn't there is a warning, and the group is still proposed without it |
+| `rename` / `remove` with `group` | `rename` changes a group's label (a group of the code is marked `renamed`; a proposed one's placeholder follows); `remove` takes back a group this splice proposes, with its proposed cards and subgroups, and moves a card of the code that was moved into it back to its own group. A group of the code can't be removed (remove its cards). A `node` that names no node but exactly names a group acts on the group |
 | `replace` … `with: {node}` or `with: "Y"` | swap X for Y: Y (a new node, whose kind, category and group default to X's, or a node that exists) takes over every relationship of X, in and out, with their kinds and labels (X's old ones are `rerouted`, a relationship that would join Y to itself is dropped); X is marked `removed` (a ghost) and `marks.replaced[X] = Y`. Later ops that place a node next to X, connect or disconnect it **follow** the replacement to Y (`result.follows`); a later remove, rename, move or replace of X doesn't (it warns "is replaced by Y"). Removing Y undoes the replace |
 
+- **Proposed groups.** The first card that lands in a proposed group (an `add` with its `group`, a `move` into it, or an add placed next to its placeholder) takes over the placeholder's relationships, and the placeholder goes; a proposed group whose last card goes gets its placeholder back. `connect` / `disconnect` and `attach.to` may name a proposed group: they mean its entry. `describeOp` says it: "Add group Notifications in Orders, which Orders API calls", "Add Mailer in Notifications, which Orders API calls", "Rename group Notifications to Alerts", "Remove group Alerts".
 - **New nodes** get `sources: ['proposed']`, kind `service` unless given, and the group of the node they are placed next to (`b` for between, `X` for before and after, `to` for attach; `splice` for a free node or one next to an ungrouped node). Their ids are `splice.<slug>`; an `add` without an id derives one from the label (`slugId`), unique in the model.
 - **Proposals retire, never ghost:** rerouting, disconnecting or removing something the splice itself proposed deletes it (it never existed). Removing a proposed node also gives back the relationships it had rerouted.
 - **Why "after X" doesn't always reroute.** Taking over every outgoing relationship of a node that fans out ("add Metrics after the Order router", which calls five services) would make the new node the middleman for all of them, which is rarely what anyone means. So a fan-out (or a fan-in, for "before") gets one more step beside the others, and `describeOp` says which happened: "Insert Formatter after Report renderer" (it went in between) or "Add Metrics, which Order router also calls" ("Add Guard, which also calls Orders store" for before). `result.trace.placed[i]` records it per op (`interpose` or `also`). To put something in front of one of several relationships, use `between`.
@@ -459,6 +504,8 @@ interface SpliceMarks {
   byOp: number[][];                                                      // per op: the earlier ops it builds on (whose proposals it names or retires)
   touched: { nodes: string[]; edges: string[] }[];                       // per op: what it proposed, retired, restored or changed
   replaced: Record<string, string>;                                      // X → Y, for every replace still in effect
+  groups: Record<string, 'proposed' | 'renamed'>;                        // by group id
+  placeholders: Record<string, string>;                                  // a proposed group's placeholder card → its group
 }
 interface SpliceWarning { op: number; message: string; hint?: string }
 // also on the result: follows: { op, ref, from, to, why: 'replaced' | 'renamed' }[] (references that followed a replace
@@ -467,6 +514,9 @@ interface SpliceWarning { op: number; message: string; hint?: string }
 
 spliceOp.add(label, where?: { between: [a, b] } | { before } | { after } | { attach: { to, dir?, kind? } } | null, opts?: { id?, kind?, category?, tags?, group?, summary?, taken?: Model | Iterable<string> })
 spliceOp.connect(from, to, kind = 'calls', label?) · .disconnect(from, to) · .remove(node) · .rename(node, label) · .move(node, group)
+spliceOp.group(label, { id?, parent?, summary?, first?: string | SpliceNode, attach?, taken? }) · .renameGroup(group, label) · .removeGroup(group)
+resolveGroupRef(model, ref): { id, match: 'id' | 'label' | 'none' | 'ambiguous', suggestions }   // a group by id or label ("the X group" too)
+entryId(groupId)                                                                                   // its placeholder card's id
 spliceOp.replace(node, label, opts?) · spliceOp.replace(node, { ref })                                    // with a new node, or with one that exists
 resolveNodeRef(model | nodes, ref): { id: string | null; match: 'id' | 'label' | 'fuzzy' | 'none' | 'ambiguous'; suggestions: { id, label }[] }
 describeOp(model, op, marks?): string         // "Insert Read cache between Checkout and Orders store", "Replace Orders store with Event store"; pass the spliced model (and its marks) to name added nodes and count only live relationships
@@ -476,7 +526,7 @@ validateSplice(json, model?): { level: 'error' | 'warn'; path: string; message: 
 landed(model, splice): ('pending' | 'landed' | 'conflict')[]            // landedDetail(): the same with a reason each
 ```
 
-**`landed`** asks, per op, whether the real code has caught up (pass the real model; proposed items in it are ignored). An `add` has landed when the model has a node with the proposed id, or one with the same label and the proposed neighbours (between a and b: a → it → b); later ops that name the proposed id then follow the real one. `connect` lands when the relationship exists, `disconnect` and `remove` when it's gone, `rename` and `move` when the label or group matches. An op that hasn't landed is `conflict` when it no longer applies to the real model (a node it names is gone, the relationship it inserts into was removed), else `pending`.
+**`landed`** asks, per op, whether the real code has caught up (a `group` has landed when the model has a group with its id or label and, when attached, a relationship between `to` and a card in it) (pass the real model; proposed items in it are ignored). An `add` has landed when the model has a node with the proposed id, or one with the same label and the proposed neighbours (between a and b: a → it → b); later ops that name the proposed id then follow the real one. `connect` lands when the relationship exists, `disconnect` and `remove` when it's gone, `rename` and `move` when the label or group matches. An op that hasn't landed is `conflict` when it no longer applies to the real model (a node it names is gone, the relationship it inserts into was removed), else `pending`.
 
 ### Combining splices
 
@@ -499,6 +549,7 @@ landed(model, splice): ('pending' | 'landed' | 'conflict')[]            // lande
 | `follows` | follows → "follows a replacement" | one splice's changes name a node another splice replaced, and now apply to the replacement (a quiet note) | "Caching's Read cache now fronts Event store, which replaced Orders store" |
 
   **Conflict** is kept for real disagreements; **consequence** covers what combining breaks or undoes without anyone disagreeing about the same thing. The checks run over each splice's changes resolved against the base model (so the words are the same in either order), then against each splice on its own (a proposal that isn't added or has lost a side, a proposed relationship that no longer holds, not even through proposed nodes, a removal undone), then any change that warns only once combined. Warnings a splice has on its own stay `warnings`. Two changes that are compatible (a rename and a move of one node, an insert next to a node another renames) report nothing.
+- **Proposed groups across splices.** Group ids are kept apart per splice like node ids (a second splice's `splice.notifications` becomes `splice.notifications.<splice id>`, labelled "Notifications (Beta)"); two splices proposing a group with one name is a **same name** question ("Two different Notifications groups, one in Alpha (called by Orders API) and one in Beta (called by Billing). Same thing?"), and treated as the same it is made once, holding what both put in it; the same group op from two splices is **agreed**. A splice that removes the node another splice's group is attached to is a **consequence** ("Nothing reaches the Notifications group any more, because Cut removes Orders API"), the same words in either order; two different names for one group are a **conflict**.
 - **Replace across splices.** Because references to a replaced node follow it, a pair like this combines the same way in either order: Caching (a Read cache between Checkout and the Orders store) and Event store (`replace` the Orders store) give Checkout → Read cache → Event store, with one `follows` note and no conflict. Written instead as a remove of the Orders store plus a new Event store, the cache dangles in one order and isn't added in the other, and both say so, with the order item.
 
 `spliceStack(model, layers, {combine, same})` builds the slices a Stack view compares: the real model, one per splice (with its marks and its changes in words), and the combination, titled by its order ("Caching, then Event store"), whose `warning` carries one numbered item per finding with its kind's name, symbol, tone and meaning (`ISSUE_WORDS`) and, for a same-name item, a "Treat as the same" / "Treat as different" action (docs/ENGINE.md "Stack of splices").

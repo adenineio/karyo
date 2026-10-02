@@ -7,8 +7,11 @@ reads the code with `ast` (nothing is imported or run) and adds, next to the dir
           stable id `module.qualname` (`orders.api.checkout`, `orders.db.Store.get`), the module's package
           as its group, its code and ref. A method's `parent` is its class, and it is drawn folded into
           it (`fold: true`) until a curation file (karyo/curation.json) says otherwise. A `# karyo:node`
-          directive on a def replaces that def's automatic node (its id, label, kind, category, tags),
-          and a `# karyo:span node=X` makes the def part of X.
+          directive (or `@karyo.node`) on a def refines that def's automatic node rather than adding one:
+          without `id=` it keeps the automatic id, with one it renames the node; what it says (label,
+          kind, category, tags, `calls=` …) wins, what it doesn't say (kind, label, group, the parent a
+          method folds into) stays the automatic node's (`refine`). A `# karyo:span node=X` makes the
+          def part of X.
   edges   `calls`, source `extracted`, between those nodes, for what can be resolved soundly:
           direct calls of functions (also through `import m`, `from m import f as g` and module-level
           aliases), class instantiation, `self.method()` (inherited methods through the known class
@@ -47,6 +50,9 @@ INIT_METHODS = ("__init__", "__new__", "__post_init__")
 PUBLIC_DUNDERS = ("__call__",)
 _FUNCS = (ast.FunctionDef, ast.AsyncFunctionDef)
 _DEFS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+_COMPS = (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
+_FOUND = frozenset({ast.Import, ast.ImportFrom, *_DEFS, ast.Call, ast.Global})   # what Mod.found() keeps
+_STATEMENTS = tuple(t for t in (ast.stmt, ast.excepthandler, getattr(ast, "match_case", None)) if t is not None)  # what holds statements
 _DIRECTIVE = re.compile(r"^[ \t]*#\s?karyo:(?:node|span|external|edge)\b|\bkaryo\.node\(|^[ \t]*@node\(", re.M)
 _BUILTINS = set(dir(builtins))
 # External base classes known not to define the methods an app calls on its own objects: a lookup may
@@ -56,10 +62,75 @@ _HARMLESS_BASES = {"builtins.object", "typing.Generic", "typing.Protocol", "typi
                    "enum.StrEnum", "enum.Flag", "enum.IntFlag"}
 
 
+# ------------------------------------------------------------------ walking the tree
+#
+# The scan walks a lot of syntax, so it walks it cheaply: `_children` is ast.iter_child_nodes without the
+# leaves nothing is ever looked up in (names, constants, operators, load/store), and the field list of each
+# node type is worked out once. Leaving out leaves keeps the order of everything else.
+
+def _subclasses(t: type) -> list[type]:
+    return [s for c in t.__subclasses__() for s in (c, *_subclasses(c))]
+
+
+_LEAVES = frozenset({ast.Name, ast.Constant, ast.alias, *_subclasses(ast.expr_context), *_subclasses(ast.boolop),
+                     *_subclasses(ast.operator), *_subclasses(ast.unaryop), *_subclasses(ast.cmpop)})
+_INNER = frozenset(t for t in _subclasses(ast.AST) if t not in _LEAVES)   # every other node type
+_NOT_NODES = frozenset({"ctx", "op", "ops", "names", "name", "id", "attr", "arg", "module", "level", "kind",
+                        "conversion", "type_comment", "is_async", "rest", "kwd_attrs"})   # fields that never hold a node worth visiting
+_FIELDS: dict[type, tuple[str, ...]] = {}
+
+
+def _children(n: ast.AST) -> list:
+    """n's child nodes, in ast.iter_child_nodes order, less leaves."""
+    t = type(n)
+    fields = _FIELDS.get(t)
+    if fields is None:
+        fields = _FIELDS[t] = () if t in _LEAVES else tuple(f for f in t._fields if f not in _NOT_NODES)
+    out = []
+    for f in fields:
+        v = getattr(n, f, None)
+        if type(v) is list:
+            out += [x for x in v if type(x) in _INNER]
+        elif type(v) in _INNER:
+            out.append(v)
+    return out
+
+
+# The fields a statement (or an except clause, a with item, a match case or pattern) can hold another one in.
+_PART_FIELDS = frozenset({"body", "orelse", "finalbody", "handlers", "items", "cases", "pattern", "patterns", "kwd_patterns"})
+_PARTS: dict[type, tuple[str, ...]] = {}
+
+
+def _parts(n: ast.AST, keep: tuple) -> list:
+    """The children of n of the `keep` types that can hold statements, with-items or patterns (as _children
+    would list them): what a walk of statements needs, without looking through every expression."""
+    t = type(n)
+    fields = _PARTS.get(t)
+    if fields is None:
+        fields = _PARTS[t] = tuple(f for f in t._fields if f in _PART_FIELDS)
+    out = []
+    for f in fields:
+        v = getattr(n, f, None)
+        out += [x for x in v if isinstance(x, keep)] if type(v) is list else [v] if isinstance(v, keep) else []
+    return out
+
+
+def _all_nodes(n: ast.AST, keep: Optional[tuple] = None) -> list:
+    """n and every node below it in ast.walk's order (breadth first), less leaves; with `keep` (statement
+    types), only the nodes of those types (and what is below them), which leaves the order of the rest as it is."""
+    out = [n]
+    i = 0
+    while i < len(out):
+        out += _children(out[i]) if keep is None else _parts(out[i], keep)
+        i += 1
+    return out
+
+
 def has_directives(texts: Iterable[str]) -> bool:
     """Do any of these sources declare themselves (a `# karyo:` directive or `@karyo.node`)? Automatic mode is
     the default only when none do, for the scan and the recorder alike."""
-    return any(_DIRECTIVE.search(t) for t in texts)
+    # every directive form has "karyo" or "@node(" in it, and a plain substring test is far cheaper than the pattern
+    return any(("karyo" in t or "@node(" in t) and _DIRECTIVE.search(t) for t in texts)
 
 
 def group_of(module: str, is_pkg: bool) -> str:
@@ -89,7 +160,8 @@ class Def:
         self.id: Optional[str] = None   # the node its code counts as: its own, its class's (init), a directive's, or None
         self.own = False                # it is that node (not a part of another one)
         self.init = False               # __init__ / __new__ / __post_init__: the class node
-        self.declared = False           # the id came from a directive
+        self.declared = False           # the id came from a directive (or @karyo.node)
+        self.given: frozenset = frozenset()   # declared: the keys the declaration gives (the rest are automatic)
         self.members: dict[str, list] = {}   # class: name -> [Def | "attr"] defined in its body
         self.calls: Optional[list["Def"]] = None
         self._attrs: Optional[dict] = None
@@ -117,13 +189,18 @@ def _deco_name(d: ast.expr) -> str:
     return name.split(".")[-1] if name.startswith(("functools.", "typing.", "abc.")) else name
 
 
+_BODIES = ("body", "orelse", "finalbody", "handlers", "cases")    # where a statement holds more statements
+_BODY_FIELDS: dict[type, tuple[str, ...]] = {}                    # node type -> those of its fields
+
+
 class Mod:
     """One module: its directives, defs and top-level bindings."""
 
-    def __init__(self, name: str, path: str, rel: str, source: str):
+    def __init__(self, name: str, path: str, rel: str, source: str, comments=None):
         self.name, self.path, self.rel = name, path, rel
         self.is_pkg = os.path.basename(path) == "__init__.py"
-        self.parsed = dv.read(source, rel)
+        # comments: dv.comments_or_error(source), if read already; a node directive without id= takes the def's automatic id
+        self.parsed = dv.read(source, rel, comments, default_id=self.auto_id)
         self.tree = self.parsed.tree
         self.lines = self.parsed.lines
         self.defs: list[Def] = []
@@ -131,8 +208,43 @@ class Mod:
         self.by_qualname: dict[str, list[Def]] = {}
         self.globals: dict[str, list] = {}
         self.stars: list[str] = []
+        self.scopes: dict[int, tuple] = {}      # id(function ast) -> its names, collected once (see Scope)
+        self.walrus = ":=" in source            # may a name be bound inside an expression (`x := …`)? (an over-estimate)
+        self.decorates = "node(" in source      # may it use the decorator form (@karyo.node(…))? (an over-estimate)
+        self._found: dict[bool, list] = {}
         if self.tree is not None:
             self._walk(self.tree.body, "", None, None)
+
+    def auto_id(self, qualname: str) -> Optional[str]:
+        """The automatic node id of the def named `qualname` here: `module.qualname`, or `module:qualname`
+        when that would also name a module."""
+        nid = f"{self.name}:{qualname}" if _module_clash(self, qualname) else f"{self.name}.{qualname}"
+        return nid if dv.ID_RE.match(nid) else None
+
+    def decorated(self) -> dict[int, tuple[str, frozenset]]:
+        """Defs declared with the decorator form (`@karyo.node("id", …)`, `@node(…)` imported from karyo):
+        id(def ast) -> (node id, the keyword arguments given)."""
+        out: dict[int, tuple[str, frozenset]] = {}
+        if self.tree is None or not self.decorates:
+            return out
+        names = karyo_names(self.found())
+        if not names[0] and not names[1]:
+            return out
+        for d in self.defs:
+            for dec in d.ast.decorator_list:  # type: ignore[attr-defined]
+                if isinstance(dec, ast.Call) and karyo_call(dec, names) == "node" and dec.args \
+                        and isinstance(dec.args[0], ast.Constant) and isinstance(dec.args[0].value, str):
+                    out[id(d.ast)] = (dec.args[0].value, frozenset(k.arg for k in dec.keywords if k.arg))
+        return out
+
+    def found(self, calls: bool = False) -> list:
+        """The module's imports, defs and `global` statements (in functions and classes too), in ast.walk's
+        order; with `calls`, its calls as well, which takes a walk of every expression instead of only the
+        statements. The scan and the bindings share these walks."""
+        if calls not in self._found:
+            keep = None if calls else _STATEMENTS
+            self._found[calls] = [n for n in _all_nodes(self.tree, keep) if type(n) in _FOUND] if self.tree is not None else []
+        return self._found[calls]
 
     def _walk(self, body: list, prefix: str, cls: Optional[Def], outer: Optional[Def]) -> None:
         for s in body:
@@ -152,10 +264,37 @@ class Mod:
                     for n in _names(t):
                         cls.members.setdefault(n, []).append("attr")
             else:
-                for field in ("body", "orelse", "finalbody", "handlers", "cases"):
+                fields = _BODY_FIELDS.get(type(s))
+                if fields is None:
+                    fields = _BODY_FIELDS[type(s)] = tuple(f for f in _BODIES if f in type(s)._fields)
+                for field in fields:
                     sub = getattr(s, field, None)
                     if isinstance(sub, list):
                         self._walk(sub, prefix, cls, outer)
+
+
+def karyo_names(found: list) -> tuple[set[str], dict[str, str]]:
+    """How a module refers to karyo: names bound to the module (`import karyo [as k]`), and names bound to
+    its functions (`from karyo import node [as n]`). `found`: the module's imports (Mod.found)."""
+    mods: set[str] = set()
+    funcs: dict[str, str] = {}
+    for n in found:
+        if isinstance(n, ast.Import):
+            mods |= {a.asname or a.name for a in n.names if a.name == "karyo"}
+        elif isinstance(n, ast.ImportFrom) and n.module == "karyo" and not n.level:
+            funcs |= {a.asname or a.name: a.name for a in n.names}
+    return mods, funcs
+
+
+def karyo_call(c: ast.Call, karyo: tuple[set[str], dict[str, str]]) -> str:
+    """The karyo function a call calls (`karyo.edge(...)`, or `edge(...)` imported from karyo), else "":
+    another library's `dot.edge("a", "b")` is not a karyo edge."""
+    f = c.func
+    if isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name) and f.value.id in karyo[0]:
+        return f.attr
+    if isinstance(f, ast.Name):
+        return karyo[1].get(f.id, "")
+    return ""
 
 
 def _names(t: ast.AST) -> list[str]:
@@ -182,12 +321,17 @@ def assign_ids(mod: Mod, auto: bool) -> None:
     for d in mod.parsed.directives:
         if d.target is not None:
             by_target.setdefault(id(d.target), []).append(d)
+    decorated = mod.decorated()
     for d in mod.defs:           # outer defs first, so a method sees its class's id
         dirs = by_target.get(id(d.ast), [])
         nd = next((x for x in dirs if x.verb == "node"), None)
         sd = next((x for x in dirs if x.verb == "span"), None)
+        deco = decorated.get(id(d.ast))
         if nd is not None:
             d.id, d.own, d.declared = nd.attrs["id"], True, True
+            d.given = frozenset(k for x in dirs if x.verb == "node" for k in x.attrs)
+        elif deco is not None:
+            d.id, d.own, d.declared, d.given = deco[0], True, True, deco[1] | {"id"}
         elif sd is not None:
             d.id = sd.attrs["node"]
         elif d.outer is not None or d.overload:
@@ -210,12 +354,13 @@ def assign_ids(mod: Mod, auto: bool) -> None:
             d.own = False
     # ids that differ only in case (`stages.Chunk` the class, `stages.chunk` the function) are one name to a reader,
     # and the model refuses them (docs/MODEL.md "Identity"): all but the first one defined are written module:qualname
+    # (a declaration keeps the id it gives or takes: an automatic one that differs from it only in case moves aside)
     folds: dict[str, list[Def]] = {}
     for d in mod.defs:
-        if d.own and not d.declared and d.id:
+        if d.own and d.id:
             folds.setdefault(_fold(d.id), []).append(d)
     for same in folds.values():
-        for d in sorted(same, key=lambda x: (x.first, x.qualname))[1:]:
+        for d in [x for x in sorted(same, key=lambda x: (not x.declared, x.first, x.qualname))[1:] if not x.declared]:
             d.id = f"{mod.name}:{d.qualname}"
             for m in mod.defs:            # its __init__ is still the class
                 if m.init and m.cls is d:
@@ -227,8 +372,32 @@ def _fold(nid: str) -> str:
 
 
 def _auto_id(mod: Mod, d: Def) -> Optional[str]:
-    nid = f"{mod.name}:{d.qualname}" if _module_clash(mod, d.qualname) else f"{mod.name}.{d.qualname}"
-    return nid if dv.ID_RE.match(nid) else None
+    return mod.auto_id(d.qualname)
+
+
+def refine(rec: dict, d: Def) -> dict:
+    """In automatic mode, a declaration on a def (a `# karyo:node` directive, `@karyo.node`) refines the def's
+    automatic node instead of standing beside it: what the declaration says wins, and what it doesn't say
+    (kind, label, group) is the automatic node's, so the node keeps its place on the board; a declared method
+    of a class that is a node keeps that class as its parent and is folded into it like any method (a curation's
+    `top` draws it as its own card). `rec`: the declaration's record, changed in place and returned."""
+    if not d.declared:
+        return rec
+    mod = d.mod
+    auto = {"kind": "type" if d.is_class else "function", "label": d.qualname, "group": group_of(mod.name, mod.is_pkg)}
+    for k, v in auto.items():
+        if k not in d.given:
+            rec[k] = v
+    if d.cls is not None and d.cls.own and d.cls.id and d.cls.id != d.id:
+        rec["parent"] = d.cls.id
+        if not d.is_class and d.outer is None:
+            rec["fold"] = True
+    return rec
+
+
+def declared_defs(mod: Mod) -> dict[str, Def]:
+    """node id -> the def a declaration (a directive or the decorator) made it, in one module (ids assigned)."""
+    return {d.id: d for d in mod.defs if d.declared and d.own and d.id}
 
 
 def node_record(d: Def) -> dict:
@@ -335,7 +504,7 @@ class Project:
                     visit(s.body); visit(s.orelse)
                 elif isinstance(s, ast.Match):
                     for c in s.cases:
-                        for n in ast.walk(c.pattern):
+                        for n in _all_nodes(c.pattern):
                             if isinstance(n, (ast.MatchAs, ast.MatchStar)) and n.name:
                                 bind(n.name, ("unknown",))
                         visit(c.body)
@@ -345,8 +514,8 @@ class Project:
                             bind(n, ("unknown",))
         visit(m.tree.body)
         # `global x` in a function rebinds x at run time
-        for n in ast.walk(m.tree):
-            if isinstance(n, ast.Global):
+        for n in m.found():
+            if type(n) is ast.Global:
                 for name in n.names:
                     bind(name, ("unknown",))
 
@@ -519,7 +688,7 @@ class Project:
                 recv = scope.receiver
                 if recv is None:
                     continue
-                for n in ast.walk(d.ast):
+                for n in _all_nodes(d.ast):
                     if isinstance(n, ast.AnnAssign) and _is_self_attr(n.target, recv):
                         ann[n.target.attr] = self.annotation(n.annotation, scope)  # type: ignore[attr-defined]
                     elif isinstance(n, ast.Assign):
@@ -527,7 +696,7 @@ class Project:
                             if _is_self_attr(t, recv):
                                 assigned.setdefault(t.attr, []).append(self.value(n.value, scope) if len(n.targets) == 1 else None)  # type: ignore[attr-defined]
                             else:
-                                for x in ast.walk(t):
+                                for x in _all_nodes(t):
                                     if _is_self_attr(x, recv):
                                         assigned.setdefault(x.attr, []).append(None)  # type: ignore[attr-defined]
                     elif isinstance(n, ast.AugAssign) and _is_self_attr(n.target, recv):
@@ -673,7 +842,13 @@ class Scope:
         self._resolving: set[str] = set()    # names whose value is being worked out (`x = x.copy()` leans on itself)
         self.d: Optional[Def] = mod.by_ast.get(id(fn)) if fn is not None else None
         if fn is not None:
-            self._collect(fn)
+            # a function's names are the same every time it is looked at: collected once, shared by its scopes
+            # (they only read them; what changes while resolving, hidden and _resolving, stays per scope)
+            names = mod.scopes.get(id(fn))
+            if names is None:
+                self._collect(fn)
+                names = mod.scopes[id(fn)] = (self.local, self.globals, self.nonlocals, self.receiver)
+            self.local, self.globals, self.nonlocals, self.receiver = names
 
     @staticmethod
     def of(project: Project, d: Def) -> "Scope":
@@ -702,8 +877,11 @@ class Scope:
         self.local.setdefault(name, []).append(v)
 
     def _visit(self, stmts: list) -> None:
+        exprs = self.mod.walrus
         for s in stmts:
-            for n in _local_nodes(s):
+            for n in _local_nodes(s, exprs):
+                if type(n) not in _BINDERS:
+                    continue
                 if isinstance(n, _DEFS):
                     self._bind(n.name, ("def", self.mod.by_ast[id(n)]) if id(n) in self.mod.by_ast else ("unknown",))
                 elif isinstance(n, ast.Global):
@@ -794,18 +972,26 @@ class Scope:
         return self.p._binding_value(self.mod, b) if k in ("def", "import", "ref") else None
 
 
-def _local_nodes(s: ast.AST):
+_OWN_NAMES = frozenset({ast.Lambda, *_COMPS, *_DEFS})   # what has names of its own (or, a class, its own body)
+# Without a walrus, an expression binds nothing: the nodes a name can be bound in are statements and these parts of them.
+_BINDS = tuple(t for t in (ast.stmt, ast.excepthandler, ast.withitem, getattr(ast, "match_case", None),
+                           getattr(ast, "pattern", None)) if t is not None)
+_BINDERS = frozenset({*_DEFS, ast.Global, ast.Nonlocal, ast.Import, ast.ImportFrom, ast.Assign, ast.AnnAssign, ast.AugAssign,
+                      ast.For, ast.AsyncFor, ast.withitem, ast.ExceptHandler, ast.NamedExpr, ast.Delete,
+                      *(getattr(ast, t) for t in ("MatchAs", "MatchStar") if hasattr(ast, t))})   # what Scope._visit binds from
+
+
+def _local_nodes(s: ast.AST, exprs: bool):
     """Every node of a statement that binds in the enclosing function: not inside nested defs, lambdas,
-    classes or comprehensions (their names are their own), but their own names."""
+    classes or comprehensions (their names are their own), but their own names. `exprs`: look inside
+    expressions too (only an `x := …` binds in one). Depth first, last child first."""
     stack = [s]
     while stack:
         n = stack.pop()
         yield n
-        if isinstance(n, (ast.Lambda, ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
+        if type(n) in _OWN_NAMES:
             continue
-        if isinstance(n, _DEFS):
-            continue
-        stack.extend(ast.iter_child_nodes(n))
+        stack += _children(n) if exprs else _parts(n, _BINDS)
 
 
 class _Calls:
@@ -820,6 +1006,21 @@ class _Calls:
             self.visit(s, scope)
 
     def visit(self, n: ast.AST, scope: Scope) -> None:
+        # depth first, in source order; a part with names of its own is visited with its own scope
+        todo = [n]
+        while todo:
+            n = todo.pop()
+            t = type(n)
+            if t in _OWN_NAMES:
+                self._scoped(n, scope)
+                continue
+            if t is ast.Call:
+                c = self.p.call_target(n, scope)
+                if c is not None:
+                    self.out.append(c)
+            todo += reversed(_children(n))
+
+    def _scoped(self, n: ast.AST, scope: Scope) -> None:
         if isinstance(n, _FUNCS):
             for x in (*n.decorator_list, *n.args.defaults, *[k for k in n.args.kw_defaults if k is not None]):
                 self.visit(x, scope)
@@ -840,7 +1041,7 @@ class _Calls:
             self.visit(n.body, scope)
             scope.hidden.pop()
             return
-        if isinstance(n, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
+        if isinstance(n, _COMPS):
             names = {x for g in n.generators for x in _names(g.target)}
             scope.hidden.append(names)
             for g in n.generators:
@@ -850,13 +1051,6 @@ class _Calls:
             for x in ((n.key, n.value) if isinstance(n, ast.DictComp) else (n.elt,)):
                 self.visit(x, scope)
             scope.hidden.pop()
-            return
-        if isinstance(n, ast.Call):
-            t = self.p.call_target(n, scope)
-            if t is not None:
-                self.out.append(t)
-        for c in ast.iter_child_nodes(n):
-            self.visit(c, scope)
 
 
 # ------------------------------------------------------------------ what the scan and the recorder use

@@ -64,7 +64,7 @@ export function kitPlate(kits: KitSet, id: string, model: Model, src: { flow?: s
   const keep = filterNodes(model, p.filter);
   const need = (what: 'flow' | 'tour') => { const v = src[what] ?? (what === 'flow' ? model.flows[0]?.id : model.tours?.[0]?.id); if (!v) throw new Error(`karyo: plate type "${id}" is drawn from a ${what}, and the model has none`); return v; };
   switch (p.view) {
-    case 'board': return boardScene(subModel(model, keep), { kits, title: o.title ?? `${p.title}: ${model.project ?? 'the model'}`, key: o.key ?? `kit:${id}:${model.project ?? 'model'}`, benchOpen: opt('bench') === true, ...(o.modelFile ? { modelFile: o.modelFile } : {}) });
+    case 'board': return boardScene(subModel(model, keep), { kits, title: o.title ?? `${p.title}: ${model.project ?? 'the model'}`, key: o.key ?? `kit:${id}:${model.project ?? 'model'}`, benchOpen: opt('bench') === true, ...(opt('start') === 'groups' || opt('start') === 'cards' ? { start: opt('start') as 'groups' | 'cards' } : {}), ...(o.modelFile ? { modelFile: o.modelFile } : {}) });
     case 'trace': { const f = need('flow'); return traceBoard(model, f, { kits, title: o.title ?? `${p.title}: ${model.flows.find((x) => x.id === f)?.title ?? f}` }); }
     case 'tour': return tourScene(model, need('tour'), { kits, ...(o.title ? { title: o.title } : {}) });
     case 'script': return scriptPlate(kits, p, model, { ...(o.title ? { title: o.title } : {}), ...(p.from === 'flow' ? { flow: need('flow') } : p.from === 'tour' ? { tour: need('tour') } : {}) });

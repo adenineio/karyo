@@ -14,11 +14,12 @@
 // Theater: --fit 1440x900 lays the plate out for that space first, as the theater does (scene.fit: an
 // aspect-aware relayout), so stills and lint show the arrangement a window of that size gets.
 // Common: --theme <id> (src/engine/theme-pick.ts, e.g. adenine-jade)   --mode light|dark   --dpr 2 (pixel density of the output)
-//         --url http://localhost:5180 (else a private no-HMR Vite server is started)
+//         --url <a running dev server of this checkout> (else a private no-HMR Vite server is started; never 5180 by default)
 // Browser: CHROME_PATH=/path/to/chrome, or the installed Google Chrome channel.
 import { chromium, type Page } from 'playwright-core';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
+import { devServer } from './dev-server';
 
 const argv = process.argv.slice(2);
 const mode = argv[0] ?? 'stills';
@@ -28,17 +29,8 @@ const OUT = path.join(ROOT, 'out');
 const SPEC = opt('spec') ? path.resolve(opt('spec')!) : null;
 const specName = SPEC ? path.basename(SPEC).replace(/(\.explainer)?\.json$/i, '') : '';
 
-async function reachable(url: string) {
-  try { return (await fetch(url, { signal: AbortSignal.timeout(1500) })).ok; } catch { return false; }
-}
 async function server() {
-  const url = opt('url', 'http://localhost:5180')!;
-  if (await reachable(url)) return { url, stop: () => {} };
-  const port = 5400 + Math.floor(Math.random() * 400);
-  const proc = Bun.spawn(['bunx', 'vite', '--port', String(port), '--strictPort'], { cwd: ROOT, stdout: 'ignore', stderr: 'ignore', env: { ...process.env, KARYO_NO_HMR: '1' } });
-  const u = `http://localhost:${port}`;
-  for (let i = 0; i < 150 && !(await reachable(u)); i++) await Bun.sleep(100);
-  return { url: u, stop: () => proc.kill() };
+  return devServer(opt('url'));
 }
 
 async function open(url: string, scene?: string) {

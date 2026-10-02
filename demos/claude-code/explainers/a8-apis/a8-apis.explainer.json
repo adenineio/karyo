@@ -1,0 +1,469 @@
+{
+  "karyo": "explainer/1",
+  "id": "a8-apis",
+  "title": "APIs: programs talking to programs",
+  "summary": "An API is a fixed-format request and a fixed-format reply; the key says who's asking. Builds on: the terminal (A1).",
+  "note": "Names, companies and files here are **made-up examples**.",
+  "narration": "side",
+  "uses": [
+    "api-message",
+    "terminal",
+    "try-it"
+  ],
+  "layout": {
+    "kind": "free"
+  },
+  "categories": [
+    {
+      "id": "asker",
+      "label": "the program asking"
+    },
+    {
+      "id": "service",
+      "label": "the service"
+    },
+    {
+      "id": "message",
+      "label": "the messages"
+    }
+  ],
+  "elements": [
+    {
+      "id": "app",
+      "type": "card",
+      "category": "asker",
+      "props": {
+        "kicker": "The customer",
+        "title": "A weather app",
+        "body": "On your phone. It doesn't know the weather in Paris, so it asks a program that does."
+      },
+      "at": {
+        "x": 0,
+        "y": 32,
+        "w": 320
+      }
+    },
+    {
+      "id": "server",
+      "type": "card",
+      "category": "service",
+      "props": {
+        "kicker": "The kitchen",
+        "title": "api.example.com",
+        "body": "A weather service's computer. It answers any request that's filled in on its form."
+      },
+      "at": {
+        "x": 900,
+        "y": 40,
+        "w": 320
+      }
+    },
+    {
+      "id": "req",
+      "type": "api-message",
+      "category": "message",
+      "label": "The request",
+      "props": {
+        "kicker": "Request · the order form",
+        "line": "GET https://api.example.com/v1/weather",
+        "fields": [
+          {
+            "k": "city",
+            "v": "Paris"
+          },
+          {
+            "k": "units",
+            "v": "metric"
+          }
+        ]
+      },
+      "at": {
+        "x": 420,
+        "y": 0,
+        "w": 380
+      }
+    },
+    {
+      "id": "reply",
+      "type": "api-message",
+      "category": "message",
+      "label": "The reply",
+      "props": {
+        "kicker": "Reply · the labelled receipt",
+        "rawLabel": "as JSON",
+        "line": "200 OK",
+        "tone": "ok",
+        "fields": [
+          {
+            "k": "city",
+            "v": "Paris"
+          },
+          {
+            "k": "temp",
+            "v": "21"
+          },
+          {
+            "k": "unit",
+            "v": "C"
+          },
+          {
+            "k": "sky",
+            "v": "cloudy"
+          }
+        ],
+        "raw": "{\"city\": \"Paris\", \"temp\": 21, \"unit\": \"C\", \"sky\": \"cloudy\"}"
+      },
+      "at": {
+        "x": 900,
+        "y": 240,
+        "w": 320
+      }
+    },
+    {
+      "id": "secret",
+      "type": "callout",
+      "props": {
+        "tone": "warn",
+        "title": "Keys are secrets",
+        "md": "Anyone with your key can use your account, and you get the bill. Never paste one into a chat, an email or a file you share."
+      },
+      "at": {
+        "x": 0,
+        "y": 480,
+        "w": 380
+      }
+    },
+    {
+      "id": "term",
+      "type": "terminal",
+      "category": "asker",
+      "label": "Terminal window",
+      "props": {
+        "title": "Terminal — zsh",
+        "lines": [
+          {
+            "kind": "cmd",
+            "text": "curl -s \"https://api.example.com/v1/weather?city=Paris&units=metric\" -H \"Authorization: Bearer $WEATHER_KEY\""
+          },
+          {
+            "kind": "out",
+            "text": "{\"city\": \"Paris\", \"temp\": 21, \"unit\": \"C\", \"sky\": \"cloudy\"}"
+          }
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 280,
+        "w": 800
+      }
+    },
+    {
+      "id": "try",
+      "type": "try-it",
+      "props": {
+        "title": "Ask a real API",
+        "command": "curl -s https://api.github.com/zen",
+        "expect": "GitHub's API replies with one line of its design advice, such as *Speak like a human.* Run it again for another. This one needs no key; most APIs do."
+      },
+      "at": {
+        "x": 420,
+        "y": 480,
+        "w": 380
+      }
+    }
+  ],
+  "links": [
+    {
+      "id": "direct",
+      "from": "app",
+      "to": "server",
+      "label": "asks",
+      "style": "dashed"
+    },
+    {
+      "id": "fill",
+      "from": "app",
+      "to": "req",
+      "label": "fills in"
+    },
+    {
+      "id": "send",
+      "from": "req",
+      "to": "server",
+      "label": "sends"
+    },
+    {
+      "id": "answer",
+      "from": "server",
+      "to": "reply",
+      "label": "answers"
+    },
+    {
+      "id": "curl",
+      "from": "term",
+      "to": "req",
+      "label": "same form"
+    }
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "title": "One program asks another",
+      "text": "An **API** is a fixed-format way for one program to ask another for something and get a reply. Your weather app doesn't know the weather; it asks a weather service's computer, many times a day.",
+      "show": [
+        "app",
+        "server"
+      ],
+      "connect": [
+        "direct"
+      ],
+      "emphasize": [
+        "app",
+        "server"
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "The order form",
+      "text": "The request is a form with fixed fields: the **address** (URL) of what you want, a **method** (`GET` means *fetch*), and the fields this service expects, here `city` and `units`. Their names come from the service's documentation, not from you.",
+      "show": [
+        "app",
+        "server",
+        "req"
+      ],
+      "connect": [
+        "fill",
+        "send"
+      ],
+      "emphasize": [
+        "req"
+      ]
+    },
+    {
+      "id": "s3",
+      "title": "The key says who's asking",
+      "text": "An **API key** is a secret string that tells the service who is asking, and who gets billed. Like an account card at the counter: no card, no service.",
+      "connect": [
+        "fill",
+        "send"
+      ],
+      "emphasize": [
+        "req"
+      ],
+      "set": {
+        "req": {
+          "fields": [
+            {
+              "k": "city",
+              "v": "Paris"
+            },
+            {
+              "k": "units",
+              "v": "metric"
+            },
+            {
+              "k": "API key",
+              "v": "•••••••• (secret)",
+              "wide": true,
+              "mark": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s4",
+      "title": "The reply, a labelled receipt",
+      "text": "The service replies in **JSON**, a text format for labelled data. Every value carries its label, so the app finds `temp` without guessing. `200 OK` means it worked.",
+      "add": [
+        "reply"
+      ],
+      "connect": [
+        "fill",
+        "send",
+        "answer"
+      ],
+      "emphasize": [
+        "reply"
+      ],
+      "set": {
+        "req": {
+          "fields": [
+            {
+              "k": "city",
+              "v": "Paris"
+            },
+            {
+              "k": "units",
+              "v": "metric"
+            },
+            {
+              "k": "API key",
+              "v": "•••••••• (secret)",
+              "wide": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s5",
+      "title": "A badly filled form is rejected",
+      "text": "Type `cty` instead of `city` and nobody guesses what you meant. The reply comes back with **status code 400 (Bad Request)** and a note on what's wrong. That's where the counter analogy stops: a person would read a messy form kindly; an API rejects it.",
+      "connect": [
+        "fill",
+        "send",
+        "answer"
+      ],
+      "emphasize": [
+        "req",
+        "reply"
+      ],
+      "set": {
+        "req": {
+          "fields": [
+            {
+              "k": "cty",
+              "v": "Paris",
+              "mark": true
+            },
+            {
+              "k": "units",
+              "v": "metric"
+            },
+            {
+              "k": "API key",
+              "v": "•••••••• (secret)",
+              "wide": true
+            }
+          ]
+        },
+        "reply": {
+          "line": "400 Bad Request",
+          "tone": "warn",
+          "fields": [
+            {
+              "k": "error",
+              "v": "missing field: city",
+              "mark": true,
+              "wide": true
+            }
+          ],
+          "raw": "{\"error\": \"missing field: city\"}"
+        }
+      }
+    },
+    {
+      "id": "s6",
+      "title": "Keys are secrets",
+      "text": "Treat a key like a password. If one leaks, cancel it in the service's settings and make a new one.",
+      "add": [
+        "secret"
+      ],
+      "connect": [
+        "fill",
+        "send",
+        "answer"
+      ],
+      "emphasize": [
+        "secret",
+        "req"
+      ],
+      "dim": "others",
+      "set": {
+        "req": {
+          "fields": [
+            {
+              "k": "city",
+              "v": "Paris"
+            },
+            {
+              "k": "units",
+              "v": "metric"
+            },
+            {
+              "k": "API key",
+              "v": "•••••••• (secret)",
+              "wide": true,
+              "mark": true
+            }
+          ]
+        },
+        "reply": {
+          "line": "200 OK",
+          "tone": "ok",
+          "fields": [
+            {
+              "k": "city",
+              "v": "Paris"
+            },
+            {
+              "k": "temp",
+              "v": "21"
+            },
+            {
+              "k": "unit",
+              "v": "C"
+            },
+            {
+              "k": "sky",
+              "v": "cloudy"
+            }
+          ],
+          "raw": "{\"city\": \"Paris\", \"temp\": 21, \"unit\": \"C\", \"sky\": \"cloudy\"}"
+        }
+      }
+    },
+    {
+      "id": "s7",
+      "title": "curl: the same request, typed",
+      "text": "`curl` sends a request and prints the reply: it's one way the terminal, and Claude Code, talk to APIs. `$WEATHER_KEY` fills in the key without showing it. (`api.example.com` is made up, reserved for examples; a real service would reply like this.)",
+      "add": [
+        "term"
+      ],
+      "connect": [
+        "curl",
+        "send",
+        "answer"
+      ],
+      "emphasize": [
+        "term"
+      ],
+      "dim": [
+        "app",
+        "secret"
+      ],
+      "set": {
+        "req": {
+          "fields": [
+            {
+              "k": "city",
+              "v": "Paris"
+            },
+            {
+              "k": "units",
+              "v": "metric"
+            },
+            {
+              "k": "API key",
+              "v": "•••••••• (secret)",
+              "wide": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s8",
+      "title": "The whole picture",
+      "text": "Programs talk through fixed forms: an exact request goes in, a labelled reply comes out, and the key says who's asking. Claude can make these calls for you; keeping the keys safe is your job.",
+      "show": "*",
+      "connect": [
+        "fill",
+        "curl",
+        "send",
+        "answer"
+      ]
+    }
+  ]
+}

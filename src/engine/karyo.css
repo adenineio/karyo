@@ -354,5 +354,6 @@ html.plate-theater-open, html.plate-fill-open { overflow: hidden; }
 .pl-code .tok-k { color: var(--pl-accent); }
 .pl-code .tok-s { color: var(--pl-accent-2); }
 .pl-code .tok-c { color: var(--pl-muted); }
+.pl-code .tok-v { color: var(--pl-accent-2); font-weight: 600; }
 .pl-caret { display: inline-block; width: 0.55em; height: 1.1em; vertical-align: -0.2em; background: var(--pl-accent); margin-left: 1px; }
 .pl-w, .pl-c { display: inline-block; white-space: pre; }

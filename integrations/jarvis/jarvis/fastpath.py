@@ -14,6 +14,13 @@ def _add(phrases: list[str], name: str, args: dict[str, Any], activity: str) -> 
 
 
 _add(["back", "go back"], "back", {}, "went back")
+# group navigation on a structure board (docs/ENGINE.md "Group navigation")
+_add(["up a level", "go up a level", "up one level", "go up one level", "level up", "go up", "zoom out a level", "out a level"],
+     "drill", {"group": "out"}, "went up a level")
+_add(["all groups", "show all groups", "show the groups", "show me the groups", "back to all groups", "back to the overview",
+      "the overview", "go to the top", "top level", "groups view", "group view"], "groups", {"on": True}, "showed the groups")
+_add(["all cards", "show all cards", "show every card", "show all the cards", "every card", "cards view"], "groups", {"on": False},
+     "showed every card")
 _add(["next", "next step"], "step", {"to": "next"}, "next step")
 _add(["previous", "prev", "previous step", "go back a step"], "step", {"to": "prev"}, "previous step")
 _add(["clear"], "clear", {}, "cleared the view")
@@ -52,6 +59,9 @@ _add(["redo", "redo that", "redo it"], "splice_redo", {}, "redid the proposal")
 _add(["leave the splice", "exit the splice", "close the splice", "leave splice", "exit splice", "back to the real view"],
      "splice_leave", {}, "left the splice")
 _add(["save the splice", "save splice", "save this splice"], "splice_save", {}, "saved the splice")
+# "splice this": the view on screen in a new splice (a name is asked for on save); named ones go to Claude
+_add(["splice this", "splice this view", "splice it", "splice here", "open this view in a new splice", "open this in a new splice",
+      "start a splice here", "new splice here"], "splice_open", {"new": True}, "opened a new splice of this view")
 # a stack of splices: only the phrasings that name no splice (the rest go to Claude)
 _add(["stack my splices", "stack the splices", "stack splices", "stack all the splices", "stack all splices", "compare my splices",
       "compare the splices", "compare all the splices", "show the splice stack"], "splice_stack", {}, "stacked the splices")

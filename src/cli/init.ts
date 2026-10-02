@@ -1,6 +1,7 @@
 // `karyo init`: what a project needs to adopt Karyo, as a plan of file changes (docs/ADOPT.md).
-//   detect(dir)          what the project is: git root, Python packages, Go modules, test runner, package manager, CI,
-//                        justfile / Makefile, Claude Code settings, and what an earlier `karyo init` already wrote
+//   detect(dir)          what the project is: git root, Python packages, Go modules, a Swift package or Xcode project (and
+//                        its `// karyo:` markers), test runner, package manager, CI, justfile / Makefile, Claude Code
+//                        settings, and what an earlier `karyo init` already wrote
 //   planInit(d, opts)    every change, each create / update / unchanged / skip / run, with its new content
 //   planRemove(d, opts)  the reverse: everything init wrote, and the generated files (--purge: the karyo/ folder too)
 //   applyChanges(dir, …) write them (a `run` change is the caller's: it spawns a package manager)
@@ -10,6 +11,7 @@
 import { spawnSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, rmdirSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { countMarkers, langByName, sourceFiles, type MarkerLang } from './markers';
 
 export type HookKind = 'stop' | 'edit' | 'git';
 export const HOOK_KINDS: HookKind[] = ['stop', 'edit', 'git'];
@@ -23,6 +25,42 @@ export const CI_FILE = '.github/workflows/karyo.yml';
 export const CI_MARK = '# Karyo (written by `karyo init`';
 /** Where the SDK comes from when a project needs it as a dev dependency (the public plugin repo, at a release tag). */
 export const SDK_GIT = (version: string) => `karyo @ git+https://github.com/adenineio/karyo@v${version}#subdirectory=sdk/python`;
+/** The project's Karyo settings (committed; written by `karyo init`): how its code is read (docs/ADOPT.md "Modes"). */
+export const CONFIG = 'karyo/config.json';
+export const CONFIG_FORMAT = 'config/1';
+/** How a project's Python code is read. `auto`: automatic mode, every class and public function a node, with the
+ *  static call graph, and `# karyo:` directives (or `@karyo.node`) refining the nodes of the defs they sit on.
+ *  `directives`: only what directives declare. */
+export type ScanMode = 'auto' | 'directives';
+export const SCAN_MODES: readonly ScanMode[] = ['auto', 'directives'];
+export interface ProjectConfig { karyo?: string; mode?: ScanMode; note?: string; [k: string]: unknown }
+const MODE_NOTE = 'mode "auto": every class and public function is a node, and # karyo: directives refine the nodes of the defs they sit on; "directives": only what directives declare. Change it with `karyo init --mode auto|directives`.';
+
+/** The project's settings file, or null (none, or not readable JSON). */
+export function readConfig(dir: string): ProjectConfig | null {
+  const t = read(path.join(dir, CONFIG));
+  if (t === null) return null;
+  try { const j = JSON.parse(t); return j && typeof j === 'object' && !Array.isArray(j) ? j as ProjectConfig : null; } catch { return null; }
+}
+
+/** How a refresh or a recording reads the project's Python code: the settings file's mode, else automatic mode (what
+ *  `karyo init` sets a project up for). `from` says which; `config` says when the file is there but its mode isn't one. */
+export function scanMode(dir: string): { mode: ScanMode; from: 'config' | 'default'; problem?: string } {
+  const c = readConfig(dir);
+  if (c && SCAN_MODES.includes(c.mode as ScanMode)) return { mode: c.mode as ScanMode, from: 'config' };
+  if (existsSync(path.join(dir, CONFIG)))
+    return { mode: 'auto', from: 'default', problem: `${CONFIG} ${c ? `has mode ${JSON.stringify(c.mode ?? null)}, not one of ${SCAN_MODES.join(', ')}` : "isn't valid JSON"}; reading the code in automatic mode` };
+  return { mode: 'auto', from: 'default' };
+}
+
+/** The settings file with `mode` set (other keys kept). */
+export function configText(cur: string | null, mode: ScanMode): string {
+  let j: ProjectConfig = {};
+  try { const p = cur ? JSON.parse(cur) : {}; if (p && typeof p === 'object' && !Array.isArray(p)) j = p; } catch {}
+  const { karyo: _k, mode: _m, note: _n, ...rest } = j;
+  return JSON.stringify({ karyo: CONFIG_FORMAT, mode, note: MODE_NOTE, ...rest }, null, 2) + '\n';
+}
+
 /** What identifies Karyo's refresh hook in .claude/settings.json and in a git hook. */
 const HOOK_SIGNATURE = 'karyo/karyo.sh" refresh --hook';
 
@@ -33,7 +71,11 @@ export interface Detection {
   /** The project dir relative to the git root ('' when it is the root). */
   inRepo: string;
   python: { packages: string[]; directives: boolean; codeForm: string[] };
+  /** The project's settings (karyo/config.json), when an earlier init wrote them. */
+  config: ProjectConfig | null;
   go: { modules: string[] };
+  /** A Swift project (a Package.swift, an .xcodeproj or .xcworkspace): Karyo reads its `// karyo:` markers. */
+  swift: SwiftProject | null;
   testRunner: 'pytest' | 'unittest' | null;
   testCommand: string[] | null;
   packageManager: 'uv' | 'poetry' | 'pipenv' | 'pip' | null;
@@ -58,6 +100,8 @@ export interface InitOptions {
   commitModel?: boolean;
   /** Karyo's version (the plugin's), for the CI checkout and the SDK's git source. */
   version: string;
+  /** How the Python code is read (karyo/config.json); undefined keeps the file's mode, else automatic mode. */
+  mode?: ScanMode;
 }
 
 export type Action = 'create' | 'update' | 'unchanged' | 'remove' | 'skip' | 'run';
@@ -131,6 +175,46 @@ function goModules(dir: string, depth = 0, out: string[] = []): string[] {
     if (isDir(d)) goModules(d, depth + 1, out);
   }
   return out;
+}
+
+export interface SwiftProject {
+  /** Package.swift, or the .xcodeproj / .xcworkspace found. */
+  manifest: string;
+  /** The package's targets (null for an Xcode project: its targets aren't read). */
+  targets: string[] | null;
+  testTargets: string[] | null;
+  /** .swift files, how many hold markers, and how many marker lines they hold. */
+  files: number;
+  filesWithMarkers: number;
+  markers: number;
+}
+
+/** The Swift manifest at the top of a project: Package.swift, else an Xcode workspace or project. */
+export function swiftManifest(dir: string): string | null {
+  if (isFile(path.join(dir, 'Package.swift'))) return 'Package.swift';
+  let names: string[] = [];
+  try { names = readdirSync(dir).sort(); } catch {}
+  return names.find((n) => n.endsWith('.xcworkspace') && isDir(path.join(dir, n)))
+    ?? names.find((n) => n.endsWith('.xcodeproj') && isDir(path.join(dir, n))) ?? null;
+}
+
+/** The languages whose `// karyo:` markers a project's refresh reads (src/cli/markers.ts), from what it is. */
+export function markerLanguages(dir: string): MarkerLang[] {
+  return swiftManifest(dir) ? [langByName('swift')!] : [];
+}
+
+function swiftProject(dir: string): SwiftProject | null {
+  const manifest = swiftManifest(dir);
+  if (!manifest) return null;
+  let targets: string[] | null = null, testTargets: string[] | null = null;
+  if (manifest === 'Package.swift') {
+    const text = (read(path.join(dir, manifest)) ?? '').replace(/\/\/.*$/gm, '');
+    targets = []; testTargets = [];
+    for (const m of text.matchAll(/\.(target|executableTarget|testTarget|macro|plugin|binaryTarget|systemLibrary)\s*\(\s*name:\s*"([^"]+)"/g)) (m[1] === 'testTarget' ? testTargets : targets).push(m[2]!);
+  }
+  const files = sourceFiles(dir, markerLanguages(dir));
+  const c = countMarkers(dir, files);
+  return { manifest, targets, testTargets, files: files.length, filesWithMarkers: c.files, markers: c.markers };
 }
 
 const IMPORTS_KARYO = /^\s*(import\s+karyo\b|from\s+karyo(\.\w+)*\s+import\b)|^\s*@karyo\./m;
@@ -208,7 +292,9 @@ export function detect(dirArg: string): Detection {
   return {
     dir, name: path.basename(dir), gitRoot, inRepo,
     python: { packages, directives, codeForm },
+    config: readConfig(dir),
     go: { modules: goModules(dir).map((m) => path.relative(dir, m) || '.') },
+    swift: swiftProject(dir),
     testRunner, testCommand, packageManager,
     ci: { github, other },
     justfile, makefile,
@@ -271,11 +357,15 @@ export const shellCommand = (argv: string[]) => argv.map(shq).join(' ');
 function recipes(d: Detection): { name: string; doc: string; cmd: string }[] {
   return [
     { name: 'karyo-scan', doc: 'Karyo: re-scan the code into karyo.model.json (applies karyo/curation.json)', cmd: `${LAUNCHER} refresh` },
-    { name: 'karyo-record', doc: 'Karyo: run the tests once under the recorder, so the board shows real calls and what never ran',
-      cmd: `${LAUNCHER} record${d.testCommand ? ` -- ${shellCommand(d.testCommand)}` : ''}` },
+    // recording runs Python tests: a project with markers and no Python package has nothing to record
+    ...(markersOnly(d) ? [] : [{ name: 'karyo-record', doc: 'Karyo: run the tests once under the recorder, so the board shows real calls and what never ran',
+      cmd: `${LAUNCHER} record${d.testCommand ? ` -- ${shellCommand(d.testCommand)}` : ''}` }]),
     { name: 'karyo-view', doc: "Karyo: open the project's Karyo view (prints its URL)", cmd: `${LAUNCHER} view` },
   ];
 }
+
+/** A project Karyo reads only through `// karyo:` markers (a Swift project with no Python package). */
+const markersOnly = (d: Detection) => !!d.swift && !d.python.packages.length;
 
 /** Recipe names the file already defines outside Karyo's block (they'd clash). */
 function recipeClashes(text: string, names: string[]): string[] {
@@ -438,6 +528,17 @@ export function planInit(d: Detection, o: InitOptions): Change[] {
   // the launcher
   out.push(fileChange(d.dir, LAUNCHER, launcherScript(), 'the Karyo launcher', 'recipes and hooks run Karyo through it; it finds the plugin, no machine paths', true));
 
+  // the project's settings: how its Python code is read (Swift and Go have directives or markers only)
+  if (d.python.packages.length) {
+    const was = SCAN_MODES.includes(d.config?.mode as ScanMode) ? d.config!.mode as ScanMode : null;
+    const mode = o.mode ?? was ?? 'auto';
+    const why = mode === 'directives' ? 'directives only: no automatic nodes; --mode auto reads every class and function, with the directives on top'
+      : d.python.directives && !was ? 'automatic mode, and the `# karyo:` directives refine the nodes of the defs they sit on (before this setting, directives switched automatic mode off); --mode directives keeps directives only'
+        : 'automatic mode: every class and public function a node, directives refining theirs; --mode directives reads directives only';
+    const c = fileChange(d.dir, CONFIG, configText(read(path.join(d.dir, CONFIG)), mode), `settings: mode ${mode}`, why);
+    out.push({ ...c, preview: c.action === 'unchanged' ? undefined : c.content?.trimEnd() });
+  }
+
   // .gitignore
   if (d.gitRoot) {
     const cur = read(path.join(d.dir, '.gitignore')) ?? '';
@@ -551,6 +652,7 @@ export function planRemove(d: Detection, o: RemoveOptions = {}): Change[] {
     out.push({ ...fileChange(d.dir, d.gitHookFile, r.text, 'remove the git refresh hook', why), path: gitHookRel(d)! });
   }
   if (d.installed.ci) out.push({ path: CI_FILE, action: 'remove', what: 'the CI workflow', why });
+  if (!o.purge && existsSync(path.join(d.dir, CONFIG))) out.push({ path: CONFIG, action: 'remove', what: 'the project\'s Karyo settings', why });
   out.push(...(['.karyo', 'karyo.model.json'] as const).filter((f) => existsSync(path.join(d.dir, f)))
     .map((f) => ({ path: f, action: 'remove' as const, what: 'generated', why: 'rebuilt from the code, nothing lost', dir: f === '.karyo' })));
   if (o.purge) {
@@ -594,10 +696,20 @@ export function applyChanges(dir: string, changes: Change[]): Change[] {
 export function describeDetection(d: Detection): string[] {
   const l: string[] = [];
   l.push(`project   ${d.dir}${d.gitRoot ? d.inRepo ? ` (in the git repo ${d.gitRoot})` : ' (git repo)' : ' (not a git repo)'}`);
-  l.push(`python    ${d.python.packages.length ? d.python.packages.join(', ') : 'no packages'}${d.python.packages.length ? `: ${d.python.codeForm.length ? 'imports karyo (code form)' : d.python.directives ? '`# karyo:` directives' : 'no directives: automatic mode'}` : ''}`);
+  const py = !markersOnly(d);
+  if (py) l.push(`python    ${d.python.packages.length ? d.python.packages.join(', ') : 'no packages'}${d.python.packages.length ? `: ${d.python.codeForm.length ? 'imports karyo (code form)' : d.python.directives ? '`# karyo:` directives' : 'no directives'}` : ''}`);
+  if (py && d.python.packages.length) l.push(`mode      ${SCAN_MODES.includes(d.config?.mode as ScanMode) ? `${d.config!.mode} (${CONFIG})` : `not set yet (${CONFIG}): automatic mode${d.python.directives ? ', directives refining its nodes' : ''}`}`);
   if (d.go.modules.length) l.push(`go        ${d.go.modules.join(', ')} (Go has directives only: //karyo:node; no automatic mode yet)`);
-  l.push(`tests     ${d.testCommand ? `${d.testRunner}: ${shellCommand(d.testCommand)}` : 'none found'}`);
-  l.push(`packages  ${d.packageManager ?? 'no Python package manager'}`);
+  if (d.swift) {
+    const s = d.swift;
+    const plural = (k: number, w: string) => `${k} ${w}${k === 1 ? '' : 's'}`;
+    l.push(`swift     ${s.manifest}${s.targets ? `: ${plural(s.targets.length, 'target')}${s.targets.length ? ` (${s.targets.join(', ')})` : ''}${s.testTargets?.length ? `, ${plural(s.testTargets.length, 'test target')}` : ''}` : ' (its targets aren\'t read)'}`);
+    l.push(`markers   ${s.markers ? `${s.markers} in ${s.filesWithMarkers} of ${plural(s.files, '.swift file')}` : `0 yet in ${plural(s.files, '.swift file')}: Claude writes \`// karyo:\` markers (the karyo-adopt skill), refresh reads them`}`);
+  }
+  if (py) {
+    l.push(`tests     ${d.testCommand ? `${d.testRunner}: ${shellCommand(d.testCommand)}` : 'none found'}`);
+    l.push(`packages  ${d.packageManager ?? 'no Python package manager'}`);
+  }
   l.push(`ci        ${[d.ci.github ? 'GitHub Actions' : '', ...d.ci.other].filter(Boolean).join(', ') || 'none found'}`);
   l.push(`tasks     ${[d.justfile, d.makefile].filter(Boolean).join(', ') || 'no justfile or Makefile'}`);
   l.push(`hooks     ${d.installed.hooks.length ? d.installed.hooks.join(', ') : 'no Karyo refresh hook'}`);

@@ -4,7 +4,7 @@
 // applySplice, describeOp, landed …); this file is the board's side: the session (ops, undo/redo, saved or
 // not), what the board draws (the spliced model plus ghosts of what it removed), the dev-server calls that
 // save and list splices, and the chrome's CSS. Shape-neutral: nothing here knows what the nodes are.
-import { applySplice, describeOp, landed, slug, validateSplice, type Splice, type SpliceOp, type SpliceResult, type SpliceWarning } from './splice';
+import { applySplice, boardMarks, describeOp, landed, slug, validateSplice, type Splice, type SpliceOp, type SpliceResult, type SpliceWarning } from './splice';
 import type { Model } from './model';
 
 type XY = { x: number; y: number };
@@ -26,10 +26,52 @@ export interface SpliceView {
   landed: number;
   canUndo: boolean;
   canRedo: boolean;
+  /** Where you are in it now, in the breadcrumb's words ("Orders › Notifications", "All groups", "every card"); a
+   *  splice is over the whole model, the view is only where you are. Empty on a board with no groups. */
+  where?: string;
+  /** Where it lives: the view it was opened in, or last saved in (what reopening restores). */
+  home?: string | null;
+  /** The groups it proposes: id, name, the path to it, how many cards it has so far. */
+  groups?: { id: string; label: string; path: string; cards: number }[];
+}
+
+/** What a splice remembers of the view it lives in (its `view`, docs/MODEL.md "Splices"): the level and group (and the
+ *  breadcrumb path, in words, as it was), Groups or every card, the drill, the selection, and its own arrangement. */
+export interface SpliceViewState {
+  nav?: 'groups' | 'cards';
+  at?: string | null;
+  path?: string[];
+  drill?: string | null;
+  open?: string | null;
+  section?: string | null;
+  cursor?: string | null;
+  positions?: Record<string, XY>;
+}
+const viewOf = (v: unknown): SpliceViewState => (v && typeof v === 'object' && !Array.isArray(v) ? v as SpliceViewState : {});
+/** Where a splice lives, in words, from its view: "Orders › Notifications", "All groups", "every card"; null
+ *  when its view doesn't say (an older splice). */
+export function spliceHome(view: unknown): string | null {
+  const v = viewOf(view);
+  if (v.nav === 'cards') return 'every card';
+  if (v.nav !== 'groups') return null;
+  const path = Array.isArray(v.path) ? v.path.filter((x): x is string => typeof x === 'string') : [];
+  return path.length ? path.join(' › ') : typeof v.at === 'string' ? v.at : 'All groups';
+}
+/** Where to reopen a splice: its view's level and group while the board has that group (a group the splice itself
+ *  proposes counts: ask after applying it), its drill, its selection; a view that says nothing (an older splice) opens at
+ *  the top level, as the board starts. */
+export function viewTarget(view: unknown, b: { available: boolean; start: 'groups' | 'cards'; has: (g: string) => boolean }): { nav: 'groups' | 'cards'; at: string | null; drill: string | null; open: string | null; section: string | null; cursor: string | null } {
+  const v = viewOf(view);
+  const str = (x: unknown) => (typeof x === 'string' && x ? x : null);
+  const nav = !b.available ? 'cards' : v.nav === 'groups' || v.nav === 'cards' ? v.nav : b.start;
+  const at = nav === 'groups' && str(v.at) && b.has(v.at!) ? v.at! : null;
+  return { nav, at, drill: nav === 'cards' ? str(v.drill) : null, open: str(v.open), section: str(v.section), cursor: str(v.cursor) };
 }
 
 /** One saved splice, as the Splices list shows it. */
-export interface SpliceEntry { file: string; id: string; title: string; ops: number; updated?: string; landed: number; warnings: number; error?: string; splice?: Splice }
+export interface SpliceEntry { file: string; id: string; title: string; ops: number; updated?: string; landed: number; warnings: number; error?: string; splice?: Splice;
+  /** Where it lives (`spliceHome`): the view it was saved in, in words. */
+  home?: string | null }
 
 /** What the board draws: the spliced model. The core keeps every real node and relationship in it (a removed or
  *  rerouted one carries its mark and is drawn as a ghost), so nothing ever just vanishes from the plate. */
@@ -60,7 +102,9 @@ export class SpliceSession {
     const last = this.splice.ops[this.splice.ops.length - 1];
     this.note = last ? this.words(this.splice.ops.length - 1) : null;
   }
-  recompute() { this.result = applySplice(this.base, this.splice); this.drawn = drawnModel(this.result); }
+  /** Apply the ops again. The result's marks are the board's (`boardMarks`): a wire between two cards with parts (types
+   *  whose methods fold into them) is marked when all it stands for is. */
+  recompute() { const r = applySplice(this.base, this.splice); this.result = { ...r, marks: boardMarks(r) }; this.drawn = drawnModel(this.result); }
   get title() { return this.splice.title || this.splice.id || ''; }
   /** Changes since it was last saved (a new splice with no changes has nothing to lose). */
   get dirty() { return JSON.stringify(this.splice.ops) !== (this.savedOps ?? '[]'); }
@@ -72,7 +116,7 @@ export class SpliceSession {
     this.recompute();
     const ws = this.result.warnings.filter((w) => w.op === i);
     const t = this.result.marks.touched[i];
-    if (ws.length && (!t || (!t.nodes.length && !t.edges.length))) {
+    if (ws.length && (!t || (!t.nodes.length && !t.edges.length && !t.groups?.length))) {
       this.splice.ops.pop();
       this.recompute();
       return { applied: false, warnings: ws.map((w) => warnText(w)) };
@@ -110,7 +154,7 @@ export class SpliceSession {
     return {
       id: this.splice.id, title: this.title, dirty: this.dirty, ops: this.splice.ops.length, last: this.lastWords(),
       warnings: this.warnings(), file: this.file, landed: landed(this.base, this.splice).filter((x) => x === 'landed').length,
-      canUndo: this.splice.ops.length > 0, canRedo: this.redo.length > 0,
+      canUndo: this.splice.ops.length > 0, canRedo: this.redo.length > 0, home: spliceHome(this.splice.view),
     };
   }
   /** Name it: the title as given, the id its slug (kept once saved, so the file doesn't move). */
@@ -175,7 +219,7 @@ export async function listSplices(dir: string, base: Model): Promise<{ ok: boole
     const s = await loadSplice(file);
     if (!s.ok) return { file, id: file.split('/').pop()!.replace(/\.splice\.json$/, ''), title: '', ops: 0, landed: 0, warnings: 0, error: s.error };
     const r = applySplice(base, s.splice);
-    return { file, id: s.splice.id, title: s.splice.title || s.splice.id, ops: s.splice.ops.length, updated: s.splice.updated, landed: landed(base, s.splice).filter((x) => x === 'landed').length, warnings: r.warnings.length, splice: s.splice };
+    return { file, id: s.splice.id, title: s.splice.title || s.splice.id, ops: s.splice.ops.length, updated: s.splice.updated, landed: landed(base, s.splice).filter((x) => x === 'landed').length, warnings: r.warnings.length, splice: s.splice, home: spliceHome(s.splice.view) };
   }));
   entries.sort((a, b) => (b.updated ?? '').localeCompare(a.updated ?? '') || a.id.localeCompare(b.id));
   return { ok: true, entries };
@@ -230,6 +274,7 @@ export const SPLICE_CSS = /* css */ `
   .sp-pal input:focus, .sp-pal select:focus { border-color: var(--pl-accent); outline: none; }
   .sp-pal .sp-row { display: flex; gap: 8px; justify-content: flex-end; }
   .sp-pal .sp-hint { margin: 0; font: 11.5px/1.4 var(--pl-font-mono); color: var(--pl-muted); }
+  .sp-pal.is-group .sp-nodeonly, .sp-pal:not(.is-group) .sp-grouponly { display: none; }
   .bd-btn.sp-add { border-style: dashed; border-color: var(--pl-accent); color: var(--pl-accent); }
   .bd-toolbar .bd-btn.sp-add[hidden] { display: none; }
   .bd-glyph.proposed, .wh-glyph.proposed { border-top: 2px dashed var(--pl-accent); }

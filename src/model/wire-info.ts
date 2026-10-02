@@ -93,7 +93,13 @@ export interface WireInfo {
   declared: boolean;
 }
 
-export function wireInfo(w: Wire, calls: RecordedCall[], o: { label: (id: string) => string; node: (id: string) => MNode | undefined; where?: string | null; statics?: boolean }): WireInfo {
+/** What the code has, in a model with no recorded run (model.ts `hasRuns`): nothing could have been seen. */
+const NO_RUNS_TEXT: Partial<Record<Verdict, string>> = {
+  unseen: 'declared in the code (no runs are recorded)',
+  extracted: 'found in the code by static analysis (no runs are recorded)',
+};
+
+export function wireInfo(w: Wire, calls: RecordedCall[], o: { label: (id: string) => string; node: (id: string) => MNode | undefined; where?: string | null; statics?: boolean; runs?: boolean }): WireInfo {
   const A = o.label(w.from), B = o.label(w.to);
   const kinds = w.kinds.length ? w.kinds : kindsOf(w.edge as MEdge);
   const firstSeen: string[] = [];
@@ -110,7 +116,8 @@ export function wireInfo(w: Wire, calls: RecordedCall[], o: { label: (id: string
     labelled: !!label, count: calls.length, ops, at,
     where: o.where !== undefined ? o.where : flowsPhrase([...new Set(calls.map((c) => c.flowTitle))]),
     direction, verdictText: w.verdict === 'confirmed' && !w.edge.sources.includes('declared') ? 'found in the code by static analysis and seen in recorded runs'
-      : w.verdict === 'undeclared' && w.edge.sources.includes('extracted') === false && o.statics ? 'seen in recorded runs; neither declared nor found by static analysis' : VERDICT_TEXT[w.verdict],
+      : w.verdict === 'undeclared' && w.edge.sources.includes('extracted') === false && o.statics ? 'seen in recorded runs; neither declared nor found by static analysis'
+      : (o.runs === false && NO_RUNS_TEXT[w.verdict]) || VERDICT_TEXT[w.verdict],
   };
 }
 

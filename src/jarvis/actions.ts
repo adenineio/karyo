@@ -10,8 +10,9 @@ import { cssId } from '../model/scenes';
 import { best, rank, norm, type Candidate } from './fuzzy';
 import type { ViewSelection, ViewSnapshot, SpliceState, SpliceStackState } from './protocol';
 import type { SpliceView, SpliceEntry } from '../model/board-splice';
-import type { SpliceOp, SpliceAddOp, SpliceAttach } from '../model/splice';
+import { spliceOp, type SpliceOp, type SpliceAddOp, type SpliceAttach } from '../model/splice';
 import type { EdgeKind, NodeKind } from '../model/model';
+import type { BoardLevel } from '../model/board';
 
 /** The union of what the plates expose (each implements its part; see src/model/{board,flowboard,tour,stack}.ts, src/explainer/scene.ts). */
 interface AnyPlate {
@@ -19,6 +20,8 @@ interface AnyPlate {
   getState?(): any;
   // board
   reveal?(id: string): void; close?(): void; drill?(g: string | null): void; back?(): boolean;
+  // board: group navigation (docs/ENGINE.md "Group navigation")
+  enter?(g: string | null): boolean; up?(): boolean; groupView?(v: 'groups' | 'cards'): boolean; level?(): BoardLevel;
   openDetails?(id: string, section?: string | null): void | boolean; sections?(id: string): SectionInfo[]; detailsView?(): DetailsView | null;
   scrollDetails?(to: 'down' | 'up' | 'top' | 'bottom' | { item: string }): boolean;
   // board, trace: the pinned inspector
@@ -56,9 +59,9 @@ interface AnyPlate {
 const NODE_KINDS: readonly NodeKind[] = ['service', 'function', 'store', 'queue', 'external', 'actor'];
 const EDGE_KINDS: readonly EdgeKind[] = ['calls', 'reads', 'writes', 'publishes', 'subscribes'];
 /** The splice actions (docs/JARVIS.md "Splices"): proposals only, never the real diagram. */
-export const SPLICE_ACTIONS = ['splice_open', 'splice_add', 'splice_connect', 'splice_disconnect', 'splice_remove', 'splice_replace', 'splice_rename', 'splice_move', 'splice_undo', 'splice_redo', 'splice_save', 'splice_discard', 'splice_leave', 'splice_list', 'splice_stack', 'splice_stack_open', 'splice_stack_return', 'splice_stack_leave', 'splice_stack_conflict', 'splice_stack_swap', 'splice_stack_same'] as const;
+export const SPLICE_ACTIONS = ['splice_open', 'splice_add', 'splice_group', 'splice_connect', 'splice_disconnect', 'splice_remove', 'splice_replace', 'splice_rename', 'splice_move', 'splice_undo', 'splice_redo', 'splice_save', 'splice_discard', 'splice_leave', 'splice_list', 'splice_stack', 'splice_stack_open', 'splice_stack_return', 'splice_stack_leave', 'splice_stack_conflict', 'splice_stack_swap', 'splice_stack_same'] as const;
 /** The splice actions that change the open splice: not while a stack of splices covers the board. */
-const SPLICE_CHANGES = ['splice_add', 'splice_connect', 'splice_disconnect', 'splice_remove', 'splice_replace', 'splice_rename', 'splice_move', 'splice_undo', 'splice_redo'];
+const SPLICE_CHANGES = ['splice_add', 'splice_group', 'splice_connect', 'splice_disconnect', 'splice_remove', 'splice_replace', 'splice_rename', 'splice_move', 'splice_undo', 'splice_redo'];
 
 export interface ActionResult { ok: boolean; state?: ViewSelection; error?: string }
 export interface PageControls { theater(): boolean; setTheater(on: boolean): void }
@@ -91,7 +94,7 @@ export class PlateAdapter {
     const pins: string[] = Array.isArray(st.pins) ? [...st.pins] : [];
     const hl = pins.includes(HIGHLIGHT) ? { highlighted: [...this.highlighted] } : {};
     switch (o?.kind) {
-      case 'board': return { open: st.open ?? null, ...this.details(), ...this.inspectorState(), drill: st.drill ?? null, pins, ...hl, ...this.spliceState(), ...this.stackState(), ...base };
+      case 'board': return { open: st.open ?? null, ...this.details(), ...this.inspectorState(), drill: (st.nav === 'groups' ? st.at : st.drill) ?? null, ...this.levelState(), pins, ...hl, ...this.spliceState(), ...this.stackState(), ...base };
       case 'trace': return { request: st.sel == null ? null : st.sel + 1, ...this.details(), ...this.inspectorState(), pins, ...hl, ...base };
       case 'tour': return { step: (st.step ?? 0) + 1, ...base };
       case 'stack': return { slice: (st.cur ?? 0) + 1, fan: !!st.fan, pins, ...hl, ...this.spliceState(), ...this.stackState(), ...base };
@@ -115,10 +118,18 @@ export class PlateAdapter {
     if (!this.board.spliceView) return {};
     const v = this.board.spliceView();
     if (!v) return { splice: null };
-    const s: SpliceState = { id: v.id, title: v.title, dirty: v.dirty, ops: v.ops, last: v.last, warnings: v.warnings, file: v.file, landed: v.landed };
+    const s: SpliceState = { id: v.id, title: v.title, dirty: v.dirty, ops: v.ops, last: v.last, warnings: v.warnings, file: v.file, landed: v.landed,
+      ...(v.where !== undefined ? { where: v.where } : {}), ...(v.home !== undefined ? { home: v.home } : {}), ...(v.groups?.length ? { groups: v.groups } : {}) };
     return { splice: s };
   }
 
+  /** A board's group navigation: the view, the group entered, its path, and what the level shows. */
+  private levelState(): Partial<ViewSelection> {
+    const l = this.board.level?.();
+    if (!l || !l.available) return {};
+    return { level: { view: l.view, at: l.at, path: l.path, groups: l.groups.map((g) => `${g.label}${g.proposed ? ' (proposed)' : ''}`), stubs: l.stubs.map((t) => `${t.label} (${t.side === 'in' ? 'calls in' : 'called'})`),
+      ...(l.view === 'groups' ? { cards: l.cards.map((id) => this.outline()?.nodes.find((n) => n.id === id)?.label ?? id) } : {}), ...(l.proposed ? { proposed: true } : {}) } };
+  }
   /** A board's stack of splices: its slices, the current one, on screen or not (null: none). */
   private stackState(): Partial<ViewSelection> {
     if (!this.board.spliceStackView) return {};
@@ -157,7 +168,7 @@ export class PlateAdapter {
     const out: Candidate<Kind>[] = [];
     for (const k of kinds) {
       if (k === 'node') for (const n of o.nodes) out.push({ kind: 'node', id: n.id, label: n.label });
-      if (k === 'group') for (const g of o.groups) out.push({ kind: 'group', id: g.id, label: g.label });
+      if (k === 'group') for (const g of o.groups) { out.push({ kind: 'group', id: g.id, label: g.label }); const leaf = g.label.split(' / ').pop()!; if (leaf !== g.label) out.push({ kind: 'group', id: g.id, label: leaf }); }
       if (k === 'tag') for (const t of o.tags) out.push({ kind: 'tag', id: t.id, label: t.label });
       if (k === 'step') o.steps.forEach((s, i) => out.push({ kind: 'step', id: String(i + 1), label: s }));
     }
@@ -253,6 +264,28 @@ export class PlateAdapter {
   // ------------------------------------------------------------ splices (docs/JARVIS.md "Splices")
   /** A node on the plate (the spliced one: proposed cards count) by id or label, loosely. */
   private nodeRef(o: PlateOutline, ref: unknown, what: string): string { return this.resolve(o, ref, ['node'], what).id; }
+  /** A group on the board (the model's or one the splice proposes) by id or name, loosely. */
+  private groupRef(o: PlateOutline, ref: unknown, what: string): string { return this.resolve(o, ref, ['group'], what).id; }
+  /** A node, else a group when no node has that name (rename / remove act on either). */
+  private nodeOrGroup(o: PlateOutline, ref: unknown, what: string): { node?: string; group?: string } {
+    try { return { node: this.nodeRef(o, ref, what) }; } catch (e) {
+      if (!(e instanceof Fail)) throw e;
+      const q = typeof ref === 'string' ? ref.replace(/\s+group\s*$/i, '') : ref;
+      try { return { group: this.groupRef(o, q, what) }; } catch { throw e; }
+    }
+  }
+  /** Where the board is, in words, and what the level shows (for a caption that says only what is on screen). */
+  private levelWords(): string {
+    const l = this.board.level?.();
+    if (!l || l.view !== 'groups') return '';
+    const here = l.at === null ? 'on the overview of all groups' : `inside ${l.path.slice(1).join(' › ')}${l.proposed ? ' (a proposed group)' : ''}`;
+    const o = this.outline(), name = (id: string) => o?.nodes.find((n) => n.id === id)?.label ?? id;
+    const cards = l.cards.map(name), gs = l.groups.map((g) => `${g.label}${g.proposed ? ' (proposed)' : ''}`);
+    const what = [cards.length ? `cards: ${list(cards)}` : l.at !== null && !gs.length ? 'no cards yet' : '', gs.length ? `groups: ${list(gs)}` : ''].filter(Boolean).join('; ');
+    const ins = l.stubs.filter((t) => t.side === 'in').map((t) => t.label), outs = l.stubs.filter((t) => t.side === 'out').map((t) => t.label);
+    const edges = [ins.length ? `${list(ins)} call${ins.length === 1 ? 's' : ''} in (left)` : '', outs.length ? `it calls ${list(outs)} (right)` : ''].filter(Boolean).join('; ');
+    return `${here}: ${what || 'nothing on this level'}${edges ? `; at the edges: ${edges}` : ''}`;
+  }
   private kindOf<T extends string>(v: unknown, all: readonly T[], what: string, dflt?: T): T | undefined {
     if (v === undefined || v === null || v === '') return dflt;
     const k = String(v).trim().toLowerCase() as T;
@@ -282,7 +315,7 @@ export class PlateAdapter {
         if (open?.dirty) fail(`the splice "${open.title}" is open with unsaved changes; splice_save it, or splice_leave {force: true} to drop them`);
         if (nm && !fresh && a.spliceOpenSaved) {
           return a.spliceOpenSaved(nm).then((r) => {
-            if (r.ok) return { spliceNote: `opened the saved splice "${r.view!.title}" over the current code` };
+            if (r.ok) { const lw = this.levelWords(); return { spliceNote: `opened the saved splice "${r.view!.title}" over the current code${r.view!.home ? `, in the view it lives in (${r.view!.home})` : ''}${lw ? `; now ${lw}` : ''}` }; }
             if (!/^no saved splice/.test(r.error ?? '')) fail(r.error ?? 'could not open it');
             if (open) a.spliceLeave!(true);
             a.spliceOpen!({ title: nm });
@@ -290,8 +323,15 @@ export class PlateAdapter {
           });
         }
         if (open) a.spliceLeave!(true);
+        // "splice the orders group": go there first, then open it in that view
+        const g = args.group ?? args.at;
+        if (g !== undefined && g !== null && g !== '') {
+          if (typeof g === 'string' && /^(top|all|all groups|overview|the overview|the top|none)$/i.test(g.trim())) a.enter?.(null);
+          else if (!a.enter?.(this.groupRef(o, g, 'group'))) fail('this board has no groups to show');
+        }
         a.spliceOpen!(nm ? { title: nm } : {});
-        return { spliceNote: 'a new splice from this view' };
+        const w = a.spliceView!()?.where;
+        return { spliceNote: `a new splice${nm ? ` "${nm}"` : ''} of this view${w ? `, ${w === 'All groups' ? 'the overview of all groups' : w === 'every card' ? 'every card' : `inside ${w}`}` : ''}: proposals only, nothing real changes; it remembers this view` };
       }
       case 'splice_add': {
         need();
@@ -300,10 +340,13 @@ export class PlateAdapter {
         const node: SpliceAddOp['node'] = { label };
         const kind = this.kindOf(args.kind, NODE_KINDS, 'kind'); if (kind) node.kind = kind;
         if (str(args.category)) node.category = str(args.category);
-        if (str(args.group)) node.group = str(args.group);
+        if (str(args.group)) node.group = this.groupRef(o, str(args.group), 'group');
         if (str(args.summary)) node.summary = str(args.summary);
         const op: SpliceAddOp = { op: 'add', node };
         const places = ['between', 'before', 'after', 'attach'].filter((k) => args[k] !== undefined && args[k] !== null && args[k] !== '');
+        // inside a group, a new card joins it (inside a proposed group always; else when it isn't placed next to others)
+        const lv = a.level?.();
+        if (!node.group && lv?.view === 'groups' && lv.at !== null && (!places.length || lv.proposed)) node.group = lv.at;
         if (places.length > 1) fail(`give one place for ${label}: between, before, after or attach (got ${places.join(' and ')})`);
         if (args.between !== undefined && args.between !== null) {
           const bw = Array.isArray(args.between) ? args.between : typeof args.between === 'string' ? args.between.split(/\s+and\s+|,/) : [];
@@ -318,7 +361,36 @@ export class PlateAdapter {
           const ek = this.kindOf(at.kind, EDGE_KINDS, 'attach.kind'); if (ek) att.kind = ek;
           op.attach = att;
         }
-        return this.change(op);
+        const r = this.change(op);
+        const v = a.spliceView!();
+        return { ...r, spliceNote: [r.spliceNote, v?.last ? `proposed: ${v.last}` : ''].filter(Boolean).join('; ') };
+      }
+      case 'splice_group': {
+        // a new group, optionally its first card and one relationship (outlet_of X: X calls into it; inlet_of X: it calls X);
+        // then, unless show is false, slide into its scene and say what is there
+        need();
+        const label = str(args.label ?? args.name);
+        if (!label) fail('splice_group needs a label (the new group\'s name)');
+        const lv = a.level?.();
+        if (!lv?.available) fail('this board has no groups to show; splice_add with a group puts a card in a new group');
+        const pr = args.parent ?? args.under ?? args.in;
+        const parent = pr === undefined || pr === null || pr === '' ? (lv!.view === 'groups' ? lv!.at : null)
+          : typeof pr === 'string' && /^(top|none|all groups|the top|top level|overview|the overview)$/i.test(pr.trim()) ? null : this.groupRef(o, pr, 'parent');
+        const ofO = str(args.outlet_of), ofI = str(args.inlet_of);
+        if (ofO && ofI) fail('give one of outlet_of (it calls into the new group) or inlet_of (the new group calls it)');
+        const ek = this.kindOf(args.kind, EDGE_KINDS, 'kind');
+        const attach: SpliceAttach | undefined = ofO ? { to: this.nodeRef(o, ofO, 'outlet_of'), dir: 'in', ...(ek ? { kind: ek } : {}) } : ofI ? { to: this.nodeRef(o, ofI, 'inlet_of'), dir: 'out', ...(ek ? { kind: ek } : {}) } : undefined;
+        const first = str(args.first);
+        const fk = this.kindOf(args.first_kind, NODE_KINDS, 'first_kind');
+        const op = spliceOp.group(label, { ...(parent ? { parent } : {}), ...(attach ? { attach } : {}), ...(first ? { first: { label: first, ...(fk ? { kind: fk } : {}) } } : {}), taken: o.groups.map((g) => g.id) });
+        if (op.first) op.first.id = spliceOp.add(first, null, { taken: o.nodes.map((n) => n.id) }).node.id;
+        const r = this.change(op);
+        const v = a.spliceView!();
+        const gid = op.group.id!;
+        const show = !(args.show === false || args.show === 'false');
+        if (show) a.enter!(gid);
+        const did = `proposed: ${v?.last ?? `Add group ${label}`} (a proposal, not in the code)`;
+        return { ...r, spliceNote: [r.spliceNote, did, show ? `now ${this.levelWords()}` : `${(parent ?? null) === (lv!.view === 'groups' ? lv!.at : null) ? 'it is on this level' : `it is inside ${o.groups.find((g) => g.id === parent)?.label ?? parent}`} as a proposed group card; drill {group: "${label}"} goes into it`].filter(Boolean).join('. ') };
       }
       case 'splice_connect': {
         need();
@@ -326,7 +398,12 @@ export class PlateAdapter {
         return this.change({ op: 'connect', from: this.nodeRef(o, args.from, 'from'), to: this.nodeRef(o, args.to, 'to'), kind, ...(str(args.label) ? { label: str(args.label) } : {}) });
       }
       case 'splice_disconnect': need(); return this.change({ op: 'disconnect', from: this.nodeRef(o, args.from, 'from'), to: this.nodeRef(o, args.to, 'to') });
-      case 'splice_remove': need(); return this.change({ op: 'remove', node: this.nodeRef(o, args.node ?? args.target, 'node') });
+      case 'splice_remove': {
+        need();
+        if (str(args.group)) return this.change({ op: 'remove', group: this.groupRef(o, args.group, 'group') });
+        const t = this.nodeOrGroup(o, args.node ?? args.target, 'node');
+        return this.change(t.group ? { op: 'remove', group: t.group } : { op: 'remove', node: t.node! });
+      }
       case 'splice_replace': {
         // swap a node for a new one (with: its label) or for one on the plate (existing: true): it takes over every relationship
         need();
@@ -343,7 +420,9 @@ export class PlateAdapter {
         need();
         const label = str(args.label ?? args.to);
         if (!label) fail('splice_rename needs the new label');
-        return this.change({ op: 'rename', node: this.nodeRef(o, args.node ?? args.target, 'node'), label });
+        if (str(args.group)) return this.change({ op: 'rename', group: this.groupRef(o, args.group, 'group'), label });
+        const t = this.nodeOrGroup(o, args.node ?? args.target, 'node');
+        return this.change(t.group ? { op: 'rename', group: t.group, label } : { op: 'rename', node: t.node!, label });
       }
       case 'splice_move': {
         need();
@@ -561,7 +640,12 @@ export class PlateAdapter {
         }
         if (k !== 'board') fail(`only the structure board drills into groups (this is a ${P}); highlight {tag: "group:<id>"} or focus {target: <group>} lights a group here`);
         const g = args.group ?? args.target;
-        if (g === null || g === undefined || (typeof g === 'string' && /^(out|none|up|back|)$/i.test(g.trim()))) return a.drill!(null);
+        if (g === null || g === undefined || (typeof g === 'string' && /^(out|none|up|back|up a level|)$/i.test(g.trim()))) {
+          if (a.level?.().view === 'groups' && a.level().at === null) fail('already at the top: the overview of all groups');
+          return a.drill!(null);
+        }
+        // the groups view's overview ("all groups", "the top")
+        if (typeof g === 'string' && /^(top|all|all groups|overview|the overview|the top|groups|top level)$/i.test(g.trim())) { if (!a.enter?.(null)) fail('this board has no groups to show'); return; }
         return a.drill!(this.resolve(o, g, ['group'], 'group').id);
       }
       case 'back': {
@@ -631,6 +715,16 @@ export class PlateAdapter {
         return this.apply(o, 'step', { to: idx });
       }
       case 'theater': return this.page.setTheater(onArg(args.on, this.page.theater()));
+      // group navigation: one card per group (entered level by level), or every card
+      case 'groups': {
+        if (k !== 'board' || !a.groupView) fail(`only a structure board has a groups view (this is a ${P})`);
+        const l = a.level!();
+        if (!l.available) fail('this board has no groups to show: every card is on it already');
+        const on = onArg(args.on ?? (typeof args.view === 'string' ? args.view !== 'cards' : undefined), l.view !== 'groups');
+        a.groupView!(on ? 'groups' : 'cards');
+        if (on && a.level!().at !== null && args.top !== false) a.enter!(null);
+        return;
+      }
       case 'fan': {
         if (k !== 'stack') fail(`only a Stack view fans out (this is a ${P})`);
         return a.fan!(onArg(args.on, !!a.getState!().fan));
@@ -686,13 +780,13 @@ export class PlateAdapter {
         return;
       }
       default:
-        return fail(`unknown action "${name}"; actions: focus, open, close, drill, back, highlight, clear, show_details, scroll, step, select, theater, fan, bench, pin_inspector, zoom, pan, ${SPLICE_ACTIONS.join(', ')}`);
+        return fail(`unknown action "${name}"; actions: focus, open, close, drill, back, groups, highlight, clear, show_details, scroll, step, select, theater, fan, bench, pin_inspector, zoom, pan, ${SPLICE_ACTIONS.join(', ')}`);
     }
   }
   /** The element that draws a node (or a board's group) on screen: the first one with a size and not hidden. */
   private elementOf(kind: Kind, id: string): Element | null {
     const dom = this.stage.dom, q = CSS.escape(id);
-    const sels = kind === 'group' ? [`#g-${cssId(id)}`] : [`.mm-card[data-node="${q}"]`, `#${cssId(id)}`, `[data-node="${q}"]`, `[data-id="${q}"]`];
+    const sels = kind === 'group' ? [`#${cssId(`·g:${id}`)}`, `#g-${cssId(id)}`] : [`.mm-card[data-node="${q}"]`, `#${cssId(id)}`, `[data-node="${q}"]`, `[data-id="${q}"]`];
     for (const sel of sels) {
       for (const e of dom.querySelectorAll(sel)) {
         const r = e.getBoundingClientRect(), cs = getComputedStyle(e);

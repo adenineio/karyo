@@ -1,7 +1,9 @@
 // Public API.
 import './karyo.css';
 export { Stage, Scene, mount, setMotion, motion, type Frame, type Fx, type SceneClass, type StageOpts } from './stage';
-export { ChromeLayer, CHROME, type Insets } from './chrome';
+export { ChromeLayer, CHROME, CHROME_FLOOR, chromeSpans, chromeBoxFor, type Insets } from './chrome';
+export { UI_SIZES, uiSize, setUiSize, stepUiSize, onUiSize, type UiSize } from './uisize';
+export { fitScaleOf, fitWaste, pickFit, settleChrome, type Space } from './fit';
 export { Dock, DOCK, DOCK_ICON, type DockSide, type DockChange } from './dock';
 export { Node, type Box } from './node';
 export { FxLayer, LineBatch, Background, type Stroke, type Col, type Pattern } from './fx';

@@ -1,23 +1,25 @@
 // The adoption commands of the karyo CLI (docs/ADOPT.md), called from cli/karyo.ts:
 //   karyo init [dir]      set a project up for Karyo (src/cli/init.ts plans it; this asks, applies, summarizes)
-//   karyo refresh [dir]   re-scan the code (automatic mode where there are no directives) and rebuild karyo.model.json;
-//                         what the recipes, the hooks and the karyo-adopt skill run
+//   karyo refresh [dir]   re-scan the code (in karyo/config.json's mode: automatic mode with the directives refining its
+//                         nodes, or directives only; `// karyo:` markers in a Swift project, src/cli/markers.ts) and rebuild
+//                         karyo.model.json; what the recipes, the hooks and the karyo-adopt skill run
 //   karyo record [dir] [-- cmd]   run the tests (or cmd) once under the sys.monitoring recorder, then rebuild
 // Scans and records use the plugin's own copy of the Python SDK (sdk/python on PYTHONPATH): the project installs nothing.
 import { spawnSync } from 'node:child_process';
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, writeSync } from 'node:fs';
 import path from 'node:path';
 import {
-  HOOK_KINDS, LAUNCHER, RECOMMENDED_HOOK, applyChanges, describeChange, describeDetection, detect, planInit, planRemove,
-  pythonPackages, shellCommand, type Change, type HookKind,
+  CONFIG, HOOK_KINDS, LAUNCHER, RECOMMENDED_HOOK, SCAN_MODES, applyChanges, describeChange, describeDetection, detect, markerLanguages, planInit, planRemove,
+  pythonPackages, scanMode, shellCommand, type Change, type HookKind, type ScanMode,
 } from './init';
+import { scanMarkers, sourceFiles } from './markers';
 
 class AdoptError extends Error {}
 export { AdoptError };
 
 type Flags = Record<string, string | true>;
 interface Parsed { pos: string[]; flags: Flags; rest: string[] | null }
-const VALUED = new Set(['hook', 'sample', 'project', 'name']);
+const VALUED = new Set(['hook', 'sample', 'project', 'name', 'mode']);
 
 export function parse(argv: string[]): Parsed {
   const p: Parsed = { pos: [], flags: {}, rest: null };
@@ -92,6 +94,25 @@ function parseHooks(v: string | true | undefined): HookKind[] | undefined {
   }))];
 }
 
+function parseMode(v: string | true | undefined): ScanMode | undefined {
+  if (v === undefined) return undefined;
+  const m = v === true ? '' : v.trim().toLowerCase();
+  const alias: Record<string, ScanMode> = { automatic: 'auto', directive: 'directives', 'directives-only': 'directives' };
+  const k = (alias[m] ?? m) as ScanMode;
+  if (!SCAN_MODES.includes(k)) throw new AdoptError(`--mode takes ${SCAN_MODES.join(' or ')} (auto: every class and public function a node, directives refining theirs; directives: only what directives declare)`);
+  return k;
+}
+
+/** The mode a refresh or recording reads the Python code in, and what to say about it: a project with directives whose
+ *  settings don't say (adopted before karyo/config.json) is read in automatic mode now, with the directives on top. */
+function modeFor(dir: string, directives: () => boolean): { auto: boolean; note: string | null } {
+  const m = scanMode(dir);
+  const note = m.problem ? `note: ${m.problem}`
+    : m.from === 'default' && directives() ? `note: automatic mode, with the \`# karyo:\` directives refining the nodes of the defs they sit on (${CONFIG} doesn't say; before, directives switched automatic mode off). \`karyo init --mode directives\` reads directives only; \`karyo init\` records the choice`
+      : null;
+  return { auto: m.mode === 'auto', note };
+}
+
 export const HOOK_WORDS: Record<HookKind | 'none', string> = {
   stop: 'Claude Code Stop hook: after each Claude turn that changed code, re-scan in the background (recommended: one scan per turn, and it follows the edits Claude makes)',
   edit: 'Claude Code PostToolUse hook on Edit|Write|MultiEdit: re-scan after every file edit (debounced; more scans, fresher mid-turn)',
@@ -129,7 +150,7 @@ async function cmdInit(p: Parsed, c: Ctx): Promise<number> {
   const plan = planInit(d, {
     hooks, ci, recipes: p.flags['no-recipes'] === true ? false : undefined,
     commitModel: p.flags['commit-model'] === true ? true : p.flags['no-commit-model'] === true ? false : undefined,
-    version: version(c.root),
+    version: version(c.root), mode: parseMode(p.flags.mode),
   });
   const code = await finish(plan, dir, c, { dry: p.flags['dry-run'] === true, yes, tty, title: 'set up Karyo', detection: d });
   if (code === 0 && p.flags['dry-run'] !== true && (yes || tty)) rememberCli(dir, c.root);
@@ -244,12 +265,12 @@ function newestPy(dir: string, depth = 0): number {
 }
 const mtime = (f: string) => { try { return statSync(f).mtimeMs; } catch { return 0; } };
 
-/** Is the model older than the code, the curation, or a recorded fragment? */
-export function isStale(dir: string, pkgs: string[]): boolean {
+/** Is the model older than the code, the curation, or a recorded fragment? `files`: other sources (marker languages). */
+export function isStale(dir: string, pkgs: string[], files: string[] = []): boolean {
   const model = mtime(path.join(dir, 'karyo.model.json'));
   if (!model) return true;
   const frags = path.join(dir, '.karyo');
-  let newest = Math.max(mtime(path.join(dir, 'karyo/curation.json')), ...pkgs.map((p) => newestPy(path.join(dir, p))));
+  let newest = Math.max(mtime(path.join(dir, 'karyo/curation.json')), mtime(path.join(dir, CONFIG)), ...pkgs.map((p) => newestPy(path.join(dir, p))), ...files.map((f) => mtime(path.join(dir, f))));
   try { for (const f of readdirSync(frags)) if (f.endsWith('.karyo.json') && !f.includes('.static.')) newest = Math.max(newest, mtime(path.join(frags, f))); } catch {}
   return newest > model;
 }
@@ -290,9 +311,27 @@ async function refreshOnce(dir: string, c: Ctx, quiet: boolean): Promise<Summary
   try { for (const f of readdirSync(frags)) if (/^python\..+\.static\.karyo\.json$/.test(f) && !keep.has(f)) rmSync(path.join(frags, f)); } catch {}
   const name = path.basename(dir);
   const log = quiet ? () => {} : c.json ? c.err : c.say;
+  // `// karyo:` markers (a Swift project): one fragment for all of them, read in-process
+  const langs = markerLanguages(dir);
+  const markerFrag = path.join(frags, 'markers.static.karyo.json');
+  if (langs.length) {
+    const s = scanMarkers(dir, { langs, version: version(c.root), at: new Date().toISOString() });
+    mkdirSync(frags, { recursive: true });
+    writeFileSync(markerFrag, JSON.stringify(s.fragment, null, 1) + '\n');
+    const exts = langs.flatMap((l) => l.exts).join(', ');
+    log(`read ${s.files} ${exts} file(s): ${s.markers} marker(s) → .karyo/markers.static.karyo.json`);
+    for (const k of s.fragment.checks ?? []) log(`${k.code}: ${k.message}`);
+    if (!s.markers) log('no markers yet: Claude writes `// karyo:node` markers above the parts that matter (the karyo-adopt skill), then refresh again');
+  } else rmSync(markerFrag, { force: true });
   try {
+    let auto = true;
+    if (pkgs.length) {
+      const m = modeFor(dir, () => detectsDirectives(dir, pkgs));
+      auto = m.auto;
+      if (m.note) log(m.note);
+    }
     const res = pkgs.length
-      ? rt.modelScan(dir, pkgs.map((p) => path.join(dir, p)), 'karyo.model.json', name, log)
+      ? rt.modelScan(dir, pkgs.map((p) => path.join(dir, p)), 'karyo.model.json', name, log, { auto })
       : rt.modelBuild(dir, 'karyo.model.json', name);
     if (!quiet && res.output?.trim()) log(res.output.trim());
   } catch (e) {
@@ -300,6 +339,25 @@ async function refreshOnce(dir: string, c: Ctx, quiet: boolean): Promise<Summary
     throw e;
   }
   return summarize(path.join(dir, 'karyo.model.json'));
+}
+
+/** Does any module of these packages carry a `# karyo:` directive or `@karyo.node` (what used to switch automatic mode off)? */
+function detectsDirectives(dir: string, pkgs: string[]): boolean {
+  const re = /^[ \t]*#\s?karyo:(?:node|span|external|edge)\b|\bkaryo\.node\(/m;
+  const walk = (d: string, depth = 0): boolean => {
+    if (depth > 8) return false;
+    let names: string[] = [];
+    try { names = readdirSync(d); } catch { return false; }
+    for (const n of names) {
+      if (n.startsWith('.') || n === '__pycache__' || n === 'node_modules') continue;
+      const f = path.join(d, n);
+      let st; try { st = statSync(f); } catch { continue; }
+      if (st.isDirectory()) { if (walk(f, depth + 1)) return true; }
+      else if (n.endsWith('.py')) { try { if (re.test(readFileSync(f, 'utf8'))) return true; } catch {} }
+    }
+    return false;
+  };
+  return pkgs.some((p) => walk(path.join(dir, p)));
 }
 
 function report(s: Summary, c: Ctx) {
@@ -333,6 +391,8 @@ async function cmdRefresh(p: Parsed, c: Ctx): Promise<number> {
   }
   rememberCli(dir, c.root);
   const pkgs = pythonPackages(dir);
+  const langs = markerLanguages(dir);
+  const markerFiles = langs.length ? sourceFiles(dir, langs) : [];
   const l = lock(dir);
   if (!l) {
     writeFileSync(path.join(dir, '.karyo', 'refresh.pending'), `${new Date().toISOString()}\n`);
@@ -344,7 +404,7 @@ async function cmdRefresh(p: Parsed, c: Ctx): Promise<number> {
   try {
     let rounds = 0;
     do {
-      if (ifStale && existsSync(model) && !isStale(dir, pkgs)) {
+      if (ifStale && existsSync(model) && !isStale(dir, pkgs, markerFiles)) {
         s = summarize(model);
         if (hook) c.say('the model is current: nothing to do');
       } else {
@@ -386,7 +446,9 @@ async function cmdRecord(p: Parsed, c: Ctx): Promise<number> {
   // a new recording replaces the last one (--keep adds to it): a stale run would read as drift
   if (p.flags.keep !== true) for (const f of readdirSync(out)) if (/^python-\d+\.karyo\.json$/.test(f)) rmSync(path.join(out, f));
   const mods = d.python.packages.map((x) => path.basename(x));
-  const args = ['-m', 'karyo', 'record', '--monitor', '--package', mods.join(','), '--root', dir, '--out', out, '--project', path.basename(dir),
+  const mode = modeFor(dir, () => d.python.directives);
+  if (mode.note && !c.json) c.say(mode.note);
+  const args = ['-m', 'karyo', 'record', '--monitor', mode.auto ? '--auto' : '--no-auto', '--package', mods.join(','), '--root', dir, '--out', out, '--project', path.basename(dir),
     ...(typeof p.flags.sample === 'string' ? ['--sample', p.flags.sample] : []), '--', ...cmd];
   if (!c.json) c.say(`recording: ${shellCommand(cmd)}  (sys.monitoring, packages ${mods.join(', ')})`);
   const sdk = path.join(c.root, 'sdk/python');

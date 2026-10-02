@@ -1,0 +1,1032 @@
+{
+  "karyo": "explainer/1",
+  "id": "index",
+  "title": "Claude Code, explained: the map",
+  "summary": "Twenty-one short explainers in five tracks, and the order we suggest. Each one stands alone; the arrows show what builds on what.",
+  "note": "Every company, person and file in this series is a **made-up example**.",
+  "narration": "bottom",
+  "uses": [
+    "map-card"
+  ],
+  "layout": {
+    "kind": "free"
+  },
+  "groups": [
+    {
+      "id": "start",
+      "label": "Start here"
+    },
+    {
+      "id": "a",
+      "label": "A · The text world"
+    },
+    {
+      "id": "b",
+      "label": "B · How Claude Code works"
+    },
+    {
+      "id": "c",
+      "label": "C · Setting up your world"
+    },
+    {
+      "id": "d",
+      "label": "D · Reaching beyond your machine"
+    }
+  ],
+  "categories": [
+    {
+      "id": "start",
+      "label": "Start"
+    },
+    {
+      "id": "a",
+      "label": "A · text world"
+    },
+    {
+      "id": "b",
+      "label": "B · how it works"
+    },
+    {
+      "id": "c",
+      "label": "C · your setup"
+    },
+    {
+      "id": "d",
+      "label": "D · beyond your machine"
+    }
+  ],
+  "elements": [
+    {
+      "id": "s1-three-claudes",
+      "type": "map-card",
+      "group": "start",
+      "label": "S1 · Where Claude works",
+      "props": {
+        "code": "S1",
+        "title": "Where Claude works",
+        "aha": "The same Claude works in a chat, a cloud sandbox or at your computer, and reaches different things in each.",
+        "file": "s1-three-claudes.html"
+      },
+      "at": {
+        "x": 0,
+        "y": 0,
+        "w": 240
+      }
+    },
+    {
+      "id": "a1-terminal",
+      "type": "map-card",
+      "group": "a",
+      "label": "A1 · The terminal is a conversation",
+      "props": {
+        "code": "A1",
+        "title": "The terminal is a conversation",
+        "aha": "You type one line; the computer answers in text, exactly and the same way every time.",
+        "file": "a1-terminal.html"
+      },
+      "at": {
+        "x": 0,
+        "y": 270,
+        "w": 240
+      }
+    },
+    {
+      "id": "a2-paths",
+      "type": "map-card",
+      "group": "a",
+      "label": "A2 · Folders, files and paths",
+      "props": {
+        "code": "A2",
+        "title": "Folders, files and paths",
+        "aha": "A path is an address; where you are changes what a short address means.",
+        "file": "a2-paths.html"
+      },
+      "at": {
+        "x": 268,
+        "y": 270,
+        "w": 240
+      }
+    },
+    {
+      "id": "a3-commands",
+      "type": "map-card",
+      "group": "a",
+      "label": "A3 · Anatomy of a command",
+      "props": {
+        "code": "A3",
+        "title": "Anatomy of a command",
+        "aha": "A command is a sentence: verb, options, object.",
+        "file": "a3-commands.html"
+      },
+      "at": {
+        "x": 536,
+        "y": 270,
+        "w": 240
+      }
+    },
+    {
+      "id": "a4-grep",
+      "type": "map-card",
+      "group": "a",
+      "label": "A4 · grep: finding the needle",
+      "props": {
+        "code": "A4",
+        "title": "grep: finding the needle",
+        "aha": "grep returns only the matching lines and where they came from; on a Mac, it's how Claude Code searches.",
+        "file": "a4-grep.html"
+      },
+      "at": {
+        "x": 804,
+        "y": 270,
+        "w": 240
+      }
+    },
+    {
+      "id": "a5-patterns",
+      "type": "map-card",
+      "group": "a",
+      "label": "A5 · Patterns: wildcards, regular expressions, sed and awk",
+      "props": {
+        "code": "A5",
+        "title": "Patterns: wildcards, regular expressions, sed and awk",
+        "aha": "Wildcards match file names; regular expressions describe the shape of the text inside.",
+        "file": "a5-patterns.html"
+      },
+      "at": {
+        "x": 0,
+        "y": 450,
+        "w": 240
+      }
+    },
+    {
+      "id": "a6-pipes",
+      "type": "map-card",
+      "group": "a",
+      "label": "A6 · Small tools joined by pipes",
+      "props": {
+        "code": "A6",
+        "title": "Small tools joined by pipes",
+        "aha": "Chain small tools: the output of one becomes the input of the next.",
+        "file": "a6-pipes.html"
+      },
+      "at": {
+        "x": 268,
+        "y": 450,
+        "w": 240
+      }
+    },
+    {
+      "id": "a7-scripts",
+      "type": "map-card",
+      "group": "a",
+      "label": "A7 · Scripts: commands you saved",
+      "props": {
+        "code": "A7",
+        "title": "Scripts: commands you saved",
+        "aha": "Anything done twice becomes a file you run with one word, and Claude can write it.",
+        "file": "a7-scripts.html"
+      },
+      "at": {
+        "x": 536,
+        "y": 450,
+        "w": 240
+      }
+    },
+    {
+      "id": "a8-apis",
+      "type": "map-card",
+      "group": "a",
+      "label": "A8 · APIs: programs talking to programs",
+      "props": {
+        "code": "A8",
+        "title": "APIs: programs talking to programs",
+        "aha": "A fixed-format request, a fixed-format reply, and a key that says who's asking.",
+        "file": "a8-apis.html"
+      },
+      "at": {
+        "x": 804,
+        "y": 450,
+        "w": 240
+      }
+    },
+    {
+      "id": "b1-loop",
+      "type": "map-card",
+      "group": "b",
+      "label": "B1 · The loop",
+      "props": {
+        "code": "B1",
+        "title": "The loop",
+        "aha": "Gather context, act, check the result, repeat until done; you can step in at any point.",
+        "file": "b1-loop.html"
+      },
+      "at": {
+        "x": 0,
+        "y": 720,
+        "w": 240
+      }
+    },
+    {
+      "id": "b2-searching",
+      "type": "map-card",
+      "group": "b",
+      "label": "B2 · Claude searches, it doesn't see",
+      "props": {
+        "code": "B2",
+        "title": "Claude searches, it doesn't see",
+        "aha": "Claude finds files by name and by contents and opens only a few; good names light the way.",
+        "file": "b2-searching.html"
+      },
+      "at": {
+        "x": 268,
+        "y": 720,
+        "w": 240
+      }
+    },
+    {
+      "id": "b3-desk",
+      "type": "map-card",
+      "group": "b",
+      "label": "B3 · The context window",
+      "props": {
+        "code": "B3",
+        "title": "The context window",
+        "aha": "Claude's working memory has a fixed size; big outputs crowd it, and a new session starts with a clear desk, apart from CLAUDE.md and a few basics.",
+        "file": "b3-desk.html"
+      },
+      "at": {
+        "x": 536,
+        "y": 720,
+        "w": 240
+      }
+    },
+    {
+      "id": "b4-smart-vs-brute",
+      "type": "map-card",
+      "group": "b",
+      "label": "B4 · Working smart vs brute force",
+      "props": {
+        "code": "B4",
+        "title": "Working smart vs brute force",
+        "aha": "Let tools do the finding and counting; let Claude do the judgment and writing.",
+        "file": "b4-smart-vs-brute.html"
+      },
+      "at": {
+        "x": 804,
+        "y": 720,
+        "w": 240
+      }
+    },
+    {
+      "id": "b5-permissions",
+      "type": "map-card",
+      "group": "b",
+      "label": "B5 · Permissions and undo",
+      "props": {
+        "code": "B5",
+        "title": "Permissions and undo",
+        "aha": "You choose what Claude may do unasked; checkpoints undo its file edits, git keeps the history.",
+        "file": "b5-permissions.html"
+      },
+      "at": {
+        "x": 1072,
+        "y": 720,
+        "w": 240
+      }
+    },
+    {
+      "id": "c1-claude-md",
+      "type": "map-card",
+      "group": "c",
+      "label": "C1 · CLAUDE.md, the briefing note",
+      "props": {
+        "code": "C1",
+        "title": "CLAUDE.md, the briefing note",
+        "aha": "A file Claude reads at the start of every session: your standing instructions.",
+        "file": "c1-claude-md.html"
+      },
+      "at": {
+        "x": 0,
+        "y": 990,
+        "w": 240
+      }
+    },
+    {
+      "id": "c2-folders",
+      "type": "map-card",
+      "group": "c",
+      "label": "C2 · Shape your folders",
+      "props": {
+        "code": "C2",
+        "title": "Shape your folders",
+        "aha": "Structure is an instruction: a tidy layout says where things are and where new things go.",
+        "file": "c2-folders.html"
+      },
+      "at": {
+        "x": 268,
+        "y": 990,
+        "w": 240
+      }
+    },
+    {
+      "id": "c3-codenames",
+      "type": "map-card",
+      "group": "c",
+      "label": "C3 · Codenames: one name per thing",
+      "props": {
+        "code": "C3",
+        "title": "Codenames: one name per thing",
+        "aha": "Give each thing one name, and give your machinery a codename that can't be confused.",
+        "file": "c3-codenames.html"
+      },
+      "at": {
+        "x": 536,
+        "y": 990,
+        "w": 240
+      }
+    },
+    {
+      "id": "c4-signposts",
+      "type": "map-card",
+      "group": "c",
+      "label": "C4 · Signposts for grep",
+      "props": {
+        "code": "C4",
+        "title": "Signposts for grep",
+        "aha": "Consistent markers in your files let one search find them all, every time.",
+        "file": "c4-signposts.html"
+      },
+      "at": {
+        "x": 804,
+        "y": 990,
+        "w": 240
+      }
+    },
+    {
+      "id": "c5-hooks",
+      "type": "map-card",
+      "group": "c",
+      "label": "C5 · Hooks: from request to rule",
+      "props": {
+        "code": "C5",
+        "title": "Hooks: from request to rule",
+        "aha": "A hook runs at fixed moments, every time, turning a request into a rule.",
+        "file": "c5-hooks.html"
+      },
+      "at": {
+        "x": 1072,
+        "y": 990,
+        "w": 240
+      }
+    },
+    {
+      "id": "d1-mcp",
+      "type": "map-card",
+      "group": "d",
+      "label": "D1 · Connectors (MCP)",
+      "props": {
+        "code": "D1",
+        "title": "Connectors (MCP)",
+        "aha": "A server puts a menu of tools in front of a service; Claude fills in the form, the server makes the call.",
+        "file": "d1-mcp.html"
+      },
+      "at": {
+        "x": 0,
+        "y": 1260,
+        "w": 240
+      }
+    },
+    {
+      "id": "d2-many-apis",
+      "type": "map-card",
+      "group": "d",
+      "label": "D2 · One tool, many APIs, one result",
+      "props": {
+        "code": "D2",
+        "title": "One tool, many APIs, one result",
+        "aha": "One outcome tool can fold several APIs into one dependable result.",
+        "file": "d2-many-apis.html"
+      },
+      "at": {
+        "x": 268,
+        "y": 1260,
+        "w": 240
+      }
+    },
+    {
+      "id": "m-s1",
+      "type": "map-card",
+      "category": "start",
+      "label": "S1 · Where Claude works",
+      "props": {
+        "code": "S1",
+        "title": "Where Claude works",
+        "file": "s1-three-claudes.html",
+        "compact": true
+      },
+      "at": {
+        "x": 0,
+        "y": 2000,
+        "w": 196
+      }
+    },
+    {
+      "id": "m-a1",
+      "type": "map-card",
+      "category": "a",
+      "label": "A1 · The terminal is a conversation",
+      "props": {
+        "code": "A1",
+        "title": "The terminal is a conversation",
+        "file": "a1-terminal.html",
+        "compact": true
+      },
+      "at": {
+        "x": 260,
+        "y": 2000,
+        "w": 196
+      }
+    },
+    {
+      "id": "m-a2",
+      "type": "map-card",
+      "category": "a",
+      "label": "A2 · Folders, files and paths",
+      "props": {
+        "code": "A2",
+        "title": "Folders, files and paths",
+        "file": "a2-paths.html",
+        "compact": true
+      },
+      "at": {
+        "x": 478,
+        "y": 2000,
+        "w": 196
+      }
+    },
+    {
+      "id": "m-a3",
+      "type": "map-card",
+      "category": "a",
+      "label": "A3 · Anatomy of a command",
+      "props": {
+        "code": "A3",
+        "title": "Anatomy of a command",
+        "file": "a3-commands.html",
+        "compact": true
+      },
+      "at": {
+        "x": 696,
+        "y": 2000,
+        "w": 196
+      }
+    },
+    {
+      "id": "m-a4",
+      "type": "map-card",
+      "category": "a",
+      "label": "A4 · grep: finding the needle",
+      "props": {
+        "code": "A4",
+        "title": "grep: finding the needle",
+        "file": "a4-grep.html",
+        "compact": true
+      },
+      "at": {
+        "x": 914,
+        "y": 2000,
+        "w": 196
+      }
+    },
+    {
+      "id": "m-a5",
+      "type": "map-card",
+      "category": "a",
+      "label": "A5 · Patterns: wildcards, regular expressions, sed and awk",
+      "props": {
+        "code": "A5",
+        "title": "Patterns: wildcards, regular expressions, sed and awk",
+        "file": "a5-patterns.html",
+        "compact": true
+      },
+      "at": {
+        "x": 1132,
+        "y": 2000,
+        "w": 196
+      }
+    },
+    {
+      "id": "m-a6",
+      "type": "map-card",
+      "category": "a",
+      "label": "A6 · Small tools joined by pipes",
+      "props": {
+        "code": "A6",
+        "title": "Small tools joined by pipes",
+        "file": "a6-pipes.html",
+        "compact": true
+      },
+      "at": {
+        "x": 1350,
+        "y": 2000,
+        "w": 196
+      }
+    },
+    {
+      "id": "m-a7",
+      "type": "map-card",
+      "category": "a",
+      "label": "A7 · Scripts: commands you saved",
+      "props": {
+        "code": "A7",
+        "title": "Scripts: commands you saved",
+        "file": "a7-scripts.html",
+        "compact": true
+      },
+      "at": {
+        "x": 1568,
+        "y": 2000,
+        "w": 196
+      }
+    },
+    {
+      "id": "m-a8",
+      "type": "map-card",
+      "category": "a",
+      "label": "A8 · APIs: programs talking to programs",
+      "props": {
+        "code": "A8",
+        "title": "APIs: programs talking to programs",
+        "file": "a8-apis.html",
+        "compact": true
+      },
+      "at": {
+        "x": 1786,
+        "y": 2000,
+        "w": 196
+      }
+    },
+    {
+      "id": "m-b1",
+      "type": "map-card",
+      "category": "b",
+      "label": "B1 · The loop",
+      "props": {
+        "code": "B1",
+        "title": "The loop",
+        "file": "b1-loop.html",
+        "compact": true
+      },
+      "at": {
+        "x": 260,
+        "y": 2128,
+        "w": 196
+      }
+    },
+    {
+      "id": "m-b2",
+      "type": "map-card",
+      "category": "b",
+      "label": "B2 · Claude searches, it doesn't see",
+      "props": {
+        "code": "B2",
+        "title": "Claude searches, it doesn't see",
+        "file": "b2-searching.html",
+        "compact": true
+      },
+      "at": {
+        "x": 478,
+        "y": 2128,
+        "w": 196
+      }
+    },
+    {
+      "id": "m-b3",
+      "type": "map-card",
+      "category": "b",
+      "label": "B3 · The context window",
+      "props": {
+        "code": "B3",
+        "title": "The context window",
+        "file": "b3-desk.html",
+        "compact": true
+      },
+      "at": {
+        "x": 696,
+        "y": 2128,
+        "w": 196
+      }
+    },
+    {
+      "id": "m-b4",
+      "type": "map-card",
+      "category": "b",
+      "label": "B4 · Working smart vs brute force",
+      "props": {
+        "code": "B4",
+        "title": "Working smart vs brute force",
+        "file": "b4-smart-vs-brute.html",
+        "compact": true
+      },
+      "at": {
+        "x": 914,
+        "y": 2128,
+        "w": 196
+      }
+    },
+    {
+      "id": "m-b5",
+      "type": "map-card",
+      "category": "b",
+      "label": "B5 · Permissions and undo",
+      "props": {
+        "code": "B5",
+        "title": "Permissions and undo",
+        "file": "b5-permissions.html",
+        "compact": true
+      },
+      "at": {
+        "x": 1132,
+        "y": 2128,
+        "w": 196
+      }
+    },
+    {
+      "id": "m-c1",
+      "type": "map-card",
+      "category": "c",
+      "label": "C1 · CLAUDE.md, the briefing note",
+      "props": {
+        "code": "C1",
+        "title": "CLAUDE.md, the briefing note",
+        "file": "c1-claude-md.html",
+        "compact": true
+      },
+      "at": {
+        "x": 260,
+        "y": 2256,
+        "w": 196
+      }
+    },
+    {
+      "id": "m-c2",
+      "type": "map-card",
+      "category": "c",
+      "label": "C2 · Shape your folders",
+      "props": {
+        "code": "C2",
+        "title": "Shape your folders",
+        "file": "c2-folders.html",
+        "compact": true
+      },
+      "at": {
+        "x": 478,
+        "y": 2256,
+        "w": 196
+      }
+    },
+    {
+      "id": "m-c3",
+      "type": "map-card",
+      "category": "c",
+      "label": "C3 · Codenames: one name per thing",
+      "props": {
+        "code": "C3",
+        "title": "Codenames: one name per thing",
+        "file": "c3-codenames.html",
+        "compact": true
+      },
+      "at": {
+        "x": 696,
+        "y": 2256,
+        "w": 196
+      }
+    },
+    {
+      "id": "m-c4",
+      "type": "map-card",
+      "category": "c",
+      "label": "C4 · Signposts for grep",
+      "props": {
+        "code": "C4",
+        "title": "Signposts for grep",
+        "file": "c4-signposts.html",
+        "compact": true
+      },
+      "at": {
+        "x": 914,
+        "y": 2256,
+        "w": 196
+      }
+    },
+    {
+      "id": "m-c5",
+      "type": "map-card",
+      "category": "c",
+      "label": "C5 · Hooks: from request to rule",
+      "props": {
+        "code": "C5",
+        "title": "Hooks: from request to rule",
+        "file": "c5-hooks.html",
+        "compact": true
+      },
+      "at": {
+        "x": 1132,
+        "y": 2256,
+        "w": 196
+      }
+    },
+    {
+      "id": "m-d1",
+      "type": "map-card",
+      "category": "d",
+      "label": "D1 · Connectors (MCP)",
+      "props": {
+        "code": "D1",
+        "title": "Connectors (MCP)",
+        "file": "d1-mcp.html",
+        "compact": true
+      },
+      "at": {
+        "x": 260,
+        "y": 2384,
+        "w": 196
+      }
+    },
+    {
+      "id": "m-d2",
+      "type": "map-card",
+      "category": "d",
+      "label": "D2 · One tool, many APIs, one result",
+      "props": {
+        "code": "D2",
+        "title": "One tool, many APIs, one result",
+        "file": "d2-many-apis.html",
+        "compact": true
+      },
+      "at": {
+        "x": 478,
+        "y": 2384,
+        "w": 196
+      }
+    }
+  ],
+  "links": [
+    {
+      "id": "m-a1-a2",
+      "from": "m-a1",
+      "to": "m-a2"
+    },
+    {
+      "id": "m-a1-a3",
+      "from": "m-a1",
+      "to": "m-a3"
+    },
+    {
+      "id": "m-a2-a3",
+      "from": "m-a2",
+      "to": "m-a3"
+    },
+    {
+      "id": "m-a2-a4",
+      "from": "m-a2",
+      "to": "m-a4"
+    },
+    {
+      "id": "m-a3-a4",
+      "from": "m-a3",
+      "to": "m-a4"
+    },
+    {
+      "id": "m-a4-a5",
+      "from": "m-a4",
+      "to": "m-a5"
+    },
+    {
+      "id": "m-a3-a6",
+      "from": "m-a3",
+      "to": "m-a6"
+    },
+    {
+      "id": "m-a4-a6",
+      "from": "m-a4",
+      "to": "m-a6"
+    },
+    {
+      "id": "m-a6-a7",
+      "from": "m-a6",
+      "to": "m-a7"
+    },
+    {
+      "id": "m-a1-a8",
+      "from": "m-a1",
+      "to": "m-a8"
+    },
+    {
+      "id": "m-a1-b1",
+      "from": "m-a1",
+      "to": "m-b1"
+    },
+    {
+      "id": "m-a2-b2",
+      "from": "m-a2",
+      "to": "m-b2"
+    },
+    {
+      "id": "m-a4-b2",
+      "from": "m-a4",
+      "to": "m-b2"
+    },
+    {
+      "id": "m-b2-b3",
+      "from": "m-b2",
+      "to": "m-b3"
+    },
+    {
+      "id": "m-a1-b4",
+      "from": "m-a1",
+      "to": "m-b4"
+    },
+    {
+      "id": "m-a4-b4",
+      "from": "m-a4",
+      "to": "m-b4"
+    },
+    {
+      "id": "m-a6-b4",
+      "from": "m-a6",
+      "to": "m-b4"
+    },
+    {
+      "id": "m-b3-b4",
+      "from": "m-b3",
+      "to": "m-b4"
+    },
+    {
+      "id": "m-b1-b5",
+      "from": "m-b1",
+      "to": "m-b5"
+    },
+    {
+      "id": "m-b3-c1",
+      "from": "m-b3",
+      "to": "m-c1"
+    },
+    {
+      "id": "m-a2-c2",
+      "from": "m-a2",
+      "to": "m-c2"
+    },
+    {
+      "id": "m-b2-c2",
+      "from": "m-b2",
+      "to": "m-c2"
+    },
+    {
+      "id": "m-a4-c3",
+      "from": "m-a4",
+      "to": "m-c3"
+    },
+    {
+      "id": "m-c1-c3",
+      "from": "m-c1",
+      "to": "m-c3"
+    },
+    {
+      "id": "m-a4-c4",
+      "from": "m-a4",
+      "to": "m-c4"
+    },
+    {
+      "id": "m-c3-c4",
+      "from": "m-c3",
+      "to": "m-c4"
+    },
+    {
+      "id": "m-a1-c5",
+      "from": "m-a1",
+      "to": "m-c5"
+    },
+    {
+      "id": "m-c1-c5",
+      "from": "m-c1",
+      "to": "m-c5"
+    },
+    {
+      "id": "m-a8-d1",
+      "from": "m-a8",
+      "to": "m-d1"
+    },
+    {
+      "id": "m-b1-d1",
+      "from": "m-b1",
+      "to": "m-d1"
+    },
+    {
+      "id": "m-b3-d1",
+      "from": "m-b3",
+      "to": "m-d1"
+    },
+    {
+      "id": "m-d1-d2",
+      "from": "m-d1",
+      "to": "m-d2"
+    }
+  ],
+  "steps": [
+    {
+      "id": "start",
+      "title": "Start here",
+      "text": "Twenty-one short explainers in five tracks. Start with *Where Claude works*. One theme runs through them all: tools that are **deterministic** (same input, same result, every time) and a model that is **probabilistic** (very likely, not guaranteed).",
+      "show": [
+        "s1-three-claudes"
+      ],
+      "emphasize": [
+        "s1-three-claudes"
+      ]
+    },
+    {
+      "id": "a",
+      "title": "A · The text world",
+      "text": "The text world Claude Code works in: the terminal, paths, commands, grep, patterns, pipes, scripts and APIs. You need to recognise these, not memorise them.",
+      "show": [
+        "a1-terminal",
+        "a2-paths",
+        "a3-commands",
+        "a4-grep",
+        "a5-patterns",
+        "a6-pipes",
+        "a7-scripts",
+        "a8-apis"
+      ],
+      "emphasize": []
+    },
+    {
+      "id": "b",
+      "title": "B · How Claude Code works",
+      "text": "How Claude Code works: the loop, how it searches, its desk (the context window), and permissions and undo. *Working smart vs brute force* is the centrepiece. Builds on track A.",
+      "show": [
+        "b1-loop",
+        "b2-searching",
+        "b3-desk",
+        "b4-smart-vs-brute",
+        "b5-permissions"
+      ],
+      "emphasize": [
+        "b4-smart-vs-brute"
+      ]
+    },
+    {
+      "id": "c",
+      "title": "C · Setting up your world",
+      "text": "How to set up your files so Claude works well: a briefing note, tidy folders, one name per thing, signposts for grep, and hooks that turn requests into rules. Builds on tracks A and B.",
+      "show": [
+        "c1-claude-md",
+        "c2-folders",
+        "c3-codenames",
+        "c4-signposts",
+        "c5-hooks"
+      ],
+      "emphasize": []
+    },
+    {
+      "id": "d",
+      "title": "D · Reaching beyond your machine",
+      "text": "Connectors: how Claude reaches outside services through MCP, and how one tool can fold several APIs into one dependable result. Builds on *APIs*, *The loop* and *The context window*.",
+      "show": [
+        "d1-mcp",
+        "d2-many-apis"
+      ],
+      "emphasize": []
+    },
+    {
+      "id": "map",
+      "title": "The whole map",
+      "text": "Arrows run from an explainer to the ones that build on it; the colours mark the tracks. Follow the tracks in order, or open any card's file: each explainer stands alone.",
+      "show": [
+        "m-s1",
+        "m-a1",
+        "m-a2",
+        "m-a3",
+        "m-a4",
+        "m-a5",
+        "m-a6",
+        "m-a7",
+        "m-a8",
+        "m-b1",
+        "m-b2",
+        "m-b3",
+        "m-b4",
+        "m-b5",
+        "m-c1",
+        "m-c2",
+        "m-c3",
+        "m-c4",
+        "m-c5",
+        "m-d1",
+        "m-d2"
+      ],
+      "emphasize": []
+    }
+  ]
+}

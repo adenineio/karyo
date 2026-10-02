@@ -1,0 +1,40 @@
+{
+  "name": "brief-note",
+  "description": "A short Markdown instruction file (such as CLAUDE.md) drawn as a page: its file name, a top heading and sections of short lines; any section can be lit, marked new, dimmed or flagged as not belonging.",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": ["sections"],
+    "additionalProperties": false,
+    "properties": {
+      "file": { "type": "string", "default": "CLAUDE.md", "description": "the file name in the header" },
+      "badge": { "type": "string", "description": "a chip in the header, e.g. `draft` or `re-read from disk`" },
+      "h1": { "type": "string", "description": "the file's top heading (shown after `#`)" },
+      "sections": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 7,
+        "items": {
+          "type": "object",
+          "required": ["heading"],
+          "additionalProperties": false,
+          "properties": {
+            "heading": { "type": "string", "minLength": 1, "description": "shown after `##`" },
+            "lines": { "type": "array", "maxItems": 4, "items": { "type": "string" }, "description": "markdown-lite, one bullet each" },
+            "state": { "enum": ["plain", "lit", "new", "dim", "waste"], "default": "plain", "description": "lit: the point of this step; new: just added; dim: not relevant now; waste: doesn't belong here" },
+            "note": { "type": "string", "description": "a short note at the right of the heading" }
+          }
+        }
+      }
+    }
+  },
+  "size": { "w": 460 },
+  "motion": ["appear", "emphasize"],
+  "example": {
+    "h1": "Acme monthly reports",
+    "sections": [
+      { "heading": "What this folder is", "lines": ["Monthly sales reports for Acme, built from CSV exports."], "state": "lit" },
+      { "heading": "Preferences", "lines": ["British spelling.", "Dates as `2026-03-31`."] }
+    ]
+  }
+}

@@ -149,7 +149,7 @@ mcp-serve:
 
 # ---------------------------------------------------------------- the Claude Code plugin (docs/PACKAGING.md)
 
-# A project's Karyo view (models, flows, tours, explainers) on a free port in 5781–5799, e.g. `just view ../my-app` (default: the directory you're in)
+# A project's Karyo view (models, flows, tours, explainers) on a free port in 5782–5799, e.g. `just view ../my-app` (default: the directory you're in)
 [group('plugin')]
 [no-cd]
 view dir="" *flags:
@@ -159,6 +159,35 @@ view dir="" *flags:
 [group('plugin')]
 adopt-test:
     bun test tests/adopt.test.ts
+
+# Tests of `// karyo:` comment markers (src/cli/markers.ts): the grammar's parity with the Go and Python SDKs, declarations under markers, a project scan's fragment and warnings, `karyo init` / `refresh` on a Swift package
+[group('plugin')]
+markers-test:
+    bun test tests/markers.test.ts
+
+# A demo that ships with Karyo (demos/<name>/), built to HTML in the plugin's data dir and opened in the browser, e.g. `just demo claude-code` (`--no-open` just prints the path); no name lists them
+[group('plugin')]
+[no-cd]
+[positional-arguments]
+demo *args:
+    bun --no-env-file --config=/dev/null "{{justfile_directory()}}/cli/karyo.ts" demo "$@"
+
+# Tests of demos: the demo.json manifest and its checks, the build cache (version + content key, rebuilds, pruning), and the shipped demo built through the CLI (--no-open, a sandboxed data dir and home) with every page opened from file:// in headless Chrome and every map link resolving
+[group('plugin')]
+demo-test:
+    bun test tests/demo.test.ts
+
+# The full explainer smoke test (scripts/smoke-explainer.ts: steps, keys, stations, play, theater, motion 0) on every page of a demo, built into a temp folder (sandboxed data dir; never opens a browser window)
+[group('plugin')]
+demo-smoke name="claude-code":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tmp=$(mktemp -d "${TMPDIR:-/tmp}/karyo-demo-smoke.XXXXXX")
+    KARYO_DATA="$tmp/data" bun --no-env-file --config=/dev/null cli/karyo.ts demo {{name}} --no-open --out "$tmp/pages"
+    fail=0
+    for f in "$tmp"/pages/*.html; do bun scripts/smoke-explainer.ts "$f" > "$tmp/log" 2>&1 && echo "ok   $(basename "$f")" || { echo "FAIL $(basename "$f")"; grep -E '^FAIL' "$tmp/log" || tail -5 "$tmp/log"; fail=1; }; done
+    rm -rf "$tmp"
+    exit $fail
 
 # Validate the plugin manifest and its skills
 [group('plugin')]

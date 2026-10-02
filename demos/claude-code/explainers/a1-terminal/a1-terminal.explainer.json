@@ -1,0 +1,305 @@
+{
+  "karyo": "explainer/1",
+  "id": "a1-terminal",
+  "title": "The terminal is a conversation",
+  "summary": "You type a line, the computer answers in text: exactly, and the same way every time. Claude Code has this conversation for you.",
+  "note": "Names, companies and files here are **made-up examples**.",
+  "narration": "side",
+  "uses": [
+    "terminal",
+    "chat-turn",
+    "try-it"
+  ],
+  "layout": {
+    "kind": "free"
+  },
+  "categories": [
+    {
+      "id": "computer",
+      "label": "the computer"
+    },
+    {
+      "id": "claude",
+      "label": "Claude"
+    },
+    {
+      "id": "you",
+      "label": "you"
+    }
+  ],
+  "elements": [
+    {
+      "id": "term",
+      "type": "terminal",
+      "category": "computer",
+      "label": "Terminal window",
+      "props": {
+        "title": "Terminal — zsh",
+        "lines": [
+          {
+            "kind": "cmd",
+            "text": "ls"
+          },
+          {
+            "kind": "out",
+            "text": "Desktop  Documents  Downloads  Music"
+          }
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 0,
+        "w": 540
+      }
+    },
+    {
+      "id": "det",
+      "type": "card",
+      "category": "computer",
+      "props": {
+        "kicker": "Deterministic",
+        "title": "Same input, same result",
+        "body": "Every time. It reads the folder or file fresh, so it has no memory to get wrong, and it can't invent an answer."
+      },
+      "at": {
+        "x": 600,
+        "y": 0,
+        "w": 400
+      }
+    },
+    {
+      "id": "you",
+      "type": "chat-turn",
+      "category": "you",
+      "label": "Your question",
+      "props": {
+        "who": "you",
+        "text": "What does my notes file say?"
+      },
+      "at": {
+        "x": 0,
+        "y": 330,
+        "w": 540
+      }
+    },
+    {
+      "id": "claude",
+      "type": "chat-turn",
+      "category": "claude",
+      "label": "Claude's answer",
+      "props": {
+        "who": "claude",
+        "text": "It says to call Acme on **Friday**."
+      },
+      "at": {
+        "x": 0,
+        "y": 420,
+        "w": 540
+      }
+    },
+    {
+      "id": "prob",
+      "type": "card",
+      "category": "claude",
+      "props": {
+        "kicker": "Probabilistic",
+        "title": "Very likely, not guaranteed",
+        "body": "Claude answers from what it has read and what's most likely. Usually right; sometimes out of date or wrong."
+      },
+      "at": {
+        "x": 600,
+        "y": 430,
+        "w": 400
+      }
+    },
+    {
+      "id": "try",
+      "type": "try-it",
+      "props": {
+        "title": "Have the conversation yourself",
+        "command": "ls",
+        "expect": "Open **Terminal** (press ⌘ Space and type *Terminal*). Type `ls` and press Return: it lists the folders in your home folder. Then try `ls Documnets`, misspelled, and read its reply."
+      },
+      "at": {
+        "x": 600,
+        "y": 175,
+        "w": 400
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "title": "You type, it answers",
+      "text": "On a Mac, the **Terminal** app is a text conversation with your computer. You type one line, a **command**, and press Return. It replies in text. Here, `ls` asks: *what's in this folder?*",
+      "show": [
+        "term"
+      ],
+      "emphasize": [
+        "term"
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "Very literal",
+      "text": "It does exactly what you typed, never what you meant. One swapped letter and there is no such folder, so it says so instead of guessing.",
+      "set": {
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "ls"
+            },
+            {
+              "kind": "out",
+              "text": "Desktop  Documents  Downloads  Music"
+            },
+            {
+              "kind": "cmd",
+              "text": "ls Documnets",
+              "mark": true
+            },
+            {
+              "kind": "err",
+              "text": "ls: Documnets: No such file or directory",
+              "mark": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s3",
+      "title": "Same input, same result",
+      "text": "Ask the same thing twice and you get the same answer, as long as nothing in the folder changed. Programmers call this **deterministic**.",
+      "add": [
+        "det"
+      ],
+      "emphasize": [
+        "det"
+      ],
+      "set": {
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "ls Documents"
+            },
+            {
+              "kind": "out",
+              "text": "Invoices  notes.txt  Reports",
+              "mark": true
+            },
+            {
+              "kind": "cmd",
+              "text": "ls Documents"
+            },
+            {
+              "kind": "out",
+              "text": "Invoices  notes.txt  Reports",
+              "mark": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s4",
+      "title": "No memory to get wrong",
+      "text": "`cat` prints a file. It reads the file **fresh** every time, so after you edit it, the answer changes with it. And when a file isn't there, it can't make one up.",
+      "emphasize": [
+        "term"
+      ],
+      "set": {
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "cat Documents/notes.txt"
+            },
+            {
+              "kind": "out",
+              "text": "Call Acme on Friday."
+            },
+            {
+              "kind": "note",
+              "text": "(you edit the file and save it)"
+            },
+            {
+              "kind": "cmd",
+              "text": "cat Documents/notes.txt"
+            },
+            {
+              "kind": "out",
+              "text": "Call Acme on Monday.",
+              "mark": true
+            },
+            {
+              "kind": "cmd",
+              "text": "cat Documents/todo.txt"
+            },
+            {
+              "kind": "err",
+              "text": "cat: Documents/todo.txt: No such file or directory"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s5",
+      "title": "Claude works differently",
+      "text": "Claude read your notes earlier, before you edited them. Asked now, it answers from what it read: confident, and out of date. Claude is **probabilistic**: very likely right, not guaranteed.",
+      "add": [
+        "you",
+        "claude",
+        "prob"
+      ],
+      "emphasize": [
+        "claude",
+        "prob"
+      ],
+      "dim": [
+        "term",
+        "det"
+      ]
+    },
+    {
+      "id": "s6",
+      "title": "So Claude checks",
+      "text": "Claude Code can run commands itself, in a **shell** (the program that runs commands) that it starts on your Mac, not in your Terminal window. When it checks the file instead of relying on memory, it gets the real answer, not a likely one.",
+      "emphasize": [
+        "claude",
+        "term"
+      ],
+      "set": {
+        "claude": {
+          "text": "Let me check the file. It says to call Acme on **Monday**.",
+          "actions": [
+            "Bash: cat Documents/notes.txt"
+          ]
+        },
+        "term": {
+          "badge": "run by Claude",
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "cat Documents/notes.txt"
+            },
+            {
+              "kind": "out",
+              "text": "Call Acme on Monday.",
+              "mark": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s7",
+      "title": "The best of both",
+      "text": "Claude brings judgment: what to look for and what it means. The terminal brings exact answers. Knowing which is which is the theme of every explainer that follows.",
+      "show": "*"
+    }
+  ]
+}

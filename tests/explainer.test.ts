@@ -11,6 +11,7 @@ import { bundleSpec } from '../src/explainer/bundle';
 import { resolveSteps } from '../src/explainer/resolve';
 import { layoutBoard } from '../src/explainer/layout';
 import { BUILTINS, type ExplainerSpec, type Issue } from '../src/explainer/types';
+import { highlight } from '../src/model/tour';
 
 // a tiny spec over four built-ins (card, metric, bar, callout), written to the temp folder for bundling
 const SAMPLE_SPEC = {
@@ -259,6 +260,23 @@ describe('bundleSpec', () => {
     expect(find(b.issues, 'error', '/elements/1/props/src', /file not found/)).toBeDefined();
     expect(find(b.issues, 'error', '/elements/2/props/src', /outside the spec's folder/)).toBeDefined();
   });
+  test('a file name in text is text: only props a component declares as images are inlined', async () => {
+    const dir = join(tmp, 'bundle-text');
+    await mkdir(dir, { recursive: true });
+    const spec: ExplainerSpec = base({
+      elements: [
+        { id: 'c', type: 'card', props: { title: 'IMG_2207.png', body: 'holiday.jpg' } },
+        { id: 'l', type: 'list', props: { items: ['photo.png', 'notes.txt'] } },
+      ],
+      steps: [{}, { set: { c: { title: 'scan.webp' } } }],
+    });
+    await writeFile(join(dir, 'x.explainer.json'), JSON.stringify(spec));
+    const b = await bundleSpec(join(dir, 'x.explainer.json'), { env: '', adenineDir: '/nonexistent-karyo-adenine' });
+    expect(b.issues.filter((i) => /image/.test(i.message))).toEqual([]);
+    expect(b.spec.elements[0]!.props!.title).toBe('IMG_2207.png');
+    expect(b.spec.elements[1]!.props!.items).toEqual(['photo.png', 'notes.txt']);
+    expect(b.spec.steps![1]!.set!.c!.title).toBe('scan.webp');
+  });
   test('the sample bundles clean; bad JSON is an issue, not a throw', async () => {
     const b = await bundleSpec(SAMPLE);
     expect(b.issues.filter((i) => i.level === 'error')).toEqual([]);
@@ -326,5 +344,32 @@ describe('resolveSteps and layoutBoard', () => {
     const fr = layoutBoard([{ id: 'x', w: 10, h: 10, at: { x: 5, y: 7 } }, { id: 'y', w: 10, h: 10 }], { kind: 'free' }, [], view);
     expect(fr.get('x')).toEqual({ x: 5, y: 7 });
     expect(fr.get('y')!.y).toBeGreaterThan(17);
+  });
+});
+
+// ------------------------------------------------------------------ footer note
+describe('note', () => {
+  test('an optional string, checked by the validator', () => {
+    expect(validateSpec(base({ note: 'Names here are **made-up examples**.' }), lib).filter((i) => i.level === 'error')).toEqual([]);
+    expect(validateSpec(base({ note: 3 as unknown as string }), lib).some((i) => i.path === '/note')).toBe(true);
+  });
+});
+
+// ------------------------------------------------------------------ code tint
+describe('highlight', () => {
+  const spans = (h: string, cls: string) => [...h.matchAll(new RegExp(`<span class="${cls}">([^<]*)</span>`, 'g'))].map((m) => m[1]);
+  test('sh: # comments at a word start, quotes, $variables and {{just}} variables, reserved words only as words', () => {
+    const [a, b, c, d] = highlight(['# this one isn\'t code', 'for f in *.txt; do echo "$f" ${#f} $1; done # n', 'out=dist/x#y {{target}}', 'make-it done-ish'], 'just');
+    expect(a!.startsWith('<span class="tok-c">#')).toBe(true);
+    expect(a).not.toContain('tok-k');
+    expect(spans(b!, 'tok-k')).toEqual(['for', 'in', 'do', 'done']);
+    expect(spans(b!, 'tok-v')).toEqual(['${#f}', '$1']);
+    expect(spans(b!, 'tok-c')).toEqual(['# n']);
+    expect(c).not.toContain('tok-c');
+    expect(spans(c!, 'tok-v')).toEqual(['{{target}}']);
+    expect(d).not.toContain('tok-k');
+  });
+  test('text: no tint at all', () => {
+    expect(highlight(['const x = "a" // this'], 'text')).toEqual(['const x = &quot;a&quot; // this']);
   });
 });

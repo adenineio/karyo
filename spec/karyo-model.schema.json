@@ -13,6 +13,7 @@
     "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
     "flows": { "type": "array", "items": { "$ref": "#/$defs/flow" } },
     "groups": { "type": "array", "items": { "$ref": "#/$defs/group" }, "description": "Named groups (a node names its own in group): labels and nesting, from a curation file (docs/MODEL.md, Curation)" },
+    "start": { "enum": ["groups", "cards"], "description": "What a structure board starts on, from a curation file: one card per group, or every card (docs/ENGINE.md, Group navigation)" },
     "coverage": { "type": "array", "items": { "$ref": "#/$defs/coverage" }, "description": "Recordings that watched every call inside some scopes (docs/MODEL.md, Coverage): what lets nodes and relationships say they were not exercised" },
     "checks": { "type": "array", "items": { "$ref": "#/$defs/check" } },
     "tours": { "type": "array", "items": { "$ref": "#/$defs/tour" }, "description": "Authored tours resolved at build time against the code and the recorded flows (docs/MODEL.md, Tours)" }

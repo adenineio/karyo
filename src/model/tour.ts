@@ -4,8 +4,9 @@
 // right, the step's prose, timing facts and a mini diagram of the nodes involved. A step is the only
 // thing that moves: the marker glides to the station, the old code slides out as the new slides in,
 // and the diagram's cards that persist glide to their new places while the others fade.
-import { Scene, Morph, Path, roundCorners, ease, clamp, mix, outline, lightUnder, type Frame, type Fx, type SceneClass, type Vals, type Node, type KeyHelp } from '../engine';
-import { wiresOf, type Model, type MNode, type BuiltTour, type BuiltStep, type BuiltCode } from './model';
+import { Scene, Morph, Path, roundCorners, ease, clamp, mix, outline, lightUnder, settleChrome, chromeBoxFor, type Frame, type Fx, type SceneClass, type Vals, type Node, type KeyHelp } from '../engine';
+import { type Model, type MNode, type BuiltTour, type BuiltStep, type BuiltCode } from './model';
+import { stepWires } from './tours';
 import { cssId, esc } from './scenes';
 import { kitsFor, modelStats, type KitSet } from '../kits/registry';
 import type { PlateOutline } from './outline';
@@ -37,21 +38,73 @@ const RX = SIDE + CODE_W + 32, RW = W - SIDE - RX;
 const TEXT_H = 300;
 const DIA_Y = PY + TEXT_H + 16, DIA_H = PY + CODE_H - DIA_Y;
 // code
-const HEAD_H = 44, LH = 21, PAD = 10, WIN_H = CODE_H - HEAD_H;
+const HEAD_H = 44, LH = 21, PAD = 10;
 const SL = 56, SLT = 28;       // slide distances: code, text
 // mini diagram
-const CH = 44, AREA = { x: RX + 18, y: DIA_Y + 34, w: RW - 36, h: DIA_H - 34 - 14 };
+const CH = 44;
+// fitted to a space (docs/ENGINE.md "Theater"): below this band width (designed px) or a squarer window, the panels stack
+const WIDE = 900, FOOT = 50, PGAP = 16;
+
+interface Box { x: number; y: number; w: number; h: number }
+type XY = { x: number; y: number };
+/** Where everything sits: the page's layout, or one fitted to a space (`fit`). The band (header, tools, step rail) is laid
+ *  out `bandW` wide and drawn k times larger from the top-left corner by the chrome floor; the code and text panels are
+ *  laid out at `code` / `text` so that, boosted, they are drawn at `codeD` / `textD` (chromeBoxFor); the diagram (content,
+ *  never boosted) fills `dia`. `w` × `h` is the logical size. */
+interface Geo {
+  key: string; w: number; h: number; bandW: number; X0: number; X1: number; sp: number; STW: number; BW: number;
+  code: Box; codeD: Box; text: Box; dia: Box; winH: number; CW: number; mini: Map<string, XY>[];
+}
 
 const KW: Record<string, Set<string>> = {
   python: new Set('def class return if elif else for while in not and or is None True False import from as with try except finally raise async await lambda yield pass break continue global nonlocal del assert self'.split(' ')),
   go: new Set('func package import return if else for range var const type struct interface map chan go defer select case switch default break continue nil true false error'.split(' ')),
   ts: new Set('function const let var return if else for while of in new class extends import from export async await throw try catch finally typeof instanceof interface type null undefined true false this default switch case break continue'.split(' ')),
 };
-const langKey = (l: string) => (/^py/.test(l) ? 'python' : /^go/.test(l) ? 'go' : 'ts');
+const SH_KW = new Set('if then else elif fi for while until do done case esac in function return export local readonly select set unset shift source exit'.split(' '));
+const langKey = (l: string) => (/^py/.test(l) ? 'python' : /^go/.test(l) ? 'go'
+  : /^(sh|bash|zsh|shell|console|just(file)?|make(file)?)$/i.test(l) ? 'sh' : /^(text|plain|txt|none)$/i.test(l) ? 'text' : 'ts');
 
-/** A light syntax tint: keywords, strings, comments. Line by line, carrying Python triple quotes across lines. */
+/** Shell (and justfile, make): `#` comments at a word's start, '…' and "…" strings, `…` substitutions,
+ *  $VAR / ${…} / $1 / {{just}} variables, and the shell's reserved words. */
+function highlightSh(line: string): string {
+  let out = '', plain = '', i = 0;
+  const flush = () => { if (plain) { out += esc(plain); plain = ''; } };
+  const tok = (cls: string, x: string) => { flush(); out += `<span class="${cls}">${esc(x)}</span>`; };
+  while (i < line.length) {
+    const c = line[i]!;
+    if (c === '#' && (i === 0 || /\s/.test(line[i - 1]!))) { tok('tok-c', line.slice(i)); break; }
+    if (c === "'") { const j = line.indexOf("'", i + 1); const e = j < 0 ? line.length : j + 1; tok('tok-s', line.slice(i, e)); i = e; continue; }
+    if (c === '"' || c === '`') {
+      let j = i + 1;
+      while (j < line.length && line[j] !== c) j += line[j] === '\\' ? 2 : 1;
+      tok('tok-s', line.slice(i, j + 1)); i = j + 1; continue;
+    }
+    if (c === '$') {
+      const m = /^\$(\{[^}]*\}|[A-Za-z_]\w*|[0-9@*#?$!-])/.exec(line.slice(i));
+      if (m) { tok('tok-v', m[0]); i += m[0].length; continue; }
+    }
+    if (line.startsWith('{{', i)) { const j = line.indexOf('}}', i + 2); if (j >= 0) { tok('tok-v', line.slice(i, j + 2)); i = j + 2; continue; } }
+    if (/[A-Za-z_]/.test(c) && (i === 0 || !/[\w./-]/.test(line[i - 1]!))) {
+      let j = i + 1;
+      while (j < line.length && /[\w-]/.test(line[j]!)) j++;
+      const w = line.slice(i, j);
+      if (SH_KW.has(w) && (j >= line.length || /[\s;]/.test(line[j]!))) tok('tok-k', w); else plain += w;
+      i = j; continue;
+    }
+    plain += c; i++;
+  }
+  flush();
+  return out;
+}
+
+/** A light syntax tint: keywords, strings, comments. Line by line, carrying Python triple quotes across lines.
+ *  `lang`: py, go, ts (and anything else), sh (bash, zsh, shell, console, just, make), text (no tint). */
 export function highlight(lines: string[], lang: string): string[] {
-  const key = langKey(lang), kw = KW[key]!, py = key === 'python', lc = py ? '#' : '//';
+  const key = langKey(lang);
+  if (key === 'text') return lines.map(esc);
+  if (key === 'sh') return lines.map(highlightSh);
+  const kw = KW[key]!, py = key === 'python', lc = py ? '#' : '//';
   let triple: string | null = null;
   return lines.map((line) => {
     let out = '', plain = '', i = 0;
@@ -113,11 +166,7 @@ export function tourScene(model: Model, tourId: string, o: { title?: string; kit
   const title = o.title ?? tour.title;
 
   // ---- timeline
-  const X0 = N === 1 ? W / 2 : SIDE + 64, X1 = N === 1 ? W / 2 : W - SIDE - 64;
-  const sp = N === 1 ? 0 : (X1 - X0) / (N - 1);
-  const sx = (i: number) => X0 + i * sp;
-  const STW = N === 1 ? 180 : Math.min(150, sp - 10);
-  const BW = Math.min(STW - 18, 104);
+  const sx = (g: Geo, i: number) => g.X0 + i * g.sp;
   const maxMs = Math.max(0, ...steps.map((s) => s.timing?.ms ?? 0));
   const runs: { group: string; i0: number; i1: number }[] = [];
   steps.forEach((s, i) => {
@@ -125,15 +174,18 @@ export function tourScene(model: Model, tourId: string, o: { title?: string; kit
     if (s.group && last && last.group === s.group && last.i1 === i - 1) last.i1 = i;
     else if (s.group) runs.push({ group: s.group, i0: i, i1: i });
   });
-  const bracket = (r: { i0: number; i1: number }) => ({ x0: sx(r.i0) - Math.min(sp * 0.42, STW / 2), x1: sx(r.i1) + Math.min(sp * 0.42, STW / 2) });
+  const bracket = (g: Geo, r: { i0: number; i1: number }) => ({ x0: sx(g, r.i0) - Math.min(g.sp * 0.42, g.STW / 2), x1: sx(g, r.i1) + Math.min(g.sp * 0.42, g.STW / 2) });
 
   // ---- mini diagrams: one layered layout per step (show ∪ node), in the right column
-  const pairs = wiresOf(model);   // one per ordered pair
   const idsOf = (s: BuiltStep) => [...new Set([...(s.node ? [s.node] : []), ...s.show])];
   const allIds = [...new Set(steps.flatMap(idsOf))];
-  const layersOf = (ids: string[]) => {
+  // each step's wires among its cards, one per ordered pair: a type card's include its methods' (stepWires); drawn as one list
+  // (a wire shows while both its cards do)
+  const wiresByStep = steps.map((s) => stepWires(model, idsOf(s)));
+  const pairs = [...new Map(wiresByStep.flat().map((w) => [w.key, w])).values()];
+  const layersOf = (ids: string[], ws: { from: string; to: string }[]) => {
     const set = new Set(ids), inn = new Map<string, string[]>();
-    for (const e of pairs) if (set.has(e.from) && set.has(e.to)) (inn.get(e.to) ?? inn.set(e.to, []).get(e.to)!).push(e.from);
+    for (const e of ws) if (set.has(e.from) && set.has(e.to)) (inn.get(e.to) ?? inn.set(e.to, []).get(e.to)!).push(e.from);
     const layer = new Map<string, number>();
     const depth = (id: string, seen: Set<string>): number => {
       if (layer.has(id)) return layer.get(id)!;
@@ -146,10 +198,11 @@ export function tourScene(model: Model, tourId: string, o: { title?: string; kit
     ids.forEach((id) => depth(id, new Set()));
     return layer;
   };
-  const stepLayers = steps.map((s) => { const ids = s.show.length ? [...new Set([...s.show, ...(s.node ? [s.node] : [])])] : idsOf(s); return { ids, layer: layersOf(ids) }; });
+  const stepLayers = steps.map((s, i) => { const ids = s.show.length ? [...new Set([...s.show, ...(s.node ? [s.node] : [])])] : idsOf(s); return { ids, layer: layersOf(ids, wiresByStep[i]!) }; });
   const maxL = Math.max(1, ...stepLayers.map((x) => Math.max(0, ...x.layer.values()) + 1));
-  const CW = Math.min(132, Math.floor((AREA.w - (maxL - 1) * 22) / maxL));
-  const mini = stepLayers.map(({ ids, layer }) => {
+  // the diagram's least height (its frame, label and the tallest column of cards, never overlapping)
+  const DIA_MIN = Math.max(120, 48 + Math.max(1, ...stepLayers.map(({ ids, layer }) => Math.max(...[...new Set(layer.values())].map((l) => ids.filter((id) => layer.get(id) === l).length)))) * (CH + 6));
+  const miniIn = (AREA: Box, CW: number) => stepLayers.map(({ ids, layer }) => {
     const L = Math.max(0, ...layer.values()) + 1;
     const cols: string[][] = Array.from({ length: L }, () => []);
     for (const id of ids) cols[layer.get(id)!]!.push(id);   // authored order within a column
@@ -165,8 +218,48 @@ export function tourScene(model: Model, tourId: string, o: { title?: string; kit
     return pos;
   });
 
+  // ---- the layout: the page's (1600 × 900), or fitted to a space with room for the chrome floor's boost `k`
+  const geo = (Wl: number, Hl: number, k: number, fitted: boolean): Geo => {
+    const bandW = Wl / k;
+    const X0 = N === 1 ? bandW / 2 : SIDE + 64, X1 = N === 1 ? bandW / 2 : bandW - SIDE - 64;
+    const sp = N === 1 ? 0 : (X1 - X0) / (N - 1);
+    const STW = N === 1 ? 180 : Math.min(150, sp - 10), BW = Math.min(STW - 18, 104);
+    let codeD: Box, textD: Box, dia: Box;
+    if (!fitted) {
+      codeD = { x: SIDE, y: PY, w: CODE_W, h: CODE_H }; textD = { x: RX, y: PY, w: RW, h: TEXT_H }; dia = { x: RX, y: DIA_Y, w: RW, h: DIA_H };
+    } else {
+      // as drawn: under the band, above the mode line, the stage's margins; the band, the panels' text and the gaps
+      // are drawn k times their designed size
+      const m = Math.round(SIDE * k), top = Math.round(PY * k), avail = Hl - Math.round(FOOT * k) - top, gap = Math.round(PGAP * k);
+      if (bandW >= WIDE && Wl >= Hl * 1.15) {
+        // side by side, as on the page: the code left; the text over the diagram right. In a low window, where the text
+        // would not get its height, the diagram moves under the code and the text takes the whole right column.
+        const inner = Wl - 2 * m - Math.round(32 * k), cw = Math.round((inner * CODE_W) / (CODE_W + RW)), rx = m + cw + Math.round(32 * k);
+        const want = Math.round(TEXT_H * k), th = Math.min(want, avail - gap - 120);
+        if (th >= want * 0.9) {
+          codeD = { x: m, y: top, w: cw, h: avail }; textD = { x: rx, y: top, w: Wl - m - rx, h: th };
+          dia = { x: rx, y: top + th + gap, w: Wl - m - rx, h: avail - th - gap };
+        } else {
+          const dh = Math.round(clamp(DIA_MIN, 120, avail * 0.5));
+          codeD = { x: m, y: top, w: cw, h: avail - gap - dh }; textD = { x: rx, y: top, w: Wl - m - rx, h: avail };
+          dia = { x: m, y: top + avail - dh, w: cw, h: dh };
+        }
+      } else {
+        // stacked, for a tall or narrow window: the code, the text, the diagram
+        const ch = Math.round(avail * 0.42), th = Math.round(Math.min(avail * 0.3, TEXT_H * k));
+        codeD = { x: m, y: top, w: Wl - 2 * m, h: ch }; textD = { x: m, y: top + ch + gap, w: Wl - 2 * m, h: th };
+        dia = { x: m, y: top + ch + th + 2 * gap, w: Wl - 2 * m, h: avail - ch - th - 2 * gap };
+      }
+    }
+    const AREA = { x: dia.x + 18, y: dia.y + 34, w: dia.w - 36, h: dia.h - 34 - 14 };
+    const CW = Math.min(132, Math.floor((AREA.w - (maxL - 1) * 22) / maxL));
+    const code = chromeBoxFor(codeD, Wl, Hl, k), text = chromeBoxFor(textD, Wl, Hl, k);
+    return { key: `${Wl}x${Hl}@${k}${fitted ? '' : ':page'}`, w: Wl, h: Hl, bandW, X0, X1, sp, STW, BW, code, codeD, text, dia, winH: codeD.h / k - HEAD_H, CW, mini: miniIn(AREA, CW) };
+  };
+  const PAGE = geo(W, H, 1, false);
+
   // ---- code excerpts: each step's window scrolls (statically) to centre its first focus line
-  const scrollOf = (c: BuiltCode) => {
+  const scrollOf = (c: BuiltCode, WIN_H = PAGE.winH) => {
     const n = c.text.split('\n').length, full = n * LH + 2 * PAD;
     if (full <= WIN_H) return 0;
     const f = c.focus.length ? Math.min(...c.focus) - c.start : 0;
@@ -201,8 +294,8 @@ export function tourScene(model: Model, tourId: string, o: { title?: string; kit
     </div>`;
   const stationHTML = (s: BuiltStep, i: number) => {
     const t = s.timing, err = t?.status === 'error';
-    const bw = t && maxMs > 0 ? Math.max(2, (BW * t.ms) / maxMs) : 0;
-    return `<button type="button" class="tr-st${err ? ' is-err' : ''}" id="st${i}" style="left:${sx(i) - STW / 2}px;width:${STW}px" title="${esc(s.title)}${t ? ` — ${fmtMs(t.ms)}` : ''}${i < 9 ? ` (${i + 1})` : ''}" aria-label="Step ${i + 1}: ${esc(s.title)}">
+    const bw = t && maxMs > 0 ? Math.max(2, (PAGE.BW * t.ms) / maxMs) : 0;
+    return `<button type="button" class="tr-st${err ? ' is-err' : ''}" id="st${i}" style="left:${sx(PAGE, i) - PAGE.STW / 2}px;width:${PAGE.STW}px" title="${esc(s.title)}${t ? ` — ${fmtMs(t.ms)}` : ''}${i < 9 ? ` (${i + 1})` : ''}" aria-label="Step ${i + 1}: ${esc(s.title)}">
       <span class="tr-dot"></span><span class="tr-stt">${esc(s.title)}</span>
       <span class="tr-bar">${t ? `<i style="width:${bw.toFixed(1)}px"></i>` : ''}</span><span class="tr-ms">${t ? fmtMs(t.ms) : 'untimed'}</span>
     </button>`;
@@ -224,10 +317,10 @@ export function tourScene(model: Model, tourId: string, o: { title?: string; kit
 
   const CSS = /* css */ `
     /* the header, tools and step rail: one chrome band (docs/ENGINE.md "Zoom and pan"); it lays nothing out itself */
-    .tr-top { position: absolute; left: 0; top: 0; width: ${W}px; height: ${PY - 14}px; pointer-events: none; }
+    .tr-top { position: absolute; left: 0; top: 0; width: ${PAGE.bandW}px; height: ${PY - 14}px; pointer-events: none; }
     .tr-top > * { pointer-events: auto; }
     .tr-top > .tr-marker { pointer-events: none; }
-    .tr-head { position: absolute; left: ${SIDE}px; top: 26px; display: grid; gap: 6px; width: ${W - 2 * SIDE}px; }
+    .tr-head { position: absolute; left: ${SIDE}px; top: 26px; display: grid; gap: 6px; width: calc(100% - ${2 * SIDE}px); }
     .tr-sum code { font: 13px/1 var(--pl-font-mono); }
     .tr-sum { margin: 0; font-size: 14px; line-height: 18px; color: var(--pl-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .tr-tools { position: absolute; right: ${SIDE}px; top: 36px; display: flex; gap: 8px; }
@@ -248,7 +341,7 @@ export function tourScene(model: Model, tourId: string, o: { title?: string; kit
     .tr-stt { flex: none; margin-top: 9px; width: 100%; height: 32px; font: 600 13px/16px var(--pl-font-display); text-align: center; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
     .tr-st.is-cur .tr-stt { color: var(--pl-accent); }
     .tr-st:hover .tr-stt { text-decoration: underline; text-underline-offset: 3px; }
-    .tr-bar { flex: none; margin-top: 6px; width: ${BW}px; height: 4px; border-radius: 2px; overflow: hidden; background: color-mix(in srgb, var(--pl-line) 40%, transparent); }
+    .tr-bar { flex: none; margin-top: 6px; width: var(--tr-bw, ${PAGE.BW}px); height: 4px; border-radius: 2px; overflow: hidden; background: color-mix(in srgb, var(--pl-line) 40%, transparent); }
     .tr-bar i { display: block; height: 100%; border-radius: 2px; background: var(--pl-muted); }
     .tr-st.is-cur .tr-bar i { background: var(--pl-accent); }
     .tr-st.is-err .tr-bar i { background: var(--pl-accent-2); }
@@ -258,6 +351,9 @@ export function tourScene(model: Model, tourId: string, o: { title?: string; kit
     .tr-marker { position: absolute; left: -12px; top: ${TY - 12}px; width: 24px; height: 24px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--pl-accent); pointer-events: none; }
 
     .tr-code { position: absolute; left: ${SIDE}px; top: ${PY}px; width: ${CODE_W}px; height: ${CODE_H}px; padding: 0; overflow: hidden; }
+    /* (an inner clip: content that no longer fits a panel the chrome floor lays out narrower is clipped here, so the
+       panel itself never overflows and keeps its span, docs/ENGINE.md "Chrome floor") */
+    .tr-clip { position: absolute; inset: 0; overflow: hidden; }
     .tr-cs { position: absolute; inset: 0; }
     .tr-ch { position: absolute; left: 0; right: 0; top: 0; height: ${HEAD_H}px; box-sizing: border-box; display: flex; align-items: center; gap: 8px; padding: 0 18px; border-bottom: 1px solid var(--pl-card-border); font: 12.5px/1 var(--pl-font-mono); color: var(--pl-muted); white-space: nowrap; }
     .tr-file { color: var(--pl-fg); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -276,7 +372,7 @@ export function tourScene(model: Model, tourId: string, o: { title?: string; kit
     .tr-texts { position: absolute; left: ${RX}px; top: ${PY}px; width: ${RW}px; height: ${TEXT_H}px; overflow: hidden; }
     .tr-tx { position: absolute; left: 0; right: 0; top: 0; display: grid; gap: 10px; align-content: start; }
     .tr-kick { display: flex; align-items: center; gap: 10px; }
-    .tr-tag { font: 500 10.5px/1 var(--pl-font-mono); padding: 3px 6px; border: 1px dashed var(--pl-line); border-radius: min(var(--pl-radius), 4px); color: var(--pl-muted); }
+    .tr-tag { font: 500 11px/1 var(--pl-font-mono); padding: 3px 6px; border: 1px dashed var(--pl-line); border-radius: min(var(--pl-radius), 4px); color: var(--pl-muted); }
     .tr-h { margin: 0; font: 700 26px/1.15 var(--pl-font-display); letter-spacing: -0.01em; }
     .tr-prose p { margin: 0 0 8px; font-size: 15.5px; line-height: 1.5; color: var(--pl-fg); max-width: 60ch; }
     .tr-prose p:last-child { margin-bottom: 0; }
@@ -292,7 +388,7 @@ export function tourScene(model: Model, tourId: string, o: { title?: string; kit
 
     .tr-dia { position: absolute; left: ${RX}px; top: ${DIA_Y}px; width: ${RW}px; height: ${DIA_H}px; box-sizing: border-box; border: 1px dashed var(--pl-line); border-radius: calc(var(--pl-radius) + 6px); }
     .tr-dia > .pl-label { position: absolute; left: 14px; top: 11px; }
-    .tr-node { position: absolute; left: 0; top: 0; z-index: 2; width: ${CW}px; height: ${CH}px; padding: 5px 10px; display: grid; align-content: center; gap: 2px; }
+    .tr-node { position: absolute; left: 0; top: 0; z-index: 2; width: var(--tr-cw, ${PAGE.CW}px); height: ${CH}px; padding: 5px 10px; display: grid; align-content: center; gap: 2px; }
     .tr-nn { font: 600 13px/1.2 var(--pl-font-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .tr-nr { font: 10.5px/1.2 var(--pl-font-mono); color: var(--pl-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .tr-node.is-ext { border-style: dashed; box-shadow: none; }
@@ -321,19 +417,63 @@ export function tourScene(model: Model, tourId: string, o: { title?: string; kit
     /** Transition progress (eased): everything, and the code / text panes leaving and arriving. The old
      *  pane is gone before the new one is readable, so two excerpts never overlap. */
     private kk = { main: 1, out: 1, in: 1 };
+    /** The layout drawn now: the page's, or the one fitted to the space the plate fills (`fit`). */
+    private g: Geo = PAGE;
+    private fits = new Map<string, Geo>();
 
     get step() { return this.cur; }
+
+    /** Theater, fill and Jarvis (docs/ENGINE.md "Theater"): laid out for the space's shape, never drawn smaller than its
+     *  designed size (the chrome floor), with room for the chrome the floor draws `o.chrome` times larger (settled, as
+     *  the trace board does: settleChrome); side by side in a wide window, stacked in a tall or narrow one. A larger
+     *  window draws the page's layout larger. null: the page's layout. */
+    fit(space: { w: number; h: number } | null, o?: { chrome?: number }) {
+      let g = PAGE;
+      if (space) {
+        const s0 = Math.max(1, Math.min(space.w / W, space.h / H));
+        const Wl = Math.round(space.w / s0), Hl = Math.round(space.h / s0);
+        const at = (k: number) => { const key = `${Wl}x${Hl}@${k}`; return this.fits.get(key) ?? this.fits.set(key, geo(Wl, Hl, k, true)).get(key)!; };
+        const k0 = Math.max(1, Math.round((o?.chrome ?? 1) * 100) / 100);
+        g = k0 > 1 ? settleChrome(space, k0, at, (sc) => this.stage.chrome.boostAt(sc)) : at(1);
+      }
+      if (g.key !== this.g.key) {
+        this.g = g;
+        if (this.built) { this.applyGeo(); this.morph = new Morph(); this.morph.snap(this.targets()); }
+      }
+      return { w: g.w, h: g.h };
+    }
+    private built = false;
+    /** Put every element where the layout says (the page's layout is what the CSS and the HTML already say). */
+    private applyGeo() {
+      const g = this.g, dom = this.stage.dom, px = (v: number) => `${Math.round(v * 1000) / 1000}px`;
+      const box = (e: HTMLElement | null, b: Box) => { if (e) Object.assign(e.style, { left: px(b.x), top: px(b.y), width: px(b.w), height: px(b.h) }); };
+      dom.style.setProperty('--tr-bw', px(g.BW));
+      dom.style.setProperty('--tr-cw', px(g.CW));
+      dom.querySelector<HTMLElement>('.tr-top')!.style.width = px(g.bandW);
+      steps.forEach((st, i) => {
+        const e = dom.querySelector<HTMLElement>(`#st${i}`)!;
+        e.style.left = px(sx(g, i) - g.STW / 2); e.style.width = px(g.STW);
+        const bar = e.querySelector<HTMLElement>('.tr-bar i'), t = st.timing;
+        if (bar && t && maxMs > 0) bar.style.width = `${Math.max(2, (g.BW * t.ms) / maxMs).toFixed(1)}px`;
+        const pre = dom.querySelector<HTMLElement>(`#cs${i} .tr-pre`);
+        if (pre && st.code) pre.style.top = `${-scrollOf(st.code, g.winH)}px`;
+      });
+      runs.forEach((r, j) => { const b = bracket(g, r), e = dom.querySelector<HTMLElement>(`#gr${j}`)!; e.style.left = px(b.x0); e.style.width = px(b.x1 - b.x0); });
+      box(dom.querySelector('.tr-code'), g.code);
+      box(dom.querySelector('.tr-texts'), g.text);
+      box(dom.querySelector('.tr-dia'), g.dia);
+    }
 
     build(dom: HTMLElement) {
       const sub = `Tour · ${N} steps${tour.flow ? ` · recorded flow ${tour.flow}` : ''}`;
       dom.innerHTML = `<style>${CSS}</style>
-        <div class="tr-top" data-pl-chrome><header class="tr-head"><div class="pl-label">${esc(sub)}</div><h1 class="pl-title">${esc(title)}</h1>${tour.summary ? `<p class="tr-sum" title="${esc(tour.summary)}">${mdInline(tour.summary)}</p>` : ''}</header>
+        <div class="tr-top" data-pl-chrome><header class="tr-head"><div class="pl-label">${esc(sub)}</div><h1 class="pl-title">${esc(title)}</h1>${tour.summary ? `<p class="tr-sum" data-pl-clip title="${esc(tour.summary)}">${mdInline(tour.summary)}</p>` : ''}</header>
         <div class="tr-tools"><button type="button" class="tr-btn" id="tr-prev" title="Previous step (← or k)" aria-label="Previous step">‹</button><button type="button" class="tr-btn" id="tr-play" title="Play the tour (p; any key stops)">Play</button><button type="button" class="tr-btn" id="tr-next" title="Next step (→, j or Enter)" aria-label="Next step">›</button></div>
-        ${runs.map((r, j) => { const b = bracket(r); return `<div class="tr-grp" id="gr${j}" style="left:${b.x0}px;width:${b.x1 - b.x0}px">${esc(r.group)}</div>`; }).join('')}
+        ${runs.map((r, j) => { const b = bracket(PAGE, r); return `<div class="tr-grp" id="gr${j}" style="left:${b.x0}px;width:${b.x1 - b.x0}px">${esc(r.group)}</div>`; }).join('')}
         ${steps.map(stationHTML).join('')}
         <div class="tr-marker" id="tr-marker"></div></div>
         <div class="pl-card tr-code" data-pl-clip data-pl-chrome>${steps.map(codeHTML).join('')}</div>
-        <div class="tr-texts" data-pl-clip data-pl-chrome>${steps.map(textHTML).join('')}</div>
+        <div class="tr-texts" data-pl-clip data-pl-chrome><div class="tr-clip" data-pl-clip>${steps.map(textHTML).join('')}</div></div>
         <div class="tr-dia"><span class="pl-label">Where it runs</span></div>
         ${allIds.map(nodeHTML).join('')}
         <div class="tr-mode" id="tr-mode" data-pl-chrome aria-live="polite"></div>`;
@@ -351,6 +491,8 @@ export function tourScene(model: Model, tourId: string, o: { title?: string; kit
       });
       // the mode line names the key that leaves the theater: re-render when the plate enters or leaves it
       new MutationObserver(() => this.stage.redraw()).observe(this.stage.root, { attributes: true, attributeFilter: ['class'] });
+      this.built = true;
+      if (this.g !== PAGE) this.applyGeo();
       this.morph.snap(this.targets());
     }
 
@@ -401,14 +543,14 @@ export function tourScene(model: Model, tourId: string, o: { title?: string; kit
     /** The resting layout of the current step. */
     private targets() {
       const m = new Map<string, Vals>(), c = this.cur;
-      m.set('mk', { x: sx(c) });
+      m.set('mk', { x: sx(this.g, c) });
       steps.forEach((_, i) => {
         m.set(`s${i}`, { o: i <= c ? 1 : 0.55, lit: i === c ? 1 : 0 });
         m.set(`c${i}`, { x: i === c ? 0 : Math.sign(i - c) * SL, o: i === c ? 1 : 0 });
         m.set(`t${i}`, { x: i === c ? 0 : Math.sign(i - c) * SLT, o: i === c ? 1 : 0 });
       });
       runs.forEach((r, j) => m.set(`g${j}`, { lit: c >= r.i0 && c <= r.i1 ? 1 : 0 }));
-      const pos = mini[c]!, lit = steps[c]!.node;
+      const pos = this.g.mini[c]!, lit = steps[c]!.node;
       for (const id of allIds) {
         const p = pos.get(id);
         m.set(`d:${id}`, p ? { x: p.x, y: p.y, o: 1, lit: id === lit ? 1 : 0 } : { x: 0, y: 0, o: 0, lit: 0 });
@@ -508,7 +650,7 @@ export function tourScene(model: Model, tourId: string, o: { title?: string; kit
         const v = this.morph.value(`s${i}`)!, st = this.$(`#st${i}`);
         st.opacity = v.o!;
         st.classes['is-cur'] = v.lit! > 0.5;
-        st.classes['is-past'] = mk > sx(i) + 1 && v.lit! <= 0.5;   // dots fill as the marker passes them
+        st.classes['is-past'] = mk > sx(this.g, i) + 1 && v.lit! <= 0.5;   // dots fill as the marker passes them
         for (const [p, id] of [['c', `#cs${i}`], ['t', `#tx${i}`]] as const) {
           const w = this.val(`${p}${i}`)!, n = this.$(id);
           n.set({ x: w.x!, opacity: w.o! });
@@ -552,10 +694,11 @@ export function tourScene(model: Model, tourId: string, o: { title?: string; kit
 
       // timeline: the track, lit up to the marker; group brackets (the rail is chrome: its fx go on the chrome's layer)
       const Lr = fx.front.lines;
+      const { X0, X1 } = this.g;
       Lr.seg(X0, TY, X1, TY, { color: 'line', width: 2 });
       if (mk > X0) Lr.seg(X0, TY, mk, TY, { color: 'accent', width: 2.4, glow: 1.2 });
       runs.forEach((r, j) => {
-        const b = bracket(r), lit = this.morph.value(`g${j}`)!.lit!;
+        const b = bracket(this.g, r), lit = this.morph.value(`g${j}`)!.lit!;
         Lr.polyline([{ x: b.x0, y: BY + 7 }, { x: b.x0, y: BY }, { x: b.x1, y: BY }, { x: b.x1, y: BY + 7 }], { color: mix(th.line, th.accent, lit), width: 1.4 });
       });
       fx.front.bg.light(mk, TY, 46, 0.3, th.accent);

@@ -73,6 +73,26 @@ export interface Stroke {
   glow?: number;
 }
 
+/** The dashes along a path, as polylines. A Path never changes once made, so the pieces are kept with it and reused
+ *  when the same path is dashed the same way again (a wire redrawn at rest, while zooming or panning). */
+const dashMemo = new WeakMap<Path, { k: string; pieces: P[][] }>();
+function dashPieces(p: Path, dash: number, gap: number, offset: number, from: number, to: number): P[][] {
+  const key = `${dash},${gap},${offset},${from},${to}`, m = dashMemo.get(p);
+  if (m && m.k === key) return m.pieces;
+  const per = dash + gap, len = p.length, pieces: P[][] = [];
+  const s0 = from * len, s1 = to * len;
+  let k = Math.floor((s0 - offset) / per);
+  for (; ; k++) {
+    const a = k * per + offset, b = a + dash;
+    if (a > s1) break;
+    const ca = Math.max(a, s0), cb = Math.min(b, s1);
+    if (cb <= ca) continue;
+    pieces.push(p.slice(ca / len, cb / len).pts);
+  }
+  dashMemo.set(p, { k: key, pieces });
+  return pieces;
+}
+
 export class LineBatch {
   readonly mesh: THREE.Mesh;
   /** The halos, as one union: a path is many short segments, and halos blended one over another pile
@@ -113,14 +133,26 @@ export class LineBatch {
   }
 
   clear() { this.count = 0; this.hasHalo = false; }
+  /** The box the segments drawn since the last clear cover (stage px), or null when there are none. */
+  bounds(): { x: number; y: number; w: number; h: number } | null {
+    if (!this.count) return null;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (let i = 0; i < this.count; i++) {
+      const a = this.ab, j = i * 4;
+      x0 = Math.min(x0, a[j]!, a[j + 2]!); x1 = Math.max(x1, a[j]!, a[j + 2]!);
+      y0 = Math.min(y0, a[j + 1]!, a[j + 3]!); y1 = Math.max(y1, a[j + 1]!, a[j + 3]!);
+    }
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  }
   rgb(c: Col | undefined): RGB { return c === undefined ? this.theme.line : typeof c === 'string' ? this.theme[c] : c; }
 
   /** One capsule segment from (ax,ay) to (bx,by). A zero-length segment is a dot of diameter `width`. */
   seg(ax: number, ay: number, bx: number, by: number, s: Stroke = {}) {
     if (this.count >= this.capacity) return;
-    const i = this.count++, c = this.rgb(s.color);
-    this.ab.set([ax, ay, bx, by], i * 4);
-    this.col.set([c[0], c[1], c[2], clamp(s.alpha ?? 1)], i * 4);
+    const i = this.count++, c = this.rgb(s.color), j = i * 4, ab = this.ab, col = this.col;
+    // (element by element: the same values as a .set([…]) of them, without an array per segment)
+    ab[j] = ax; ab[j + 1] = ay; ab[j + 2] = bx; ab[j + 3] = by;
+    col[j] = c[0]; col[j + 1] = c[1]; col[j + 2] = c[2]; col[j + 3] = clamp(s.alpha ?? 1);
     this.wg[i * 2] = s.width ?? 1.5; this.wg[i * 2 + 1] = s.glow ?? 0;
     if (s.glow) this.hasHalo = true;
   }
@@ -134,16 +166,7 @@ export class LineBatch {
   }
   /** Dashes along a path; `offset` (px) scrolls them — drive it with time for "flow". */
   dashes(p: Path, s: Stroke & { dash?: number; gap?: number; offset?: number; from?: number; to?: number } = {}) {
-    const dash = s.dash ?? 6, gap = s.gap ?? 6, per = dash + gap, len = p.length;
-    const s0 = (s.from ?? 0) * len, s1 = (s.to ?? 1) * len;
-    let k = Math.floor((s0 - (s.offset ?? 0)) / per);
-    for (; ; k++) {
-      const a = k * per + (s.offset ?? 0), b = a + dash;
-      if (a > s1) break;
-      const ca = Math.max(a, s0), cb = Math.min(b, s1);
-      if (cb <= ca) continue;
-      this.polyline(p.slice(ca / len, cb / len).pts, s);
-    }
+    for (const pts of dashPieces(p, s.dash ?? 6, s.gap ?? 6, s.offset ?? 0, s.from ?? 0, s.to ?? 1)) this.polyline(pts, s);
   }
   /** Rounded-rect outline, drawn on from 0 to `progress`. */
   rrect(x: number, y: number, w: number, h: number, r: number, s: Stroke & { progress?: number } = {}) {
@@ -242,6 +265,12 @@ export class Background {
     this.mesh.frustumCulled = false;
   }
   clear() { this.lights.length = 0; }
+  /** The box the lights added since the last clear cover (stage px), or null when there are none. */
+  bounds(): { x: number; y: number; w: number; h: number } | null {
+    if (!this.lights.length) return null;
+    const x0 = Math.min(...this.lights.map((l) => l.x - l.r)), y0 = Math.min(...this.lights.map((l) => l.y - l.r));
+    return { x: x0, y: y0, w: Math.max(...this.lights.map((l) => l.x + l.r)) - x0, h: Math.max(...this.lights.map((l) => l.y + l.r)) - y0 };
+  }
   /** A soft pool of light under the HTML at (x,y), radius r px, intensity k (0..1). */
   light(x: number, y: number, r: number, k: number, color: RGB) { if (this.lights.length < MAX_LIGHTS && k > 0.001) this.lights.push({ x, y, r, k, c: color }); }
   upload(res: THREE.Vector2, pxScale: number, t: number, theme: Theme, origin: THREE.Vector2) {
@@ -342,6 +371,12 @@ export class FxLayer {
     }
     this.setBacking(w, h);
   }
+  /** Show a `box`-sized canvas (the chrome's layer) over another box (stage px), keeping what it draws. */
+  place(box: { x: number; y: number; w: number; h: number }) {
+    Object.assign(this.canvas.style, { left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px`, height: `${box.h}px`, right: 'auto', bottom: 'auto' });
+  }
+  /** The box what was drawn since `begin` covers (stage px): its lines, else its lights; null when nothing was. */
+  bounds() { return this.lines.bounds() ?? this.bg.bounds(); }
   private setBacking(w: number, h: number) {
     if (this.canvas.width !== w || this.canvas.height !== h) { this.canvas.width = w; this.canvas.height = h; }
     this.renderer?.setViewport(0, 0, w, h);

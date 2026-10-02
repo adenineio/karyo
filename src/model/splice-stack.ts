@@ -6,7 +6,7 @@
 // the result, proposals two splices agree on, changes that follow another splice's replacement, and two different
 // proposals that share a name. Pure (no DOM, no fs): the board, the tests and Jarvis's page use it. Shape-neutral:
 // every word comes from the splices' titles, the model's labels and the core's descriptions (describeOp).
-import { applySplice, describeOp, mapRefs, resolveNodeRef, slug, slugId, type Splice, type SpliceNode, type SpliceOp, type SpliceResult } from './splice';
+import { applySplice, boardMarks, describeOp, entryId, groupIds, mapRefs, resolveNodeRef, slug, slugId, type Splice, type SpliceGroup, type SpliceNode, type SpliceOp, type SpliceResult } from './splice';
 import { isImport, pairKey, type Model } from './model';
 import type { StackSlice, WarningItem } from './stack-diff';
 
@@ -125,6 +125,8 @@ interface Desc {
   near?: { rel: 'front' | 'behind' | 'calls' | 'called' | 'instead'; x: string };
   /** Every node it needs to be there. */
   uses: string[];
+  /** The group it proposes (its id in the combination) and that group's name; or the group it renames or removes. */
+  group?: string; groupLabel?: string;
 }
 
 /** Several splices as one what-if: every layer's changes, in the order given, applied as one splice over `base` (so each
@@ -140,11 +142,11 @@ export function combineSplices(base: Model, layers: { title: string; splice: Spl
   const bLabel = new Map(base.nodes.map((n) => [n.id, n.label ?? n.id]));
 
   // ---- 1. each layer's proposals, with explicit ids (an id-less one gets the id it would get on its own)
-  type Prop = { l: number; i: number; id: string; label: string };
+  type Prop = { l: number; i: number; id: string; label: string; group?: boolean };
   const props: Prop[][] = layers.map((L, l) => {
     const taken = new Set(baseIds), out: Prop[] = [];
     opsOf(L.splice).forEach((op, i) => {
-      const nd = (op?.op === 'add' ? op.node : op?.op === 'replace' && op.with && typeof op.with === 'object' ? op.with : null) as SpliceNode | null;
+      const nd = (op?.op === 'add' ? op.node : op?.op === 'replace' && op.with && typeof op.with === 'object' ? op.with : op?.op === 'group' && op.first && typeof op.first === 'object' ? op.first : null) as SpliceNode | null;
       if (!nd || typeof nd !== 'object') return;
       const label = typeof nd.label === 'string' && nd.label.trim() ? nd.label.trim() : isStr(nd.id) ? nd.id : '';
       if (!label) return;
@@ -155,6 +157,29 @@ export function combineSplices(base: Model, layers: { title: string; splice: Spl
     return out;
   });
   const propAt = (l: number, i: number) => props[l]!.find((p) => p.i === i);
+  // the groups each layer proposes, with explicit ids (as each would get on its own)
+  const baseGroups = new Set(groupIds(base));
+  const gprops: Prop[][] = layers.map((L, l) => {
+    const taken = new Set(baseGroups), out: Prop[] = [];
+    opsOf(L.splice).forEach((op, i) => {
+      if (op?.op !== 'group' || !op.group || typeof op.group !== 'object') return;
+      const label = typeof op.group.label === 'string' && op.group.label.trim() ? op.group.label.trim() : isStr(op.group.id) ? op.group.id : '';
+      if (!label) return;
+      const id = isStr(op.group.id) ? op.group.id : slugId(label, taken);
+      taken.add(id);
+      out.push({ l, i, id, label, group: true });
+    });
+    return out;
+  });
+  const gpropAt = (l: number, i: number) => gprops[l]!.find((p) => p.i === i);
+  const canonG: Map<string, string>[] = layers.map(() => new Map());   // a layer's proposed group id → its id in the combination
+  /** A layer's group reference (one it proposes, by id or name) as the combination names it; others as they are. */
+  const gid = (l: number, ref: unknown): unknown => {
+    if (!isStr(ref)) return ref;
+    if (canonG[l]!.has(ref)) return canonG[l]!.get(ref)!;
+    const own = gprops[l]!.find((p) => fold(p.label) === fold(ref.replace(/\s+group\s*$/i, '')));
+    return own ? canonG[l]!.get(own.id) ?? own.id : ref;
+  };
 
   // ---- 2. a layer's references in base terms (its own proposals by id or label)
   const canon: Map<string, string>[] = layers.map(() => new Map());    // a layer's proposal id → its id in the combination
@@ -179,9 +204,13 @@ export function combineSplices(base: Model, layers: { title: string; splice: Spl
       case 'replace': return `replace|${refKey(l, op.node)}|${isStr(op.with) ? refKey(l, op.with) : `new:${fold(op.with?.label ?? '')}:${op.with?.kind ?? ''}`}`;
       case 'connect': return `connect|${refKey(l, op.from)}|${refKey(l, op.to)}|${op.kind ?? 'calls'}`;
       case 'disconnect': return `disconnect|${refKey(l, op.from)}|${refKey(l, op.to)}`;
-      case 'remove': return `remove|${refKey(l, op.node)}`;
-      case 'rename': return `rename|${refKey(l, op.node)}|${(op.label ?? '').trim()}`;
-      case 'move': return `move|${refKey(l, op.node)}|${op.group}`;
+      case 'remove': return op.group !== undefined ? `remove-group|${String(gid(l, op.group))}` : `remove|${refKey(l, op.node)}`;
+      case 'rename': return op.group !== undefined ? `rename-group|${String(gid(l, op.group))}|${(op.label ?? '').trim()}` : `rename|${refKey(l, op.node)}|${(op.label ?? '').trim()}`;
+      case 'move': return `move|${refKey(l, op.node)}|${String(gid(l, op.group))}`;
+      case 'group': {
+        const g = op.group ?? ({} as SpliceGroup);
+        return `group|${fold(g.label ?? g.id ?? '')}|${isStr(g.parent) ? String(gid(l, g.parent)) : ''}|${fold(op.first?.label ?? '')}|${op.attach ? `${refKey(l, op.attach.to)}:${op.attach.dir ?? 'out'}:${op.attach.kind ?? 'calls'}` : ''}`;
+      }
     }
     return null;
   };
@@ -197,19 +226,43 @@ export function combineSplices(base: Model, layers: { title: string; splice: Spl
   const pairs: Pair[] = [];
   const unifiedTo: Map<string, string>[] = layers.map(() => new Map()); // proposal id → the combined id it is one with
   const pkey = (p: Prop) => `${layers[p.l]!.splice?.id ?? p.l}/${p.id}`;
+  const gkey = (p: Prop) => `${layers[p.l]!.splice?.id ?? p.l}/group:${p.id}`;
+  const usedG = new Set<string>(baseGroups);
+  const relabelG: Map<string, string>[] = layers.map(() => new Map());
+  const unifiedG: Map<string, string>[] = layers.map(() => new Map()); // proposal group id → the combined group it is one with
   for (let l = 0; l < N; l++) {
     opsOf(layers[l]!.splice).forEach((op, i) => {
       const s = sig(l, op);
       const prop = propAt(l, i);
       const g = s !== null ? bySig.get(s) : undefined;
+      const gp = gpropAt(l, i);
       if (g !== undefined && !groups[g]!.members.some((m) => m.l === l)) {
         groups[g]!.members.push({ l, i });
         group[l]!.set(i, g);
-        // the same proposal: the same node
-        if (prop) { const f = groups[g]!.members[0]!, fp = propAt(f.l, f.i); if (fp) canon[l]!.set(prop.id, canon[f.l]!.get(fp.id) ?? fp.id); }
+        // the same proposal: the same node (and the same group)
+        const f = groups[g]!.members[0]!;
+        if (prop) { const fp = propAt(f.l, f.i); if (fp) canon[l]!.set(prop.id, canon[f.l]!.get(fp.id) ?? fp.id); }
+        if (gp) { const fg = gpropAt(f.l, f.i); if (fg) canonG[l]!.set(gp.id, canonG[f.l]!.get(fg.id) ?? fg.id); }
         return;
       }
       if (s !== null && g === undefined) { bySig.set(s, groups.length); groups.push({ sig: s, members: [{ l, i }] }); group[l]!.set(i, groups.length - 1); }
+      if (gp) {
+        // an earlier splice's group with the same name: two different groups, unless the person said they are one
+        const earlierG = gprops.slice(0, l).flat().filter((p) => fold(p.label) === fold(gp.label));
+        for (const p of earlierG) {
+          const key = [gkey(p), gkey(gp)].sort().join(' = ');
+          const unified = sameKeys.has(key);
+          pairs.push({ key, a: p, b: gp, unified });
+          if (unified && !unifiedG[l]!.has(gp.id)) { const to = canonG[p.l]!.get(p.id) ?? p.id; unifiedG[l]!.set(gp.id, to); canonG[l]!.set(gp.id, to); }
+        }
+        if (!canonG[l]!.has(gp.id)) {
+          let id = gp.id;
+          if (usedG.has(id)) { const sp = slug(layers[l]!.splice?.id || layers[l]!.title || `splice-${l + 1}`); id = `${gp.id}.${sp}`; for (let n = 2; usedG.has(id); n++) id = `${gp.id}.${sp}-${n}`; }
+          usedG.add(id);
+          canonG[l]!.set(gp.id, id);
+          if (earlierG.length) relabelG[l]!.set(gp.id, `${gp.label} (${layers[l]!.title})`);
+        }
+      }
       if (!prop) return;
       // an earlier splice's proposal with the same name: two different things, unless the person said they are one
       const earlier = props.slice(0, l).flat().filter((p) => fold(p.label) === fold(prop.label));
@@ -237,12 +290,24 @@ export function combineSplices(base: Model, layers: { title: string; splice: Spl
   // ---- 4. each layer's changes as they apply in the combination (its proposals under their combined ids)
   const rew: SpliceOp[][] = layers.map((L, l) => opsOf(L.splice).map((op, i) => {
     if (!op || typeof op !== 'object') return op;
-    const x = mapRefs(op, (r) => canon[l]!.get(r) ?? r);
+    let x = mapRefs(op, (r) => canon[l]!.get(r) ?? r);
+    // the groups it proposes or names, under their ids in the combination
+    const G = (r: unknown) => gid(l, r) as string;
+    if (x.op === 'add' && x.node && typeof x.node === 'object' && isStr(x.node.group)) x = { ...x, node: { ...x.node, group: G(x.node.group) } };
+    else if (x.op === 'move') x = { ...x, group: G(x.group) };
+    else if ((x.op === 'rename' || x.op === 'remove') && x.group !== undefined) x = { ...x, group: G(x.group) } as SpliceOp;
+    else if (x.op === 'connect' || x.op === 'disconnect') x = { ...x, from: canon[l]!.has(x.from) ? x.from : G(x.from), to: canon[l]!.has(x.to) ? x.to : G(x.to) };
+    else if (x.op === 'group' && x.group && typeof x.group === 'object') {
+      const gp = gpropAt(l, i), lb = gp ? relabelG[l]!.get(gp.id) : undefined;
+      x = { ...x, group: { ...x.group, ...(gp ? { id: canonG[l]!.get(gp.id) ?? gp.id } : {}), ...(lb ? { label: lb } : {}), ...(isStr(x.group.parent) ? { parent: G(x.group.parent) } : {}) } };
+      if (x.attach && !canon[l]!.has(x.attach.to)) x = { ...x, attach: { ...x.attach, to: G(x.attach.to) } };
+    }
     const p = propAt(l, i);
     if (!p) return x;
     const node = (nd: SpliceNode) => { const lb = relabel[l]!.get(p.id); return { ...nd, id: canon[l]!.get(p.id) ?? p.id, ...(lb ? { label: lb } : {}) }; };
     if (x.op === 'add' && x.node && typeof x.node === 'object') return { ...x, node: node(x.node) };
     if (x.op === 'replace' && x.with && typeof x.with === 'object') return { ...x, with: node(x.with) };
+    if (x.op === 'group' && x.first && typeof x.first === 'object') return { ...x, first: node(x.first) };
     return x;
   }));
   const fwd = layers.map((_, l) => l);
@@ -259,6 +324,9 @@ export function combineSplices(base: Model, layers: { title: string; splice: Spl
       const g = agreedOf(l, i);
       if (g !== undefined) { if (done.has(`g${g}`)) return; done.add(`g${g}`); }
       let x = op;
+      // a group treated as the same as another splice's: made once, the second only adds its card and relationship
+      const gp = gpropAt(l, i), gto = gp ? unifiedG[l]!.get(gp.id) ?? (unifiedG.some((u) => [...u.values()].includes(canonG[l]!.get(gp.id) ?? '')) ? canonG[l]!.get(gp.id) : undefined) : undefined;
+      if (gto && x.op === 'group') { if (done.has(`ug:${gto}`)) x = { ...x, group: { ...x.group, id: gto }, $reuse: true } as SpliceOp; else done.add(`ug:${gto}`); }
       const p = propAt(l, i), to = p ? unifiedTo[l]!.get(p.id) : undefined;
       if (to) {
         if (done.has(`u:${to}`)) x = x.op === 'add' ? ({ ...x, node: { ...x.node, id: to }, $reuse: true } as SpliceOp) : x.op === 'replace' ? { ...x, with: to } : x;
@@ -281,7 +349,9 @@ export function combineSplices(base: Model, layers: { title: string; splice: Spl
   const labels = new Map<string, string>();
   for (const m of [result.model, ...(back ? [back.result.model] : []), ...alone.map((r) => r.model), base]) for (const n of m.nodes) if (!labels.has(n.id)) labels.set(n.id, n.label ?? n.id);
   /** A node's name as the people who wrote the splices knew it: the base model's label, else the proposal's. */
-  const lbl = (id: string) => bLabel.get(id) ?? labels.get(id) ?? id;
+  const phLabel = new Map<string, string>();
+  for (const r of [result, ...(back ? [back.result] : []), ...alone]) for (const [ph, g] of Object.entries(r.marks.placeholders ?? {})) if (!phLabel.has(ph)) phLabel.set(ph, `the ${r.model.groups?.find((x) => x.id === g)?.label ?? g} group`);
+  const lbl = (id: string) => bLabel.get(id) ?? phLabel.get(id) ?? labels.get(id) ?? id;
   const pw = (a: string, b: string) => `${lbl(a)} → ${lbl(b)}`;
   const words = layers.map((L, l) => describeSplice(base, { ...L.splice, ops: rew[l]! }));
   const said = (l: number, i: number) => words[l]![i] ?? '';
@@ -306,7 +376,14 @@ export function combineSplices(base: Model, layers: { title: string; splice: Spl
         break;
       }
       case 'connect': case 'disconnect': { const a = r(op.from), b = r(op.to); d.uses = nn([a, b]); if (a && b) d.pair = [a, b]; break; }
-      case 'remove': case 'rename': case 'move': d.node = r(op.node) ?? undefined; break;
+      case 'remove': case 'rename': if (op.group !== undefined) { d.group = op.group; break; } d.node = r(op.node) ?? undefined; break;
+      case 'move': d.node = r(op.node) ?? undefined; break;
+      case 'group': {
+        d.group = isStr(op.group?.id) ? op.group.id : undefined; d.groupLabel = gpropAt(l, i)?.label ?? op.group?.label;
+        if (op.first && typeof op.first === 'object') { d.made = isStr(op.first.id) ? op.first.id : undefined; d.label = op.first.label; }
+        if (op.attach) { const x = r(op.attach.to); d.uses = nn([x]); if (x) d.near = { rel: op.attach.dir === 'in' ? 'called' : 'calls', x }; }
+        break;
+      }
       case 'replace': {
         d.node = r(op.node) ?? undefined;
         if (isStr(op.with)) { d.with = r(op.with) ?? undefined; d.uses = nn([d.with ?? null]); }
@@ -400,7 +477,13 @@ export function combineSplices(base: Model, layers: { title: string; splice: Spl
     return path.map(lbl).join(' → ');
   };
   /** What became of a change that needed a node another splice removed. */
+  const hasGroup = (g: string | undefined) => !!g && !!result.model.groups?.some((x) => x.id === g);
   const lostWords = (y: Desc, cause: string): { kind: 'lost' | 'dangling'; text: string } => {
+    if (y.op.op === 'group') {
+      if (!hasGroup(y.group)) return { kind: 'lost', text: `The ${y.groupLabel} group is not added, because ${cause}` };
+      const dir = y.op.attach?.dir ?? 'out';
+      return { kind: 'dangling', text: dir === 'in' ? `Nothing reaches the ${y.groupLabel} group any more, because ${cause}` : `The ${y.groupLabel} group reaches nothing any more, because ${cause}` };
+    }
     if (y.made) {
       if (!C.has.has(y.made)) return { kind: 'lost', text: `${y.label} is not added, because ${cause}` };
       const A = liveOf(alone[y.l]!), aIn = A.edges.some((e) => e.to === y.made), aOut = A.edges.some((e) => e.from === y.made);
@@ -431,7 +514,23 @@ export function combineSplices(base: Model, layers: { title: string; splice: Spl
     const da = D.find((d) => d.l === p.a.l && d.i === p.a.i), db = D.find((d) => d.l === p.b.l && d.i === p.b.i);
     const ga = agreedOf(p.a.l, p.a.i);
     if (!da || !db || (ga !== undefined && ga === agreedOf(p.b.l, p.b.i))) continue;
-    const name = p.a.label, ida = canon[p.a.l]!.get(p.a.id) ?? p.a.id, idb = canon[p.b.l]!.get(p.b.id) ?? p.b.id;
+    const name = p.a.label;
+    if (p.a.group) {
+      const ga = canonG[p.a.l]!.get(p.a.id) ?? p.a.id, gb = canonG[p.b.l]!.get(p.b.id) ?? p.b.id;
+      const inG = (g: string) => result.model.nodes.filter((m) => m.group === g).map((m) => m.id);
+      const where = (d: Desc) => (d.near ? nearWords(d) : 'on its own');
+      const glbl = (g: string) => result.model.groups?.find((z) => z.id === g)?.label ?? g;
+      if (p.unified) add(`same|${p.key}`, { kind: 'same-name', group: 'same', layers: [p.a.l, p.b.l], nodes: inG(ga), pairs: [], subject: `One ${name} group`, same: { key: p.key, unified: true },
+        message: `${titles[p.a.l]}'s and ${titles[p.b.l]}'s ${name} groups are treated as the same (in this combination only)`,
+        parts: [part(da, `proposes a ${name} group ${where(da)}`), part(db, `proposes a ${name} group ${where(db)}`)],
+        result: `Combined: one ${name} group, with what both put in it. Recorded in this combination, not in either splice` });
+      else add(`same|${p.key}`, { kind: 'same-name', layers: [p.a.l, p.b.l], nodes: [...inG(ga), ...inG(gb)], pairs: [], subject: `Two different ${name} groups`, same: { key: p.key, unified: false },
+        message: `Two different ${name} groups, one in ${titles[p.a.l]} (${where(da)}) and one in ${titles[p.b.l]} (${where(db)}). Same thing?`,
+        parts: [part(da, `proposes one ${where(da)}`), part(db, `proposes one ${where(db)}`)],
+        result: `Combined: two groups, “${glbl(ga)}” and “${glbl(gb)}”. If they are one group, treat them as the same` });
+      continue;
+    }
+    const ida = canon[p.a.l]!.get(p.a.id) ?? p.a.id, idb = canon[p.b.l]!.get(p.b.id) ?? p.b.id;
     if (p.unified) {
       add(`same|${p.key}`, { kind: 'same-name', group: 'same', layers: [p.a.l, p.b.l], nodes: [ida], pairs: [], subject: `One ${name}`, same: { key: p.key, unified: true },
         message: `${titles[p.a.l]}'s and ${titles[p.b.l]}'s ${name} are treated as the same (in this combination only)`,
@@ -456,6 +555,13 @@ export function combineSplices(base: Model, layers: { title: string; splice: Spl
         const n = x.node, w = (d: Desc) => (d.op.op === 'rename' ? `renames it to ${d.op.label}` : d.op.op === 'move' ? `moves it into ${d.op.group}` : `replaces it with ${lbl(d.with ?? '')}`);
         add(`conflict|n:${n}|${xo}`, { kind: 'conflict', layers: [x.l, y.l], nodes: [n], pairs: [], subject: lbl(n), message: `${titles[x.l]} and ${titles[y.l]} disagree about ${lbl(n)}`, parts: [part(x, w(x)), part(y, w(y))], result: `Combined: ${nodeNow(n)}` });
         cover([x, y], [n]);
+      }
+      // two names for one group
+      if (xo === 'rename' && yo === 'rename' && x.group && x.group === y.group && x.op.label.trim() !== (y.op as { label: string }).label.trim()) {
+        const g = x.group, gl = base.groups?.find((z) => z.id === g)?.label ?? g, now = result.model.groups?.find((z) => z.id === g)?.label ?? g;
+        add(`conflict|g:${g}|rename`, { kind: 'conflict', layers: [x.l, y.l], nodes: result.model.nodes.filter((m) => m.group === g).map((m) => m.id).slice(0, 12), pairs: [], subject: `the ${gl} group`, message: `${titles[x.l]} and ${titles[y.l]} disagree about the ${gl} group`,
+          parts: [part(x, `renames it to ${x.op.label}`), part(y, `renames it to ${(y.op as { label: string }).label}`)], result: `Combined: it is called ${now}` });
+        cover([x, y]);
       }
       // two different things into one relationship
       if (x.into && y.into && sameRel(x.into, y.into) && x.made !== y.made) {
@@ -497,9 +603,11 @@ export function combineSplices(base: Model, layers: { title: string; splice: Spl
     if (xo === 'remove' && x.node && yo !== 'disconnect' && yo !== 'remove' && y.uses.includes(x.node)) {
       const n = x.node, subj = y.made ? (y.label ?? lbl(y.made)) : y.pair ? pw(...y.pair) : `“${y.words}”`;
       const res = lostWords(y, `${titles[x.l]} ${says(x.words)}`);
-      add(`lost|${y.l}:${y.i}`, { kind: res.kind, layers: [x.l, y.l], op: { layer: y.l, index: y.i }, nodes: uniq([n, ...(y.made && C.has.has(y.made) ? [y.made] : [])]), pairs: y.pair && C.keys.has(pairKey(...y.pair)) ? [pairKey(...y.pair)] : [], subject: subj,
+      const inG = yo === 'group' && y.group ? result.model.nodes.filter((m) => m.group === y.group && C.has.has(m.id)).map((m) => m.id) : [];
+      add(`lost|${y.l}:${y.i}`, { kind: res.kind, layers: [x.l, y.l], op: { layer: y.l, index: y.i }, nodes: uniq([n, ...(y.made && C.has.has(y.made) ? [y.made] : []), ...inG]), pairs: y.pair && C.keys.has(pairKey(...y.pair)) ? [pairKey(...y.pair)] : [], subject: yo === 'group' ? `The ${y.groupLabel} group` : subj,
         message: res.text, parts: [part(y, says(y.words)), part(x, `removes ${lbl(n)}`)], result: `Combined: ${res.text}` });
-      cover([y], y.made ? [y.made] : [], y.pair ? [pairKey(...y.pair)] : []);
+      // (the group's cards were placed by its relationship: said here, not once more each)
+      cover([y], [...(y.made ? [y.made] : []), ...inG, ...(yo === 'group' && y.group ? (alone[y.l]!.model.nodes.filter((m) => m.group === canonG[y.l]!.get(y.group!) || m.group === y.group).map((m) => m.id)) : [])], y.pair ? [pairKey(...y.pair)] : []);
     }
   }
   // (d) follows: changes that name a node another splice replaced now apply to its replacement (one note per splice and replace)
@@ -528,6 +636,7 @@ export function combineSplices(base: Model, layers: { title: string; splice: Spl
   layers.forEach((_, l) => {
     const A = alone[l]!, AL = liveOf(A);
     for (const id of AL.proposed) {
+      if (A.marks.placeholders?.[id]) continue;
       const d = D.find((x) => x.l === l && x.made === id);
       if (!d || coveredNodes.has(id) || coveredOps.has(`${l}:${d.i}`)) continue;
       if (!C.has.has(id)) {
@@ -718,7 +827,7 @@ export function spliceStack(base: Model, layers: SpliceLayer[], o: SpliceStackOp
     const lines = describeSplice(base, l.splice);
     slices.push({
       id: `splice:${l.key}`, title: l.title, subtitle: `${plural(n, 'change')} · ${l.unsaved ? 'unsaved' : 'saved'}`, model: r.model,
-      marks: { nodes: r.marks.nodes, edges: r.marks.edges }, about: lines, ...(l.unsaved ? { badge: 'unsaved' } : {}),
+      marks: { nodes: r.marks.nodes, edges: boardMarks(r).edges }, about: lines, ...(l.unsaved ? { badge: 'unsaved' } : {}),
       ...(ws.length ? { warning: { name: 'no longer applies', text: `⚠ ${plural(ws.length, 'change')} no longer appl${ws.length === 1 ? 'ies' : 'y'}`, details: ws.map((w) => `${w.op >= 0 ? `“${lines[w.op] ?? ''}”: ` : ''}${w.message}`), nodes: [], pairs: [] } } : {}),
     });
     kinds.push({ kind: 'splice', layer: i });
@@ -743,7 +852,7 @@ export function spliceStack(base: Model, layers: SpliceLayer[], o: SpliceStackOp
     const lines = describeSplice(base, c.splice);
     slices.push({
       id: 'combined', title: c.splice.title, subtitle: `${plural(n, 'change')} · read-only`, model: c.result.model,
-      marks: { nodes: c.result.marks.nodes, edges: c.result.marks.edges }, badge: 'combined',
+      marks: { nodes: c.result.marks.nodes, edges: boardMarks(c.result).edges }, badge: 'combined',
       about: [`${c.order.join(', then ')}: each one's changes, in that order${c.other?.differs ? ' (the other order gives something else)' : ''}`, ...cs.map((x) => `${ISSUE_WORDS[x.group].sym} ${x.message}`), ...lines],
       ...(cs.length ? {
         warning: {

@@ -1,0 +1,11 @@
+<div class="pl-card box">
+  <div class="bar"><span class="ic" aria-hidden="true"></span><span class="fn">{{file}}</span>{{#if badge}}<span class="badge">{{badge}}</span>{{/if}}</div>
+  <div class="page">
+    {{#if h1}}<div class="h1"><span class="mk">#</span>{{h1}}</div>{{/if}}
+    {{#each sections}}<section class="sec st-{{state}}">
+      <div class="h2"><span class="mk">##</span><span class="ht">{{heading}}</span>{{#if note}}<span class="note">{{note}}</span>{{/if}}</div>
+      {{#if lines}}<ul class="lines">{{#each lines}}<li>{{{this}}}</li>{{/each}}</ul>{{/if}}
+    </section>
+    {{/each}}
+  </div>
+</div>

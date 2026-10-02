@@ -1,0 +1,842 @@
+{
+  "karyo": "explainer/1",
+  "id": "b2-searching",
+  "title": "Claude searches, it doesn't see",
+  "summary": "Claude can't glance at your folders. It finds files by name and by the words inside them, then opens only a few. Good names and words light the way.",
+  "note": "Names, companies and files here are **made-up examples**.",
+  "narration": "side",
+  "uses": [
+    "file-tree",
+    "terminal",
+    "chat-turn",
+    "try-it"
+  ],
+  "layout": {
+    "kind": "free"
+  },
+  "categories": [
+    {
+      "id": "files",
+      "label": "your files"
+    },
+    {
+      "id": "tools",
+      "label": "search commands"
+    },
+    {
+      "id": "claude",
+      "label": "Claude"
+    },
+    {
+      "id": "you",
+      "label": "you"
+    }
+  ],
+  "elements": [
+    {
+      "id": "tree",
+      "type": "file-tree",
+      "category": "files",
+      "label": "The Work folder",
+      "props": {
+        "title": "~/Work",
+        "items": [
+          {
+            "name": "Clients",
+            "depth": 0,
+            "kind": "folder"
+          },
+          {
+            "name": "Acme",
+            "depth": 1,
+            "kind": "folder"
+          },
+          {
+            "name": "Acme-contract-2026.pdf",
+            "depth": 2,
+            "kind": "file"
+          },
+          {
+            "name": "kickoff-notes.md",
+            "depth": 2,
+            "kind": "file"
+          },
+          {
+            "name": "Birch",
+            "depth": 1,
+            "kind": "folder"
+          },
+          {
+            "name": "proposal.md",
+            "depth": 2,
+            "kind": "file"
+          },
+          {
+            "name": "Finance",
+            "depth": 0,
+            "kind": "folder"
+          },
+          {
+            "name": "budget-2026.csv",
+            "depth": 1,
+            "kind": "file"
+          },
+          {
+            "name": "invoices-2026.csv",
+            "depth": 1,
+            "kind": "file"
+          },
+          {
+            "name": "Meetings",
+            "depth": 0,
+            "kind": "folder"
+          },
+          {
+            "name": "2026-03-02-call.md",
+            "depth": 1,
+            "kind": "file"
+          },
+          {
+            "name": "2026-03-09-sync.md",
+            "depth": 1,
+            "kind": "file"
+          },
+          {
+            "name": "Scans",
+            "depth": 0,
+            "kind": "folder"
+          },
+          {
+            "name": "scan0042.pdf",
+            "depth": 1,
+            "kind": "file"
+          }
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 0,
+        "w": 380
+      }
+    },
+    {
+      "id": "you",
+      "type": "chat-turn",
+      "category": "you",
+      "label": "Your question",
+      "props": {
+        "who": "you",
+        "text": "What does the Acme contract say about late fees?"
+      },
+      "at": {
+        "x": 420,
+        "y": 0,
+        "w": 420
+      }
+    },
+    {
+      "id": "term",
+      "type": "terminal",
+      "category": "tools",
+      "label": "Claude's searches",
+      "props": {
+        "title": "Terminal — zsh",
+        "badge": "run by Claude",
+        "prompt": "~/Work %",
+        "lines": [
+          {
+            "kind": "cmd",
+            "text": "find . -iname \"*acme*\""
+          },
+          {
+            "kind": "out",
+            "text": "./Clients/Acme"
+          },
+          {
+            "kind": "out",
+            "text": "./Clients/Acme/Acme-contract-2026.pdf",
+            "mark": true
+          }
+        ]
+      },
+      "at": {
+        "x": 420,
+        "y": 100,
+        "w": 420
+      }
+    },
+    {
+      "id": "claude",
+      "type": "chat-turn",
+      "category": "claude",
+      "label": "Claude's answer",
+      "props": {
+        "who": "claude",
+        "text": "The contract sets a late fee of **2% a month**, and the 2 March call kept it at 2%.",
+        "actions": [
+          "Bash: find . -iname \"*acme*\"",
+          "Bash: grep -ril \"acme\" .",
+          "Read: Clients/Acme/Acme-contract-2026.pdf",
+          "Read: Meetings/2026-03-02-call.md"
+        ]
+      },
+      "at": {
+        "x": 420,
+        "y": 365,
+        "w": 420
+      }
+    },
+    {
+      "id": "librarian",
+      "type": "card",
+      "category": "claude",
+      "label": "The librarian analogy",
+      "props": {
+        "kicker": "Like a librarian",
+        "title": "Search the catalogue, pull a few books",
+        "body": "Titles first (file names), then an index of what's inside (the words in each file). Only a few books leave the shelf."
+      },
+      "at": {
+        "x": 0,
+        "y": 455,
+        "w": 380
+      }
+    },
+    {
+      "id": "unseen",
+      "type": "callout",
+      "category": "files",
+      "label": "Why the scan stays hidden",
+      "props": {
+        "tone": "warn",
+        "title": "Invisible to both searches",
+        "md": "**By name:** `scan0042.pdf` says nothing about Acme.\n\n**By contents:** a scan is a picture of words, so grep has no letters to match."
+      },
+      "at": {
+        "x": 880,
+        "y": 200,
+        "w": 320
+      }
+    },
+    {
+      "id": "try",
+      "type": "try-it",
+      "props": {
+        "title": "Watch Claude search",
+        "ask": "Which files in this folder mention invoices? Tell me how you searched.",
+        "expect": "Run it in a folder of your own. In its steps you'll usually see `find` and `grep`: on a Mac, that is how Claude Code searches."
+      },
+      "at": {
+        "x": 880,
+        "y": 420,
+        "w": 320
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "title": "It can't see your folders",
+      "text": "You take in this folder at a glance. Claude can't: about your files, it knows only what it has read. So it works like a librarian, searching the catalogue instead of reading every book.",
+      "show": [
+        "tree",
+        "librarian"
+      ],
+      "emphasize": [
+        "tree"
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "You ask about a thing",
+      "text": "Your question names a thing, *the Acme contract*, not a file. Claude has to work out which of these eight files hold the answer.",
+      "add": [
+        "you"
+      ],
+      "emphasize": [
+        "you"
+      ],
+      "dim": [
+        "librarian"
+      ]
+    },
+    {
+      "id": "s3",
+      "title": "Search by name",
+      "text": "First the titles. `find` lists everything whose **name** contains *acme*, in capitals or not (`-iname`). One hit is the contract itself.",
+      "add": [
+        "term"
+      ],
+      "emphasize": [
+        "term",
+        "tree"
+      ],
+      "dim": [
+        "you",
+        "librarian"
+      ],
+      "set": {
+        "tree": {
+          "title": "~/Work",
+          "items": [
+            {
+              "name": "Clients",
+              "depth": 0,
+              "kind": "folder"
+            },
+            {
+              "name": "Acme",
+              "depth": 1,
+              "kind": "folder",
+              "state": "hit"
+            },
+            {
+              "name": "Acme-contract-2026.pdf",
+              "depth": 2,
+              "kind": "file",
+              "state": "hit",
+              "note": "name"
+            },
+            {
+              "name": "kickoff-notes.md",
+              "depth": 2,
+              "kind": "file"
+            },
+            {
+              "name": "Birch",
+              "depth": 1,
+              "kind": "folder"
+            },
+            {
+              "name": "proposal.md",
+              "depth": 2,
+              "kind": "file"
+            },
+            {
+              "name": "Finance",
+              "depth": 0,
+              "kind": "folder"
+            },
+            {
+              "name": "budget-2026.csv",
+              "depth": 1,
+              "kind": "file"
+            },
+            {
+              "name": "invoices-2026.csv",
+              "depth": 1,
+              "kind": "file"
+            },
+            {
+              "name": "Meetings",
+              "depth": 0,
+              "kind": "folder"
+            },
+            {
+              "name": "2026-03-02-call.md",
+              "depth": 1,
+              "kind": "file"
+            },
+            {
+              "name": "2026-03-09-sync.md",
+              "depth": 1,
+              "kind": "file"
+            },
+            {
+              "name": "Scans",
+              "depth": 0,
+              "kind": "folder"
+            },
+            {
+              "name": "scan0042.pdf",
+              "depth": 1,
+              "kind": "file"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s4",
+      "title": "Search by contents",
+      "text": "Then the index. `grep` looks **inside** every file in every folder (`-r`), ignores capitals (`-i`) and lists just the file names (`-l`). Three more files mention Acme, though their names don't.",
+      "emphasize": [
+        "term",
+        "tree"
+      ],
+      "dim": [
+        "you",
+        "librarian"
+      ],
+      "set": {
+        "tree": {
+          "title": "~/Work",
+          "items": [
+            {
+              "name": "Clients",
+              "depth": 0,
+              "kind": "folder"
+            },
+            {
+              "name": "Acme",
+              "depth": 1,
+              "kind": "folder",
+              "state": "hit"
+            },
+            {
+              "name": "Acme-contract-2026.pdf",
+              "depth": 2,
+              "kind": "file",
+              "state": "hit",
+              "note": "name"
+            },
+            {
+              "name": "kickoff-notes.md",
+              "depth": 2,
+              "kind": "file",
+              "state": "hit",
+              "note": "words inside"
+            },
+            {
+              "name": "Birch",
+              "depth": 1,
+              "kind": "folder"
+            },
+            {
+              "name": "proposal.md",
+              "depth": 2,
+              "kind": "file"
+            },
+            {
+              "name": "Finance",
+              "depth": 0,
+              "kind": "folder"
+            },
+            {
+              "name": "budget-2026.csv",
+              "depth": 1,
+              "kind": "file"
+            },
+            {
+              "name": "invoices-2026.csv",
+              "depth": 1,
+              "kind": "file",
+              "state": "hit",
+              "note": "words inside"
+            },
+            {
+              "name": "Meetings",
+              "depth": 0,
+              "kind": "folder"
+            },
+            {
+              "name": "2026-03-02-call.md",
+              "depth": 1,
+              "kind": "file",
+              "state": "hit",
+              "note": "words inside"
+            },
+            {
+              "name": "2026-03-09-sync.md",
+              "depth": 1,
+              "kind": "file"
+            },
+            {
+              "name": "Scans",
+              "depth": 0,
+              "kind": "folder"
+            },
+            {
+              "name": "scan0042.pdf",
+              "depth": 1,
+              "kind": "file"
+            }
+          ]
+        },
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "find . -iname \"*acme*\""
+            },
+            {
+              "kind": "out",
+              "text": "./Clients/Acme"
+            },
+            {
+              "kind": "out",
+              "text": "./Clients/Acme/Acme-contract-2026.pdf"
+            },
+            {
+              "kind": "cmd",
+              "text": "grep -ril \"acme\" ."
+            },
+            {
+              "kind": "out",
+              "text": "Clients/Acme/kickoff-notes.md",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "Finance/invoices-2026.csv",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "Meetings/2026-03-02-call.md",
+              "mark": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s5",
+      "title": "Only a few are opened",
+      "text": "Searching is quick and exact. Reading takes up Claude's working memory, so it opens as little as it can: two of eight files, the contract and the call notes, and it answers.",
+      "add": [
+        "claude"
+      ],
+      "emphasize": [
+        "claude"
+      ],
+      "dim": [
+        "term",
+        "librarian"
+      ],
+      "set": {
+        "tree": {
+          "title": "~/Work",
+          "items": [
+            {
+              "name": "Clients",
+              "depth": 0,
+              "kind": "folder",
+              "state": "plain"
+            },
+            {
+              "name": "Acme",
+              "depth": 1,
+              "kind": "folder",
+              "state": "plain"
+            },
+            {
+              "name": "Acme-contract-2026.pdf",
+              "depth": 2,
+              "kind": "file",
+              "state": "hit",
+              "note": "read"
+            },
+            {
+              "name": "kickoff-notes.md",
+              "depth": 2,
+              "kind": "file",
+              "state": "dim"
+            },
+            {
+              "name": "Birch",
+              "depth": 1,
+              "kind": "folder",
+              "state": "dim"
+            },
+            {
+              "name": "proposal.md",
+              "depth": 2,
+              "kind": "file",
+              "state": "dim"
+            },
+            {
+              "name": "Finance",
+              "depth": 0,
+              "kind": "folder",
+              "state": "dim"
+            },
+            {
+              "name": "budget-2026.csv",
+              "depth": 1,
+              "kind": "file",
+              "state": "dim"
+            },
+            {
+              "name": "invoices-2026.csv",
+              "depth": 1,
+              "kind": "file",
+              "state": "dim"
+            },
+            {
+              "name": "Meetings",
+              "depth": 0,
+              "kind": "folder",
+              "state": "plain"
+            },
+            {
+              "name": "2026-03-02-call.md",
+              "depth": 1,
+              "kind": "file",
+              "state": "hit",
+              "note": "read"
+            },
+            {
+              "name": "2026-03-09-sync.md",
+              "depth": 1,
+              "kind": "file",
+              "state": "dim"
+            },
+            {
+              "name": "Scans",
+              "depth": 0,
+              "kind": "folder",
+              "state": "dim"
+            },
+            {
+              "name": "scan0042.pdf",
+              "depth": 1,
+              "kind": "file",
+              "state": "dim"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s6",
+      "title": "The file nobody finds",
+      "text": "In April the fee went up, and the signed amendment is `scan0042.pdf`. Neither search can reach it, so Claude never opens it. Its answer is confident and out of date: about your files, it knows only what it read.",
+      "add": [
+        "unseen"
+      ],
+      "emphasize": [
+        "unseen",
+        "tree"
+      ],
+      "dim": [
+        "term",
+        "you",
+        "librarian",
+        "claude"
+      ],
+      "set": {
+        "tree": {
+          "title": "~/Work",
+          "items": [
+            {
+              "name": "Clients",
+              "depth": 0,
+              "kind": "folder",
+              "state": "dim"
+            },
+            {
+              "name": "Acme",
+              "depth": 1,
+              "kind": "folder"
+            },
+            {
+              "name": "Acme-contract-2026.pdf",
+              "depth": 2,
+              "kind": "file"
+            },
+            {
+              "name": "kickoff-notes.md",
+              "depth": 2,
+              "kind": "file"
+            },
+            {
+              "name": "Birch",
+              "depth": 1,
+              "kind": "folder",
+              "state": "dim"
+            },
+            {
+              "name": "proposal.md",
+              "depth": 2,
+              "kind": "file",
+              "state": "dim"
+            },
+            {
+              "name": "Finance",
+              "depth": 0,
+              "kind": "folder",
+              "state": "dim"
+            },
+            {
+              "name": "budget-2026.csv",
+              "depth": 1,
+              "kind": "file",
+              "state": "dim"
+            },
+            {
+              "name": "invoices-2026.csv",
+              "depth": 1,
+              "kind": "file"
+            },
+            {
+              "name": "Meetings",
+              "depth": 0,
+              "kind": "folder",
+              "state": "dim"
+            },
+            {
+              "name": "2026-03-02-call.md",
+              "depth": 1,
+              "kind": "file"
+            },
+            {
+              "name": "2026-03-09-sync.md",
+              "depth": 1,
+              "kind": "file",
+              "state": "dim"
+            },
+            {
+              "name": "Scans",
+              "depth": 0,
+              "kind": "folder",
+              "state": "plain"
+            },
+            {
+              "name": "scan0042.pdf",
+              "depth": 1,
+              "kind": "file",
+              "state": "hit",
+              "note": "never found"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s7",
+      "title": "Good names light the way",
+      "text": "Rename the scan to say what it is, and the same `find` turns it up. There's no index built in advance: Claude searches fresh every time, so your names and words are the catalogue.",
+      "emphasize": [
+        "term",
+        "tree",
+        "librarian"
+      ],
+      "dim": [
+        "you",
+        "claude",
+        "unseen"
+      ],
+      "set": {
+        "tree": {
+          "title": "~/Work",
+          "items": [
+            {
+              "name": "Clients",
+              "depth": 0,
+              "kind": "folder"
+            },
+            {
+              "name": "Acme",
+              "depth": 1,
+              "kind": "folder",
+              "state": "hit"
+            },
+            {
+              "name": "Acme-contract-2026.pdf",
+              "depth": 2,
+              "kind": "file",
+              "state": "hit",
+              "note": "name"
+            },
+            {
+              "name": "kickoff-notes.md",
+              "depth": 2,
+              "kind": "file"
+            },
+            {
+              "name": "Birch",
+              "depth": 1,
+              "kind": "folder"
+            },
+            {
+              "name": "proposal.md",
+              "depth": 2,
+              "kind": "file"
+            },
+            {
+              "name": "Finance",
+              "depth": 0,
+              "kind": "folder"
+            },
+            {
+              "name": "budget-2026.csv",
+              "depth": 1,
+              "kind": "file"
+            },
+            {
+              "name": "invoices-2026.csv",
+              "depth": 1,
+              "kind": "file"
+            },
+            {
+              "name": "Meetings",
+              "depth": 0,
+              "kind": "folder"
+            },
+            {
+              "name": "2026-03-02-call.md",
+              "depth": 1,
+              "kind": "file"
+            },
+            {
+              "name": "2026-03-09-sync.md",
+              "depth": 1,
+              "kind": "file"
+            },
+            {
+              "name": "Scans",
+              "depth": 0,
+              "kind": "folder",
+              "state": "plain"
+            },
+            {
+              "name": "Acme-amendment-2026-04.pdf",
+              "depth": 1,
+              "kind": "file",
+              "state": "new",
+              "note": "now found"
+            }
+          ]
+        },
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "find . -iname \"*acme*\""
+            },
+            {
+              "kind": "out",
+              "text": "./Clients/Acme"
+            },
+            {
+              "kind": "out",
+              "text": "./Scans/Acme-amendment-2026-04.pdf",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "./Clients/Acme/Acme-contract-2026.pdf"
+            }
+          ]
+        },
+        "unseen": {
+          "title": "Invisible to both searches, until renamed",
+          "md": "**By name:** `scan0042.pdf` said nothing about Acme. The new name does.\n\n**By contents:** a scan is a picture of words, so grep still has no letters to match."
+        },
+        "librarian": {
+          "body": "Titles first (file names), then what's inside (the words in each file). **Where it stops:** a library's catalogue is written in advance. Claude has none; it searches the shelves fresh each time."
+        }
+      }
+    },
+    {
+      "id": "s8",
+      "title": "The whole picture",
+      "text": "The searches are exact and repeatable; choosing what to search for, and what to open, is Claude's judgment. Name files for what they are and use the same words for the same things, and both work better.",
+      "show": "*",
+      "emphasize": [
+        "try"
+      ]
+    }
+  ]
+}

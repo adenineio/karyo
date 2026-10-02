@@ -12,6 +12,7 @@
     "id": { "$ref": "#/$defs/id", "description": "Stable id (file names, anchors)." },
     "title": { "type": "string", "minLength": 1 },
     "summary": { "type": "string", "description": "One line under the title (markdown-lite inline)." },
+    "note": { "type": "string", "description": "A short line in the footer on every step, beside the step hint (markdown-lite inline), e.g. that the names and files shown are made-up examples." },
     "size": {
       "type": "object", "required": ["w", "h"], "additionalProperties": false,
       "description": "Logical stage size in px (default 1600×900). The plate scales to fit its container.",

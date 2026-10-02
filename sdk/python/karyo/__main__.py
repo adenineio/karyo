@@ -5,7 +5,8 @@
         tokenize + ast, without importing or running anything. Writes a model fragment. Malformed
         directives are `directive-invalid` warnings (printed, and in the fragment's checks).
         Automatic mode (--auto; the default when no module has a directive) also makes every class
-        and public function a node and adds the static call graph (karyo/auto.py).
+        and public function a node and adds the static call graph (karyo/auto.py); directives then
+        refine the automatic nodes of the defs they sit on. --no-auto: directives only.
 
     python -m karyo record [--out .karyo] [--root .] [--hooks karyo_hooks.py] [--package app] [--project name]
                            [--monitor | --no-monitor] [--sample 0.01] [--auto | --no-auto] -- <command ...>
@@ -25,11 +26,14 @@ from __future__ import annotations
 
 import argparse
 import ast
+import gc
 import json
 import os
 import re
 import sys
+from concurrent.futures import BrokenExecutor, ProcessPoolExecutor
 from datetime import datetime, timezone
+from typing import Iterator
 
 from . import __version__, code_excerpt
 from . import auto as am
@@ -78,28 +82,8 @@ def _lit(n: ast.AST):
         return None
 
 
-def _karyo_names(tree: ast.AST) -> tuple[set[str], dict[str, str]]:
-    """How a module refers to karyo: names bound to the module (`import karyo [as k]`), and names bound to
-    its functions (`from karyo import node [as n]`)."""
-    mods: set[str] = set()
-    funcs: dict[str, str] = {}
-    for n in ast.walk(tree):
-        if isinstance(n, ast.Import):
-            mods |= {a.asname or a.name for a in n.names if a.name == "karyo"}
-        elif isinstance(n, ast.ImportFrom) and n.module == "karyo" and not n.level:
-            funcs |= {a.asname or a.name: a.name for a in n.names}
-    return mods, funcs
-
-
-def _call_name(c: ast.Call, karyo: tuple[set[str], dict[str, str]]) -> str:
-    """The karyo function a call calls (`karyo.edge(...)`, or `edge(...)` imported from karyo), else "":
-    another library's `dot.edge("a", "b")` is not a karyo edge."""
-    f = c.func
-    if isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name) and f.value.id in karyo[0]:
-        return f.attr
-    if isinstance(f, ast.Name):
-        return karyo[1].get(f.id, "")
-    return ""
+_karyo_names = am.karyo_names     # how a module refers to karyo
+_call_name = am.karyo_call        # the karyo function a call calls, else ""
 
 
 def _code(rel: str, lines: list[str], n: ast.AST) -> dict:
@@ -111,10 +95,44 @@ def _code(rel: str, lines: list[str], n: ast.AST) -> dict:
 
 # ------------------------------------------------------------------ scan
 
-def scan(pkg_dirs: list[str], root: str, auto: bool | None = None) -> dict:
+# Below this much source, starting worker processes costs more than they save (`scan(parallel=True)`).
+PARALLEL_MIN_BYTES = 2_000_000
+PARALLEL_WORKERS = 2        # they only tokenize (for comments), which two keep well ahead of the rest of the scan
+
+
+def _comments(texts: list[str], parallel: bool) -> Iterator:
+    """Each source's comments (dv.comments_or_error), in order, read by worker processes while this one
+    parses and resolves; None for each one left to the scan itself (few sources, or no processes here)."""
+    done = 0
+    if parallel and len(texts) > 1 and sum(map(len, texts)) >= PARALLEL_MIN_BYTES and (os.cpu_count() or 1) > 1:
+        try:
+            with ProcessPoolExecutor(max_workers=PARALLEL_WORKERS) as pool:
+                for c in pool.map(dv.comments_or_error, texts, chunksize=16):
+                    done += 1
+                    yield c
+        except (OSError, NotImplementedError, BrokenExecutor):
+            pass                    # no worker processes to be had: the scan reads the rest itself
+    for _ in texts[done:]:
+        yield None
+
+
+def scan(pkg_dirs: list[str], root: str, auto: bool | None = None, parallel: bool = False) -> dict:
     """The static fragment of some package directories. `auto` (automatic mode: every class and public
     function a node, plus the static call graph; karyo/auto.py): None means "when no module declares
-    itself", i.e. no `# karyo:` directive and no `@karyo.node` anywhere in them."""
+    itself", i.e. no `# karyo:` directive and no `@karyo.node` anywhere in them. `parallel`: read the
+    files' comments in worker processes when there are enough of them (the CLI does; the fragment is the same)."""
+    # the scan makes millions of objects (every module's syntax tree, kept to the end) and next to no cycles:
+    # the cyclic garbage collector would only walk them all again and again
+    collecting = gc.isenabled()
+    gc.disable()
+    try:
+        return _scan(pkg_dirs, root, auto, parallel)
+    finally:
+        if collecting:
+            gc.enable()
+
+
+def _scan(pkg_dirs: list[str], root: str, auto: bool | None, parallel: bool) -> dict:
     mods = _modules(pkg_dirs)
     sources: dict[str, str] = {}
     for mod, path in mods.items():
@@ -136,9 +154,10 @@ def scan(pkg_dirs: list[str], root: str, auto: bool | None = None) -> dict:
         if label:
             e.setdefault("label", label)
 
-    for mod, path in sorted(mods.items()):
+    order = sorted(mods.items())
+    for (mod, path), comments in zip(order, _comments([sources[m] for m, _ in order], parallel)):
         rel = os.path.relpath(path, root).replace(os.sep, "/")
-        parsed_mods[mod] = am.Mod(mod, path, rel, sources[mod])
+        parsed_mods[mod] = am.Mod(mod, path, rel, sources[mod], comments)
         parsed = parsed_mods[mod].parsed
         problems += parsed.problems
         tree, lines = parsed.tree, parsed.lines
@@ -167,8 +186,10 @@ def scan(pkg_dirs: list[str], root: str, auto: bool | None = None) -> dict:
         spans += [(d, rel) for d in parsed.directives if d.verb == "span"]
 
         pkg = mod if is_pkg else mod.rpartition(".")[0]
-        karyo_names = _karyo_names(tree)
-        for n in ast.walk(tree):
+        karyo_names = _karyo_names(parsed_mods[mod].found())
+        # its imports, defs and calls in ast.walk's order (all this loop looks at); a module that doesn't
+        # import karyo makes no karyo calls, and then its imports are all there is to see
+        for n in parsed_mods[mod].found(calls=bool(karyo_names[0] or karyo_names[1])):
             # imports between this project's modules
             targets: list[str] = []
             if isinstance(n, ast.Import):
@@ -220,12 +241,17 @@ def scan(pkg_dirs: list[str], root: str, auto: bool | None = None) -> dict:
                     else:
                         add_edge(a, b, kind or "calls", label if isinstance(label, str) else None)
 
-    # automatic mode: a node for every class and public function no directive declares, and the static call graph
+    # automatic mode: a node for every class and public function no directive declares, and the static call graph;
+    # a declaration on a def refines that def's automatic node (am.refine) instead of standing beside it
     if auto:
         taken = set(nodes)
         auto_nodes, calls, project = am.extract(parsed_mods, taken)
         for n in auto_nodes:
             nodes[n["id"]] = n
+        for m in parsed_mods.values():
+            for nid, d in am.declared_defs(m).items():
+                if nid in nodes and nodes[nid].get("ref"):
+                    am.refine(nodes[nid], d)
         for a, b in calls:
             add_edge(a, b, "calls", source="extracted")
 
@@ -604,7 +630,11 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "check-prod":
         return check_prod(a.dirs, a.allow.split(","), a.strict)
 
-    frag = scan(a.packages, a.root, a.auto)
+    # what the scan builds (every module's syntax tree, in reference cycles) is garbage once it is done: the
+    # collector would only walk it all again while the fragment is written out
+    collecting = gc.isenabled()
+    gc.disable()
+    frag = scan(a.packages, a.root, a.auto, parallel=True)
     for chk in frag.get("checks", []):
         print(f"karyo: ⚠ {chk['code']} {chk['message']}", file=sys.stderr)
     text = json.dumps(frag, indent=1)
@@ -616,8 +646,12 @@ def main(argv: list[str] | None = None) -> int:
               f"{', %d warning(s)' % len(frag['checks']) if frag.get('checks') else ''}", file=sys.stderr)
     else:
         print(text)
+    if collecting:
+        gc.enable()
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    status = main()
+    gc.freeze()         # exiting: the collector needn't walk what a scan left behind once more
+    sys.exit(status)

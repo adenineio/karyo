@@ -39,6 +39,7 @@ install.
 | Jarvis mode | `karyo jarvis`, or `/karyo:jarvis` | local voice control of plates: `integrations/jarvis` (official Whisper and a `claude -p` brain) and `jarvis.html` |
 | models from code | `karyo model scan`, `karyo model build` | the Python SDK's scan (`sdk/python`, standard library only) and `scripts/model.ts` |
 | kits | `karyo kit new` / `list` / `check` / `trust` / `untrust` | node kinds and plate types a project adds ([KITS.md](KITS.md)) |
+| demos | `karyo demo [name]`, or `/karyo:demo` | `demos/<name>/`: a series of explainer specs, their components and a `demo.json` manifest, built to HTML on first use. `claude-code` is "Claude Code, explained": 21 explainers and a map of them (names and files in it are made-up examples) |
 
 The CLI is not on PATH: a plugin with a top-level `bin/` can't be installed in claude.ai or Cowork, so the skills call
 it by its full path. From a checkout, `just karyo …` runs it.
@@ -51,6 +52,7 @@ it by its full path. From a checkout, `just karyo …` runs it.
 - `view` triggers when you ask to open or see the project's Karyo view, board or map, and turns `# karyo:` directives
   into a model when there's nothing to draw yet.
 - `jarvis` runs only when you invoke `/karyo:jarvis`: it starts a microphone server and spends model turns.
+- `demo` triggers when you ask to see the Karyo demo or the Claude Code explainer series, or on `/karyo:demo`.
 
 ## Commands
 
@@ -65,6 +67,7 @@ The project-level commands (`karyo --help` lists every command):
 | `karyo model scan [<package-dir>…]` | reads the project's Python `# karyo:` directives into `.karyo/` and builds `karyo.model.json` (no argument: every package holding a directive) |
 | `karyo model build` | merges the fragments in `.karyo/` (scans and recorded runs) into `karyo.model.json` |
 | `karyo setup [--jarvis]` | checks the tools and installs the dependencies (above) |
+| `karyo demo [name] [--no-open] [--out DIR] [--force]` | no name: lists the demos that ship (`demos/*/demo.json`). With one: builds each page to a self-contained HTML file (the manifest's landing spec to `index.html`, the others to `<id>.html` beside it), prints progress and the path, and opens `index.html` in the default browser unless `--no-open`. The build is cached (below) and reused until Karyo's version or the demo's files change; `--force` rebuilds, `--out DIR` builds into DIR instead |
 
 Explainers: `karyo new`, `validate`, `info`, `stills`, `lint`, `build`, `open`, `serve`, and `components` /
 `component show|new|check` ([EXPLAINERS.md](EXPLAINERS.md)). Kits: `karyo kit …` ([KITS.md](KITS.md)). The docket:
@@ -92,6 +95,8 @@ loaded from its own folder (a checkout), `$KARYO_HOME/runtime`.
 | `venv/mcp`, `venv/jarvis` | the MCP server's and Jarvis's Python envs (uv, from their locked versions) |
 | `whisper/` | the Whisper weights, fetched on Jarvis's first start from OpenAI's official URL and SHA-256 checked |
 | `vite-cache/`, `pycache/`, `logs/`, `servers.json` | the view server's cache, Python bytecode, server logs, and what `karyo view` / `jarvis` started |
+| `demos/<name>/<version>-<hash>/` | a demo's built pages (`index.html` and one `<id>.html` per explainer; about 15 MB for `claude-code`), keyed by Karyo's version and a hash of `demos/<name>/`; an older build is removed when a new one lands |
+| `explainer-runtime/` | the explainer runtime the demo's pages embed (one script and stylesheet, rebuilt when Karyo's engine changes) |
 
 **Karyo's home**, `$KARYO_HOME` (default `~/.adenine/karyo`), holds what belongs to you rather than to one install:
 the dockets (`dockets/`), shared kits (`kits/`) and components (`components/`), the MCP server's explainer workspace
@@ -104,7 +109,7 @@ A changed file asks again. Built-in kits need no entry. It survives reinstalling
 
 ## Ports and security
 
-`karyo view` uses the first free port in 5781–5799 (or `--port`); `karyo jarvis` picks its server's port from the same
+`karyo view` uses the first free port in 5782–5799 (or `--port`); `karyo jarvis` picks its server's port from the same
 range. Every server binds to this machine only. The view server makes a random token at each start and puts it in the
 pages it serves; its write endpoints (splices, the team layout, trust) refuse requests without it or from another
 origin ([KITS.md](KITS.md) "The local server"). When a project has kits that run their own JavaScript, `karyo view`

@@ -13,6 +13,7 @@ import { Dock, type DockChange } from './dock';
 import { ViewCtl, type View } from './viewport';
 import { ChromeLayer, Z0 } from './chrome';
 import { KeyHelpCtl, type KeyHelpList } from './keyhelp';
+import { onUiSize } from './uisize';
 
 export interface Frame {
   /** Clip time (s). */
@@ -31,8 +32,9 @@ export interface Fx {
   under: FxLayer;
   over: FxLayer | null;
   /** Where to draw fx that belong to chrome (docs/ENGINE.md "Zoom and pan"), in the plate's fit coordinates: the under
-   *  layer itself at fit; while the viewer is zoomed in, a layer over the chrome's backdrops and under its HTML, shown
-   *  where the chrome is (so an outline around a legend entry or a step rail stays with it, at its fit size). */
+   *  layer itself at fit; while the viewer is zoomed in (or the chrome floor draws chrome larger), a layer over the
+   *  chrome's backdrops and under its HTML, shown where the chrome is (so an outline around a legend entry or a step rail
+   *  stays with it, at its size). */
   readonly front: FxLayer;
 }
 
@@ -86,8 +88,12 @@ export abstract class Scene {
    *  window resize there, with the space the plate may fill (CSS px), and with null when it leaves (back to the page).
    *  Return the logical size the plate wants for that space (lay the plate out for it first: this runs before the next
    *  frame), or nothing to keep the current size. The Stage then scales that size to fit the space whole. Must be a
-   *  pure function of (the scene's content, the space): the same space always gives the same layout. */
-  fit?(space: { w: number; h: number } | null): { w: number; h: number } | void;
+   *  pure function of (the scene's content, the space, `o`): the same call always gives the same layout. A plate with
+   *  more than one way to lay itself out offers them to `pickFit(space, candidates)` (the one drawn largest wins).
+   *  `o.chrome`: the chrome floor will draw the chrome that many times its size at this fit (docs/ENGINE.md "Chrome
+   *  floor"; 1 when it won't): a plate may leave its chrome bands that much more room. The Stage asks again with it
+   *  when the first answer's fit calls for a boost. */
+  fit?(space: { w: number; h: number } | null, o?: { chrome: number }): { w: number; h: number } | void;
   /** Inspector plates: the dock was pinned or unpinned, locked or unlocked, moved or resized (`stage.dock` has the
    *  new values). Called before the plate is refitted and redrawn; the scene fills `dock.body` in update(). */
   dockChanged?(what: DockChange): void;
@@ -140,6 +146,8 @@ let motionDial = 1;
 export function setMotion(k: number) { motionDial = clamp(k, 0, 2); }
 export function motion() { return reducedMotion() ? 0 : motionDial; }
 const MAX_CONTEXTS = 12;
+/** A plain id selector (`#card-3`): `Stage.find` remembers what it matches. */
+const ID_SEL = /^#[A-Za-z_-][\w-]*$/;
 const live: Stage[] = [];
 
 export class Stage {
@@ -182,6 +190,7 @@ export class Stage {
   private ro: ResizeObserver;
   private io: IntersectionObserver | null = null;
   private mo: MutationObserver;
+  private offUi: (() => void) | null = null;
 
   constructor(root: HTMLElement, readonly Cls: SceneClass, opts: StageOpts = {}) {
     this.root = root;
@@ -227,6 +236,8 @@ export class Stage {
     const zoomable = !preserve && (opts.zoom ?? (this.interactive && !nested));
     this.view = new ViewCtl(this, { enabled: zoomable, storeKey: zoomable ? `karyo:view:${location.pathname}:${root.id || root.dataset.scene || Cls.title || Cls.name}` : null });
     this.chrome = new ChromeLayer(this, (e) => this.nodeMap.get(e), (e) => this.parentNode(e));
+    // the interface size (docs/ENGINE.md "Chrome floor") changes how large chrome is drawn
+    if (zoomable) this.offUi = onUiSize(() => { this.refit(); this.redraw(); });
     this.keyHelp = new KeyHelpCtl(this, { enabled: !preserve && !nested });
     this.keyHelp.mountHint();
 
@@ -253,6 +264,7 @@ export class Stage {
     this.layout();
     this.isReady = true;
     if (this.filling) this.fitTheater();
+    else this.checkChromeRoom();
     this.view.restore();
     this.dock?.sync();
     const rm = reducedMotion();
@@ -278,7 +290,7 @@ export class Stage {
   // ---------------------------------------------------------------- nodes
   /** Node for an element (or the first match of a selector inside the stage). */
   node(sel: string | HTMLElement): Node {
-    const e = typeof sel === 'string' ? this.dom.querySelector<HTMLElement>(sel) : sel;
+    const e = typeof sel === 'string' ? this.find(sel) : sel;
     if (!e) throw new Error(`karyo: no element matches ${String(sel)}`);
     let n = this.nodeMap.get(e);
     if (!n) {
@@ -291,6 +303,23 @@ export class Stage {
     return n;
   }
   nodes(sel: string): Node[] { return [...this.dom.querySelectorAll<HTMLElement>(sel)].map((e) => this.node(e)); }
+  /** `dom.querySelector(sel)`, remembered for plain id selectors (`#card-3`), which scenes look up for every card on
+   *  every frame. What such a query returns depends only on which elements are in the plate, in what order, with what
+   *  ids: any change to those (seen synchronously through `takeRecords()`) forgets everything, so the answer is always
+   *  the query's own. */
+  private find(sel: string): HTMLElement | null {
+    if (!ID_SEL.test(sel)) return this.dom.querySelector<HTMLElement>(sel);
+    if (!this.idMo) {
+      this.idMo = new MutationObserver(() => this.idCache.clear());
+      this.idMo.observe(this.dom, { subtree: true, childList: true, attributes: true, attributeFilter: ['id'] });
+    }
+    if (this.idMo.takeRecords().length) this.idCache.clear();
+    let e = this.idCache.get(sel);
+    if (e === undefined) { e = this.dom.querySelector<HTMLElement>(sel); this.idCache.set(sel, e); }
+    return e;
+  }
+  private idCache = new Map<string, HTMLElement | null>();
+  private idMo: MutationObserver | null = null;
   private parentNode(e: HTMLElement): Node | null {
     for (let a = e.parentElement; a && a !== this.frame; a = a.parentElement) { const n = this.nodeMap.get(a); if (n) return n; }
     return null;
@@ -313,6 +342,13 @@ export class Stage {
     const w = this.viewport.clientWidth || this.W;
     this.scale = w / this.W;
     this.applyView();
+    this.checkChromeRoom();
+  }
+  /** A plate on the page drawn at another size: the room its chrome needs may change (docs/ENGINE.md "Chrome floor"). */
+  private checkChromeRoom() {
+    if (!this.isReady || !this.scene.fit || this.inTheater || this.filling || this.refitListeners.size || !this.viewport.clientWidth) return;
+    const k = this.chrome.boostAt(this.scale);
+    if (Math.abs(Math.max(1, k) - this.fitChrome) > 0.02) queueMicrotask(() => { if (!this.inTheater && !this.filling) this.refit(); });
   }
   /** The frame's transform and the fx canvases for the fit (`scale`) and the viewer's zoom and pan (`view`), then a
    *  redrawn frame. At fit this is exactly the plain fitted plate. */
@@ -360,6 +396,8 @@ export class Stage {
         this.fx.under.render(t, this.theme);
         this.fx.over?.render(t, this.theme);
         if (this.frontFx) {
+          // shown under the transform of the chrome it draws for (the chrome floor scales chrome about its edge)
+          if (this.frontLive && this.chrome.k !== 1) this.frontFx.place(this.chrome.frontBox(this.frontFx.bounds()));
           if (this.frontLive) this.frontFx.render(t, this.theme);
           this.frontFx.canvas.style.display = this.frontLive ? '' : 'none';
         }
@@ -371,7 +409,7 @@ export class Stage {
   private frontFx: FxLayer | null = null;
   private frontLive = false;
   private frontLayer(): FxLayer {
-    if (!this.view.zoomed) return this.fx.under;
+    if (!this.view.zoomed && this.chrome.k === 1) return this.fx.under;
     let L = this.frontFx;
     if (!L) {
       L = this.frontFx = new FxLayer('front', this.exportMode);
@@ -381,7 +419,7 @@ export class Stage {
     if (!L.canvas.isConnected) this.dom.append(L.canvas);
     if (!this.frontLive) {
       L.ensure();
-      L.resize(this.W, this.H, Math.min(3, this.scale * (window.devicePixelRatio || 1)), null, this.view.rect());
+      L.resize(this.W, this.H, Math.min(3, this.scale * (window.devicePixelRatio || 1) * Math.max(1, this.chrome.k)), null, this.view.rect());
       L.begin(this.theme);
       this.frontLive = true;
     }
@@ -417,6 +455,14 @@ export class Stage {
   get zoom() { return this.scale * this.view.zoom; }
   /** CSS px per stage px at fit (the viewer's zoom left out). */
   get fitScale() { return this.scale; }
+  /** Does the plate fill a space of its own (the theater, `fill`, a host page that sizes it such as Jarvis, or inside
+   *  a plate that does)? There the chrome floor applies (docs/ENGINE.md "Chrome floor"); a plate in a page's column
+   *  keeps its chrome at the fit, and the theater is one key away. */
+  get fills(): boolean {
+    if (this.inTheater || this.filling || this.refitListeners.size) return true;
+    const host = live.find((s) => s !== this && s.dom.contains(this.root));
+    return !!host?.fills;
+  }
 
   /** The scene's view state plus the viewer's `view` ({zoom, x, y}; docs/ENGINE.md "Zoom and pan"). */
   getState(): unknown {
@@ -574,7 +620,7 @@ export class Stage {
       this.viewport.style.width = ''; this.root.style.removeProperty('--plate-w');
       this.layoutDock();
       // back to the page: the scene's default layout and size
-      if (this.isReady && this.scene.fit) { let r: { w: number; h: number } | void = undefined; try { r = this.scene.fit(null); } catch (e) { this.fail(e); } this.resize(r?.w ?? this.Cls.width, r?.h ?? this.Cls.height); }
+      if (this.isReady && this.scene.fit) { const r = this.fitScene(null); this.resize(r?.w ?? this.Cls.width, r?.h ?? this.Cls.height); }
     }
     this.viewport.focus({ preventScroll: true });
     if (!on) this.viewport.scrollIntoView({ block: 'nearest' });
@@ -584,11 +630,28 @@ export class Stage {
   private fitTheater() {
     this.layoutDock();
     if (this.isReady && this.scene.fit) {
-      let r: { w: number; h: number } | void = undefined;
-      try { r = this.scene.fit(this.theaterSpace()); } catch (e) { this.fail(e); }
+      const r = this.fitScene(this.theaterSpace());
       if (r) this.resize(r.w, r.h);
     }
     this.sizeTheater();
+  }
+  /** The chrome floor's boost the plate was last laid out for (`fit`'s `o.chrome`). */
+  private fitChrome = 1;
+  /** Lay the scene out for a space (`scene.fit`; null: the page, `width` wide on screen): once as it is, and again with
+   *  `o.chrome` when the chrome floor will draw its chrome larger at that fit, so the plate can make room for it. A host
+   *  page that sizes the plate itself (Jarvis) calls this too. Returns the size the scene asked for, if any. */
+  fitScene(space: { w: number; h: number } | null, width?: number): { w: number; h: number } | void {
+    if (!this.scene?.fit) return;
+    let r: { w: number; h: number } | void = undefined;
+    try {
+      r = this.scene.fit(space, { chrome: 1 });
+      this.fitChrome = 1;
+      const size = r ?? { w: this.W, h: this.H };
+      const s = space ? Math.min(space.w / size.w, space.h / size.h) : (width ?? this.viewport.clientWidth) / size.w;
+      const k = this.chrome.boostAt(s);
+      if (k > 1.01) { r = this.scene.fit(space, { chrome: k }) ?? r; this.fitChrome = k; }
+    } catch (e) { this.fail(e); }
+    return r;
   }
   private sizeTheater() {
     const sp = this.theaterSpace();
@@ -620,8 +683,7 @@ export class Stage {
     if (!this.isReady) return;
     if (this.refitListeners.size) { for (const l of this.refitListeners) l(); return; }
     if (this.inTheater || this.filling) { this.fitTheater(); return; }
-    let r: { w: number; h: number } | void = undefined;
-    try { r = this.scene.fit?.(space); } catch (e) { this.fail(e); }
+    const r = this.fitScene(space);
     if (r) this.resize(r.w, r.h);
   }
   private dockListeners = new Set<(what: DockChange) => void>();
@@ -641,6 +703,7 @@ export class Stage {
     Ticker.remove(this);
     this.ro.disconnect(); this.io?.disconnect(); this.mo.disconnect();
     this.view.dispose();
+    this.offUi?.();
     this.keyHelp.dispose();
     this.fx.under.release(); this.fx.over?.release(); this.frontFx?.release();
     const i = live.indexOf(this); if (i >= 0) live.splice(i, 1);

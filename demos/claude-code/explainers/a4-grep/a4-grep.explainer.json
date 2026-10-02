@@ -1,0 +1,998 @@
+{
+  "karyo": "explainer/1",
+  "id": "a4-grep",
+  "title": "grep: finding the needle",
+  "summary": "grep searches inside files and gives back only the matching lines, with the file each came from. On a Mac, it's how Claude Code searches too.",
+  "note": "Names, companies and files here are **made-up examples**.",
+  "narration": "side",
+  "uses": [
+    "text-file",
+    "file-tree",
+    "terminal",
+    "chat-turn",
+    "try-it"
+  ],
+  "layout": {
+    "kind": "free"
+  },
+  "categories": [
+    {
+      "id": "files",
+      "label": "your files"
+    },
+    {
+      "id": "computer",
+      "label": "the computer"
+    },
+    {
+      "id": "claude",
+      "label": "Claude"
+    }
+  ],
+  "elements": [
+    {
+      "id": "page",
+      "type": "text-file",
+      "category": "files",
+      "label": "notes.txt",
+      "props": {
+        "title": "notes.txt",
+        "lines": [
+          {
+            "parts": [
+              {
+                "t": "Call Acme on Friday about the renewal."
+              }
+            ]
+          },
+          {
+            "parts": [
+              {
+                "t": "Lunch with Priya on Tuesday."
+              }
+            ]
+          },
+          {
+            "parts": [
+              {
+                "t": "Send ACME the signed contract."
+              }
+            ]
+          },
+          {
+            "parts": [
+              {
+                "t": "Acme Corp wants the Q3 report early."
+              }
+            ]
+          },
+          {
+            "parts": [
+              {
+                "t": "Rent a vehicle for the Denver trip."
+              }
+            ]
+          }
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 0,
+        "w": 440
+      }
+    },
+    {
+      "id": "tree",
+      "type": "file-tree",
+      "category": "files",
+      "label": "The Work folder",
+      "props": {
+        "title": "~/Work",
+        "items": [
+          {
+            "name": "Work",
+            "kind": "folder",
+            "depth": 0,
+            "state": "here",
+            "note": "you are here"
+          },
+          {
+            "name": "Clients",
+            "kind": "folder",
+            "depth": 1
+          },
+          {
+            "name": "acme.txt",
+            "kind": "file",
+            "depth": 2
+          },
+          {
+            "name": "globex.txt",
+            "kind": "file",
+            "depth": 2
+          },
+          {
+            "name": "Meetings",
+            "kind": "folder",
+            "depth": 1
+          },
+          {
+            "name": "2026-03-02.txt",
+            "kind": "file",
+            "depth": 2
+          },
+          {
+            "name": "notes.txt",
+            "kind": "file",
+            "depth": 1
+          }
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 240,
+        "w": 440
+      }
+    },
+    {
+      "id": "term",
+      "type": "terminal",
+      "category": "computer",
+      "label": "Terminal window",
+      "props": {
+        "prompt": "Work %",
+        "lines": [
+          {
+            "kind": "cmd",
+            "text": "grep \"Acme\" notes.txt"
+          },
+          {
+            "kind": "out",
+            "text": "Call Acme on Friday about the renewal."
+          },
+          {
+            "kind": "out",
+            "text": "Acme Corp wants the Q3 report early."
+          }
+        ]
+      },
+      "at": {
+        "x": 490,
+        "y": 0,
+        "w": 600
+      }
+    },
+    {
+      "id": "opts",
+      "type": "kv",
+      "category": "computer",
+      "label": "Options so far",
+      "props": {
+        "title": "Options so far",
+        "pairs": [
+          {
+            "k": "-r",
+            "v": "every folder inside, too"
+          }
+        ]
+      },
+      "at": {
+        "x": 490,
+        "y": 290,
+        "w": 290
+      }
+    },
+    {
+      "id": "limit",
+      "type": "callout",
+      "category": "computer",
+      "label": "Where the highlighter stops",
+      "props": {
+        "tone": "warn",
+        "title": "Exact text, not meaning",
+        "md": "grep matches the letters you type. *Acme Corp* won't find *Acme, Inc.*, and *car* won't find *vehicle*."
+      },
+      "at": {
+        "x": 800,
+        "y": 290,
+        "w": 290
+      }
+    },
+    {
+      "id": "claude",
+      "type": "chat-turn",
+      "category": "claude",
+      "label": "Claude's answer",
+      "props": {
+        "who": "claude",
+        "text": "Four files mention Acme. In **notes.txt** it's the renewal, the contract and the Q3 report.",
+        "actions": [
+          "Bash: grep -rli \"acme\" .",
+          "Bash: grep -i \"acme\" notes.txt"
+        ]
+      },
+      "at": {
+        "x": 490,
+        "y": 525,
+        "w": 600
+      }
+    },
+    {
+      "id": "try",
+      "type": "try-it",
+      "label": "Try it",
+      "props": {
+        "title": "Search your own Documents",
+        "command": "grep -ri \"invoice\" ~/Documents | head",
+        "expect": "Lines that mention *invoice*, each after its file's name. `| head` keeps only the first 10; that bar is a **pipe** (explainer A6)."
+      },
+      "at": {
+        "x": 0,
+        "y": 525,
+        "w": 440
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "title": "A highlighter for files",
+      "text": "Your notes are spread over a few folders and you need every mention of Acme. **grep** is a command that searches inside files and prints the lines that match: a highlighter run over every page at once, giving back only the highlighted lines.",
+      "show": [
+        "page",
+        "tree"
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "Search one file",
+      "text": "`grep \"Acme\" notes.txt` reads: find *Acme* in *notes.txt*. It prints only the two lines that contain it; the file itself is untouched.",
+      "add": [
+        "term"
+      ],
+      "emphasize": [
+        "term",
+        "page"
+      ],
+      "set": {
+        "page": {
+          "lines": [
+            {
+              "parts": [
+                {
+                  "t": "Call "
+                },
+                {
+                  "t": "Acme",
+                  "mark": "hit"
+                },
+                {
+                  "t": " on Friday about the renewal."
+                }
+              ],
+              "state": "lit"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Lunch with Priya on Tuesday."
+                }
+              ],
+              "state": "dim"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Send ACME the signed contract."
+                }
+              ],
+              "state": "dim"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Acme",
+                  "mark": "hit"
+                },
+                {
+                  "t": " Corp wants the Q3 report early."
+                }
+              ],
+              "state": "lit"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Rent a vehicle for the Denver trip."
+                }
+              ],
+              "state": "dim"
+            }
+          ],
+          "note": "2 matching lines"
+        }
+      }
+    },
+    {
+      "id": "s3",
+      "title": "Search every folder",
+      "text": "Add `-r` and give it `.` (*the folder you're in*) instead of one file: grep searches every file in every folder inside. Each line now starts with the file it came from.",
+      "add": [
+        "opts"
+      ],
+      "emphasize": [
+        "term",
+        "tree"
+      ],
+      "set": {
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "grep -r \"Acme\" ."
+            },
+            {
+              "kind": "out",
+              "text": "./Clients/acme.txt:Client: Acme, Inc."
+            },
+            {
+              "kind": "out",
+              "text": "./Clients/globex.txt:Referred to us by Acme."
+            },
+            {
+              "kind": "out",
+              "text": "./notes.txt:Call Acme on Friday about the renewal."
+            },
+            {
+              "kind": "out",
+              "text": "./notes.txt:Acme Corp wants the Q3 report early."
+            }
+          ]
+        },
+        "tree": {
+          "items": [
+            {
+              "name": "Work",
+              "kind": "folder",
+              "depth": 0,
+              "state": "here",
+              "note": "you are here"
+            },
+            {
+              "name": "Clients",
+              "kind": "folder",
+              "depth": 1
+            },
+            {
+              "name": "acme.txt",
+              "kind": "file",
+              "depth": 2,
+              "state": "hit",
+              "note": "1 line"
+            },
+            {
+              "name": "globex.txt",
+              "kind": "file",
+              "depth": 2,
+              "state": "hit",
+              "note": "1 line"
+            },
+            {
+              "name": "Meetings",
+              "kind": "folder",
+              "depth": 1
+            },
+            {
+              "name": "2026-03-02.txt",
+              "kind": "file",
+              "depth": 2
+            },
+            {
+              "name": "notes.txt",
+              "kind": "file",
+              "depth": 1,
+              "state": "hit",
+              "note": "2 lines"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s4",
+      "title": "Capitals don't matter",
+      "text": "grep matches letter for letter, capitals included, so it skipped *ACME* and *acme*. Add `-i` and it ignores capitals: six lines now.",
+      "emphasize": [
+        "term",
+        "page"
+      ],
+      "set": {
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "grep -ri \"acme\" ."
+            },
+            {
+              "kind": "out",
+              "text": "./Clients/acme.txt:Client: Acme, Inc."
+            },
+            {
+              "kind": "out",
+              "text": "./Clients/globex.txt:Referred to us by Acme."
+            },
+            {
+              "kind": "out",
+              "text": "./notes.txt:Call Acme on Friday about the renewal."
+            },
+            {
+              "kind": "out",
+              "text": "./notes.txt:Send ACME the signed contract.",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "./notes.txt:Acme Corp wants the Q3 report early."
+            },
+            {
+              "kind": "out",
+              "text": "./Meetings/2026-03-02.txt:Pricing review with the acme team.",
+              "mark": true
+            }
+          ]
+        },
+        "tree": {
+          "items": [
+            {
+              "name": "Work",
+              "kind": "folder",
+              "depth": 0,
+              "state": "here",
+              "note": "you are here"
+            },
+            {
+              "name": "Clients",
+              "kind": "folder",
+              "depth": 1
+            },
+            {
+              "name": "acme.txt",
+              "kind": "file",
+              "depth": 2,
+              "state": "hit",
+              "note": "1 line"
+            },
+            {
+              "name": "globex.txt",
+              "kind": "file",
+              "depth": 2,
+              "state": "hit",
+              "note": "1 line"
+            },
+            {
+              "name": "Meetings",
+              "kind": "folder",
+              "depth": 1
+            },
+            {
+              "name": "2026-03-02.txt",
+              "kind": "file",
+              "depth": 2,
+              "state": "hit",
+              "note": "1 line"
+            },
+            {
+              "name": "notes.txt",
+              "kind": "file",
+              "depth": 1,
+              "state": "hit",
+              "note": "3 lines"
+            }
+          ]
+        },
+        "page": {
+          "lines": [
+            {
+              "parts": [
+                {
+                  "t": "Call "
+                },
+                {
+                  "t": "Acme",
+                  "mark": "hit"
+                },
+                {
+                  "t": " on Friday about the renewal."
+                }
+              ],
+              "state": "lit"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Lunch with Priya on Tuesday."
+                }
+              ],
+              "state": "dim"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Send "
+                },
+                {
+                  "t": "ACME",
+                  "mark": "hit"
+                },
+                {
+                  "t": " the signed contract."
+                }
+              ],
+              "state": "lit"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Acme",
+                  "mark": "hit"
+                },
+                {
+                  "t": " Corp wants the Q3 report early."
+                }
+              ],
+              "state": "lit"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Rent a vehicle for the Denver trip."
+                }
+              ],
+              "state": "dim"
+            }
+          ],
+          "note": "3 matching lines"
+        },
+        "opts": {
+          "title": "Options so far",
+          "pairs": [
+            {
+              "k": "-r",
+              "v": "every folder inside, too"
+            },
+            {
+              "k": "-i",
+              "v": "capitals don't matter"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s5",
+      "title": "Just names, or a count",
+      "text": "Sometimes you don't need the lines themselves. `-l` lists only the files that match; `-c` counts the matching lines instead of printing them.",
+      "emphasize": [
+        "term",
+        "opts"
+      ],
+      "set": {
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "grep -rli \"acme\" ."
+            },
+            {
+              "kind": "out",
+              "text": "./Clients/acme.txt"
+            },
+            {
+              "kind": "out",
+              "text": "./Clients/globex.txt"
+            },
+            {
+              "kind": "out",
+              "text": "./notes.txt"
+            },
+            {
+              "kind": "out",
+              "text": "./Meetings/2026-03-02.txt"
+            },
+            {
+              "kind": "cmd",
+              "text": "grep -ci \"acme\" notes.txt"
+            },
+            {
+              "kind": "out",
+              "text": "3",
+              "mark": true
+            }
+          ]
+        },
+        "tree": {
+          "items": [
+            {
+              "name": "Work",
+              "kind": "folder",
+              "depth": 0,
+              "state": "here",
+              "note": "you are here"
+            },
+            {
+              "name": "Clients",
+              "kind": "folder",
+              "depth": 1
+            },
+            {
+              "name": "acme.txt",
+              "kind": "file",
+              "depth": 2,
+              "state": "hit"
+            },
+            {
+              "name": "globex.txt",
+              "kind": "file",
+              "depth": 2,
+              "state": "hit"
+            },
+            {
+              "name": "Meetings",
+              "kind": "folder",
+              "depth": 1
+            },
+            {
+              "name": "2026-03-02.txt",
+              "kind": "file",
+              "depth": 2,
+              "state": "hit"
+            },
+            {
+              "name": "notes.txt",
+              "kind": "file",
+              "depth": 1,
+              "state": "hit"
+            }
+          ]
+        },
+        "opts": {
+          "title": "Options so far",
+          "pairs": [
+            {
+              "k": "-r",
+              "v": "every folder inside, too"
+            },
+            {
+              "k": "-i",
+              "v": "capitals don't matter"
+            },
+            {
+              "k": "-l",
+              "v": "just the file names"
+            },
+            {
+              "k": "-c",
+              "v": "just a count"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s6",
+      "title": "Exact text, not meaning",
+      "text": "grep finds the letters you typed, nothing more. *Acme Corp* misses *Acme, Inc.* and *ACME*; *car* finds nothing, though the notes mention a vehicle. Search the way the words are actually written.",
+      "add": [
+        "limit"
+      ],
+      "emphasize": [
+        "limit",
+        "page"
+      ],
+      "dim": [
+        "opts"
+      ],
+      "set": {
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "grep -r \"Acme Corp\" ."
+            },
+            {
+              "kind": "out",
+              "text": "./notes.txt:Acme Corp wants the Q3 report early.",
+              "mark": true
+            },
+            {
+              "kind": "cmd",
+              "text": "grep -r \"car\" ."
+            },
+            {
+              "kind": "note",
+              "text": "(nothing: no line contains \"car\")"
+            }
+          ]
+        },
+        "tree": {
+          "items": [
+            {
+              "name": "Work",
+              "kind": "folder",
+              "depth": 0,
+              "state": "here",
+              "note": "you are here"
+            },
+            {
+              "name": "Clients",
+              "kind": "folder",
+              "depth": 1
+            },
+            {
+              "name": "acme.txt",
+              "kind": "file",
+              "depth": 2,
+              "state": "dim"
+            },
+            {
+              "name": "globex.txt",
+              "kind": "file",
+              "depth": 2,
+              "state": "dim"
+            },
+            {
+              "name": "Meetings",
+              "kind": "folder",
+              "depth": 1
+            },
+            {
+              "name": "2026-03-02.txt",
+              "kind": "file",
+              "depth": 2,
+              "state": "dim"
+            },
+            {
+              "name": "notes.txt",
+              "kind": "file",
+              "depth": 1,
+              "state": "hit",
+              "note": "1 line"
+            }
+          ]
+        },
+        "page": {
+          "lines": [
+            {
+              "parts": [
+                {
+                  "t": "Call "
+                },
+                {
+                  "t": "Acme",
+                  "mark": "miss"
+                },
+                {
+                  "t": " on Friday about the renewal."
+                }
+              ],
+              "state": "dim"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Lunch with Priya on Tuesday."
+                }
+              ],
+              "state": "dim"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Send "
+                },
+                {
+                  "t": "ACME",
+                  "mark": "miss"
+                },
+                {
+                  "t": " the signed contract."
+                }
+              ],
+              "state": "dim"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Acme Corp",
+                  "mark": "hit"
+                },
+                {
+                  "t": " wants the Q3 report early."
+                }
+              ],
+              "state": "lit"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Rent a "
+                },
+                {
+                  "t": "vehicle",
+                  "mark": "miss"
+                },
+                {
+                  "t": " for the Denver trip."
+                }
+              ],
+              "state": "dim"
+            }
+          ],
+          "note": "1 matching line"
+        }
+      }
+    },
+    {
+      "id": "s7",
+      "title": "How Claude Code searches",
+      "text": "On a Mac, Claude Code searches your files by running `find` and `grep` itself (as of October 2026, with its own built-in grep). The search is exact and repeatable; deciding what the matches mean is Claude's part.",
+      "add": [
+        "claude"
+      ],
+      "emphasize": [
+        "claude",
+        "tree"
+      ],
+      "dim": [
+        "page",
+        "opts",
+        "limit"
+      ],
+      "set": {
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "grep -rli \"acme\" ."
+            },
+            {
+              "kind": "out",
+              "text": "Clients/globex.txt"
+            },
+            {
+              "kind": "out",
+              "text": "Meetings/2026-03-02.txt"
+            },
+            {
+              "kind": "out",
+              "text": "Clients/acme.txt"
+            },
+            {
+              "kind": "out",
+              "text": "notes.txt"
+            },
+            {
+              "kind": "note",
+              "text": "(its built-in grep: the same four files, in its own order)"
+            }
+          ],
+          "badge": "run by Claude"
+        },
+        "tree": {
+          "items": [
+            {
+              "name": "Work",
+              "kind": "folder",
+              "depth": 0,
+              "state": "here",
+              "note": "you are here"
+            },
+            {
+              "name": "Clients",
+              "kind": "folder",
+              "depth": 1
+            },
+            {
+              "name": "acme.txt",
+              "kind": "file",
+              "depth": 2,
+              "state": "hit"
+            },
+            {
+              "name": "globex.txt",
+              "kind": "file",
+              "depth": 2,
+              "state": "hit"
+            },
+            {
+              "name": "Meetings",
+              "kind": "folder",
+              "depth": 1
+            },
+            {
+              "name": "2026-03-02.txt",
+              "kind": "file",
+              "depth": 2,
+              "state": "hit"
+            },
+            {
+              "name": "notes.txt",
+              "kind": "file",
+              "depth": 1,
+              "state": "hit"
+            }
+          ]
+        },
+        "page": {
+          "lines": [
+            {
+              "parts": [
+                {
+                  "t": "Call "
+                },
+                {
+                  "t": "Acme",
+                  "mark": "hit"
+                },
+                {
+                  "t": " on Friday about the renewal."
+                }
+              ],
+              "state": "lit"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Lunch with Priya on Tuesday."
+                }
+              ],
+              "state": "dim"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Send "
+                },
+                {
+                  "t": "ACME",
+                  "mark": "hit"
+                },
+                {
+                  "t": " the signed contract."
+                }
+              ],
+              "state": "lit"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Acme",
+                  "mark": "hit"
+                },
+                {
+                  "t": " Corp wants the Q3 report early."
+                }
+              ],
+              "state": "lit"
+            },
+            {
+              "parts": [
+                {
+                  "t": "Rent a vehicle for the Denver trip."
+                }
+              ],
+              "state": "dim"
+            }
+          ],
+          "note": "3 matching lines"
+        }
+      }
+    },
+    {
+      "id": "s8",
+      "title": "The whole picture",
+      "text": "grep is how you find what's inside many files at once: exact, fast and the same every time. Claude brings the judgment about what the lines mean.",
+      "show": "*"
+    }
+  ]
+}

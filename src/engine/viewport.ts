@@ -13,10 +13,12 @@
 //   - a plain wheel / two-finger scroll pans while zoomed in, and scrolls the page at fit;
 //   - a drag on blank space pans (the engine's backdrop, anything marked `data-pl-blank`, and what the scene's
 //     `isBlank(e, byDefault)` hook allows); Space + drag and a middle-button drag pan from anywhere;
-//   - `+` / `=`, `-`, `0` (reset to fit) on the focused plate;
+//   - `+` / `=`, `-`, `0` (reset to fit) on the focused plate; `[` / `]` a smaller / larger interface (the chrome
+//     floor's size, uisize.ts);
 //   - a small − 100% + control in the viewport's corner (on hover and focus, and always while zoomed).
 import type { Stage } from './stage';
 import { clamp } from './util';
+import { uiSize, setUiSize, stepUiSize } from './uisize';
 
 export interface View {
   /** Zoom relative to fit: 1 = the whole plate … ZOOM_MAX. */
@@ -68,22 +70,28 @@ export class ViewCtl {
   // ---------------------------------------------------------------- the view
   get(): View { return { zoom: this.zoom, x: this.x, y: this.y }; }
   get zoomed() { return this.zoom > 1 + 1e-6; }
+  /** Is anything the scene places beside the content drawn other than at its fit size: zoomed in, or the chrome floor
+   *  boosting it (docs/ENGINE.md "Chrome floor")? Then place it with `overlay()`. */
+  get scaled() { return this.zoomed || this.stage.chrome.k !== 1; }
+  /** The scale a card placed with `overlay()` is drawn at, relative to the stage (1 at fit with no boost). */
+  get cardScale() { return this.stage.chrome.k / this.zoom; }
   /** The part of the stage on screen (stage px). */
   rect() { return { x: this.x, y: this.y, w: this.stage.W / this.zoom, h: this.stage.H / this.zoom }; }
   /** The part of the stage on screen that no chrome band covers (stage px): the visible part less the bands along its
    *  edges (docs/ENGINE.md "Zoom and pan"). At fit, `rect()`. */
   clear() {
     const v = this.rect();
-    if (!this.zoomed) return v;
+    if (!this.scaled) return v;
     const i = this.stage.chrome.insets, k = 1 / this.zoom;
     return { x: v.x + i.l * k, y: v.y + i.t * k, w: Math.max(40, v.w - (i.l + i.r) * k), h: Math.max(40, v.h - (i.t + i.b) * k) };
   }
   /** Place a card the scene shows beside the pointer (a hover card, w×h stage px at fit) inside the visible part of the
-   *  stage, clear of the chrome, at its fit size on screen however far in: `place` is the scene's own placement over a
-   *  W×H area (avoiding `avoid`). Returns the Node's x, y and scale. At fit it is exactly `place(at, w, h, W, H, avoid)`. */
+   *  stage, clear of the chrome, at its fit size on screen however far in (and at the chrome floor's size: the card is
+   *  chrome-sized text): `place` is the scene's own placement over a W×H area (avoiding `avoid`). Returns the Node's x, y
+   *  and scale. At fit with no boost it is exactly `place(at, w, h, W, H, avoid)`. */
   overlay(at: Pt, w: number, h: number, avoid: Box[], place: (at: Pt, w: number, h: number, W: number, H: number, avoid: Box[]) => Pt): { x: number; y: number; scale: number } {
-    if (!this.zoomed) return { ...place(at, w, h, this.stage.W, this.stage.H, avoid), scale: 1 };
-    const v = this.clear(), k = 1 / this.zoom;
+    if (!this.scaled) return { ...place(at, w, h, this.stage.W, this.stage.H, avoid), scale: 1 };
+    const v = this.clear(), k = this.cardScale;
     const rel = (r: Box) => ({ x: r.x - v.x, y: r.y - v.y, w: r.w, h: r.h });
     const p = place({ x: at.x - v.x, y: at.y - v.y }, w * k, h * k, v.w, v.h, [...avoid, ...this.stage.chrome.shown()].map(rel));
     // a Node scales around its centre: shift so the scaled card's corner lands on p
@@ -133,10 +141,14 @@ export class ViewCtl {
   }
   /** Where the view's top-left may go at zoom z: the plate covers the viewport, and where chrome bands run along an edge
    *  the view may pan past it by up to the band's depth (never so far that the stage's edge leaves the band's inner edge),
-   *  so every edge of the content can be brought out from under the chrome. */
+   *  so every edge of the content can be brought out from under the chrome. A band the chrome floor draws deeper than at
+   *  fit (`insets` past `insets0`) covers that much more content at fit: from the first step in, the view may pan past
+   *  it by that much more, so nothing stays under it. */
   private bounds(z: number, W: number, H: number) {
-    const i = this.stage.chrome?.insets ?? { l: 0, t: 0, r: 0, b: 0 }, f = z > 1 ? Math.min(1 / z, 1 - 1 / z) : 0;
-    return { x0: -i.l * f, x1: W - W / z + i.r * f, y0: -i.t * f, y1: H - H / z + i.b * f };
+    const ch = this.stage.chrome, i = ch?.insets ?? { l: 0, t: 0, r: 0, b: 0 }, i0 = ch?.insets0 ?? i;
+    // past an edge, in fit px: the band's depth less, at the first zoom steps, what it covered at fit without the floor
+    const g = Math.max(0, 2 - z), d = (a: number, a0: number) => (z > 1 ? Math.max(0, a - Math.min(a, a0) * g) / z : 0);
+    return { x0: -d(i.l, i0.l), x1: W - W / z + d(i.r, i0.r), y0: -d(i.t, i0.t), y1: H - H / z + d(i.b, i0.b) };
   }
   /** Restore the view this tab last had for the plate (sessionStorage), once the plate is laid out. */
   restore() {
@@ -157,15 +169,20 @@ export class ViewCtl {
   }
 
   // ---------------------------------------------------------------- keys (called by the Stage for the focused plate)
-  /** `+` / `=` zoom in, `-` zooms out, `0` resets to fit. True when handled. */
+  /** `+` / `=` zoom in, `-` zooms out, `0` resets to fit; `[` / `]` a smaller / larger interface. True when handled. */
   key(e: KeyboardEvent): boolean {
     if (!this.enabled || e.metaKey || e.ctrlKey || e.altKey || typing(e.target) || !this.mine(e.target)) return false;
     if (e.key === '+' || e.key === '=') this.zoomIn();
     else if (e.key === '-' || e.key === '_') this.zoomOut();
     else if (e.key === '0') this.reset();
+    else if (e.key === '[' || e.key === ']') stepUiSize(e.key === ']' ? 1 : -1);
     else return false;
     return true;
   }
+  /** The interface size (page-wide: uisize.ts), S, M or L … */
+  get interfaceSize(): string { return uiSize().id; }
+  /** … and setting it (every plate on the page redraws its chrome). */
+  setInterfaceSize(id: string) { setUiSize(id); }
   /** Space held over a zoomed plate arms a pan from anywhere; Space's own meaning (play, open) runs on release when it
    *  never panned. */
   private onSpaceDown = (e: KeyboardEvent) => {

@@ -665,10 +665,11 @@ export function sequenceScene(model0: Model, flowId: string, o: SequenceOpts = {
         else { x = clamp((box.classList.contains('rev') ? bl : bx) - CARD_W / 2, 8, g.W - CARD_W - 8); y = rowY + ROW + 6 + ch <= BODY_Y + g.bodyH ? rowY + ROW + 6 : rowY - ch - 6; }
         y = clamp(y, BODY_Y, BODY_Y + g.bodyH - ch);
         const view = this.stage.view;
-        if (!view.zoomed) card.set({ x, y: y + 8 * (1 - co), opacity: co });
+        if (!view.scaled) card.set({ x, y: y + 8 * (1 - co), opacity: co });
         else {
-          // zoomed in (docs/ENGINE.md "Zoom and pan"): beside the arrow, at its fit size, inside the visible part
-          const k = 1 / view.zoom, arrow = { x: bl, y: rowY, w: bx - bl, h: ROW };
+          // zoomed in (docs/ENGINE.md "Zoom and pan"), or chrome drawn larger ("Chrome floor"): beside the arrow, at its
+          // fit size (the floor's), inside the visible part
+          const k = view.cardScale, arrow = { x: bl, y: rowY, w: bx - bl, h: ROW };
           const o = view.overlay({ x: bl, y: rowY }, CARD_W, ch, [arrow], (_a, w, h, W, H, av) => {
             const r = av[0]!, m = 8 * k, gap = 16 * k;
             const p = r.x + r.w + gap + w <= W - m ? { x: r.x + r.w + gap, y: r.y - 4 * k } : r.x - gap - w >= m ? { x: r.x - gap - w, y: r.y - 4 * k } : { x: r.x + r.w / 2 - w / 2, y: r.y + r.h + 6 * k + h <= H - m ? r.y + r.h + 6 * k : r.y - h - 6 * k };

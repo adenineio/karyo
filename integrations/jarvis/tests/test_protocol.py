@@ -115,6 +115,25 @@ def test_view_is_sent_to_the_brain_only_when_it_changed():
     assert "no view reported yet" in a[0] and '"board"' in a[1] and "view unchanged" in a[2]
 
 
+def test_quick_commands_are_told_to_the_brain_once():
+    async def turn(hub, text):
+        await hub.brain_turn_end(True, None)
+    hub, client, brains = make(script=turn)
+    with client.websocket_connect("/ws") as ws:
+        hello(ws)
+        ws.send_json({"type": "view", "snapshot": SNAP})
+        ws.send_json({"type": "text", "text": "theater"})
+        msg = until(ws, "action")[-1]
+        ws.send_json({"type": "action_result", "id": msg["id"], "ok": True, "state": {}})
+        until(ws, "activity")
+        for _ in range(2):
+            ws.send_json({"type": "text", "text": "what is this"})
+            until(ws, "status"); until(ws, "status")
+    a = brains[0].asked
+    assert a[0].startswith("[quick commands since your last turn, already done (not by you): \"theater\" → theater on]\n[page")
+    assert "quick commands" not in a[1]
+
+
 def test_audio_ptt_wake_and_silence():
     async def turn(hub, text):
         await hub.brain_turn_end(True, None)
@@ -272,6 +291,9 @@ def test_activity_lines_use_labels():
     assert describe("splice_connect", {"from": "A", "to": "B"}) == "proposed A → B"
     assert describe("splice_remove", {"node": "Audit log"}) == "proposed removing Audit log"
     assert describe("splice_open", {"name": "caching"}) == "opened a splice 'caching'"
+    assert describe("splice_group", {"label": "Notifications", "outlet_of": "Orders API"}) == "proposed the group Notifications, an outlet of Orders API"
+    assert describe("splice_group", {"label": "Email", "parent": "Notifications"}) == "proposed the group Email under Notifications"
+    assert describe("splice_rename", {"group": "Notifications", "label": "Alerts"}) == "proposed renaming the group Notifications to Alerts"
     assert describe("splice_leave", {}) == "left the splice (the real view)"
     assert describe("splice_stack", {}) == "stacked the splices"
     assert describe("splice_stack", {"splices": ["Caching", "Session queue"], "combine": True}) == "stacked and combined Caching, Session queue"
