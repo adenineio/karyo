@@ -1,0 +1,20 @@
+[project]
+name = "karyo"
+version = "0.1.0"
+description = "Describe how Python code fits together (annotations, import scan, traced runs) as a Karyo model."
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["karyo"]
+# A plain path entry for editable installs (a static .pth), not setuptools' import finder: a project folder
+# named `karyo/` (where splices and kits live, e.g. my-app/karyo/) would otherwise shadow the package as a
+# namespace package whenever Python runs from that project's root. A regular package on sys.path always wins.
+package-dir = { "" = "." }
+
+[tool.setuptools.package-data]
+karyo = ["_boot/sitecustomize.py"]

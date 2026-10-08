@@ -1,0 +1,871 @@
+{
+  "karyo": "explainer/1",
+  "id": "a2-paths",
+  "title": "Folders, files and paths",
+  "summary": "A path is an address. Where you are changes what a short address means, and a full one works from anywhere.",
+  "note": "Names, companies and files here are **made-up examples**.",
+  "narration": "side",
+  "uses": [
+    "terminal",
+    "file-tree",
+    "try-it"
+  ],
+  "layout": {
+    "kind": "free"
+  },
+  "categories": [
+    {
+      "id": "computer",
+      "label": "the computer"
+    },
+    {
+      "id": "address",
+      "label": "addresses"
+    },
+    {
+      "id": "claude",
+      "label": "Claude"
+    }
+  ],
+  "elements": [
+    {
+      "id": "tree",
+      "type": "file-tree",
+      "category": "computer",
+      "label": "Folders on Sam's Mac",
+      "props": {
+        "title": "Sam's Mac",
+        "items": [
+          {
+            "name": "/",
+            "depth": 0,
+            "kind": "folder"
+          },
+          {
+            "name": "Users",
+            "depth": 1,
+            "kind": "folder"
+          },
+          {
+            "name": "sam",
+            "depth": 2,
+            "kind": "folder",
+            "state": "here",
+            "note": "you are here"
+          },
+          {
+            "name": "Desktop",
+            "depth": 3,
+            "kind": "folder"
+          },
+          {
+            "name": "Documents",
+            "depth": 3,
+            "kind": "folder"
+          },
+          {
+            "name": "Reports",
+            "depth": 4,
+            "kind": "folder"
+          },
+          {
+            "name": "q3.csv",
+            "depth": 5,
+            "kind": "file"
+          },
+          {
+            "name": "q4.csv",
+            "depth": 5,
+            "kind": "file"
+          },
+          {
+            "name": "todo.txt",
+            "depth": 4,
+            "kind": "file"
+          },
+          {
+            "name": "Downloads",
+            "depth": 3,
+            "kind": "folder"
+          },
+          {
+            "name": "Music",
+            "depth": 3,
+            "kind": "folder"
+          }
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 0,
+        "w": 360
+      }
+    },
+    {
+      "id": "term",
+      "type": "terminal",
+      "category": "computer",
+      "label": "Terminal window 1",
+      "props": {
+        "title": "Window 1 — zsh",
+        "lines": [
+          {
+            "kind": "cmd",
+            "text": "pwd"
+          },
+          {
+            "kind": "out",
+            "text": "/Users/sam",
+            "mark": true
+          },
+          {
+            "kind": "cmd",
+            "text": "ls"
+          },
+          {
+            "kind": "out",
+            "text": "Desktop  Documents  Downloads  Music"
+          }
+        ]
+      },
+      "at": {
+        "x": 400,
+        "y": 0,
+        "w": 460
+      }
+    },
+    {
+      "id": "term2",
+      "type": "terminal",
+      "category": "computer",
+      "label": "Terminal window 2",
+      "props": {
+        "title": "Window 2 — zsh",
+        "lines": [
+          {
+            "kind": "cmd",
+            "text": "pwd"
+          },
+          {
+            "kind": "out",
+            "text": "/Users/sam"
+          },
+          {
+            "kind": "cmd",
+            "text": "ls Reports",
+            "mark": true
+          },
+          {
+            "kind": "err",
+            "text": "ls: Reports: No such file or directory",
+            "mark": true
+          }
+        ]
+      },
+      "at": {
+        "x": 400,
+        "y": 175,
+        "w": 460
+      }
+    },
+    {
+      "id": "addr",
+      "type": "list",
+      "category": "address",
+      "label": "Kinds of address",
+      "props": {
+        "title": "Two kinds of address",
+        "frame": true,
+        "items": [
+          "**Relative path** `Reports/q3.csv`: directions from where you are"
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 420,
+        "w": 360
+      }
+    },
+    {
+      "id": "short",
+      "type": "list",
+      "category": "address",
+      "label": "Shortcuts",
+      "props": {
+        "title": "Two shortcuts",
+        "frame": true,
+        "items": [
+          "`~` your home folder, `/Users/sam`",
+          "`..` one level up"
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 590,
+        "w": 360
+      }
+    },
+    {
+      "id": "claude",
+      "type": "card",
+      "category": "claude",
+      "props": {
+        "kicker": "Claude Code",
+        "title": "Its “here” is where you start it",
+        "body": "Start it in `~/Documents` and it works in that folder and the ones inside. Files anywhere else: only with your permission."
+      },
+      "at": {
+        "x": 400,
+        "y": 350,
+        "w": 460
+      }
+    },
+    {
+      "id": "try",
+      "type": "try-it",
+      "props": {
+        "title": "Find your own “here”",
+        "command": "pwd",
+        "expect": "It prints your home folder, like `/Users/sam`. Then try `ls`, `cd Documents` and `pwd` again."
+      },
+      "at": {
+        "x": 400,
+        "y": 505,
+        "w": 460
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "title": "You are here",
+      "text": "A terminal window is always *in* one folder. `pwd` (print working directory) prints its **path**, its address: `/Users/sam`, Sam's **home folder**. `ls` lists what's in it.",
+      "show": [
+        "tree",
+        "term"
+      ],
+      "emphasize": [
+        "tree",
+        "term"
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "Move the marker",
+      "text": "`cd Documents` (change directory) moves you into Documents. It prints nothing, but the prompt now says `Documents`, and `pwd` agrees.",
+      "emphasize": [
+        "term"
+      ],
+      "set": {
+        "tree": {
+          "items": [
+            {
+              "name": "/",
+              "depth": 0,
+              "kind": "folder"
+            },
+            {
+              "name": "Users",
+              "depth": 1,
+              "kind": "folder"
+            },
+            {
+              "name": "sam",
+              "depth": 2,
+              "kind": "folder"
+            },
+            {
+              "name": "Desktop",
+              "depth": 3,
+              "kind": "folder"
+            },
+            {
+              "name": "Documents",
+              "depth": 3,
+              "kind": "folder",
+              "state": "here",
+              "note": "you are here"
+            },
+            {
+              "name": "Reports",
+              "depth": 4,
+              "kind": "folder"
+            },
+            {
+              "name": "q3.csv",
+              "depth": 5,
+              "kind": "file"
+            },
+            {
+              "name": "q4.csv",
+              "depth": 5,
+              "kind": "file"
+            },
+            {
+              "name": "todo.txt",
+              "depth": 4,
+              "kind": "file"
+            },
+            {
+              "name": "Downloads",
+              "depth": 3,
+              "kind": "folder"
+            },
+            {
+              "name": "Music",
+              "depth": 3,
+              "kind": "folder"
+            }
+          ]
+        },
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "cd Documents",
+              "mark": true
+            },
+            {
+              "kind": "cmd",
+              "text": "pwd",
+              "prompt": "Documents %"
+            },
+            {
+              "kind": "out",
+              "text": "/Users/sam/Documents",
+              "mark": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s3",
+      "title": "Directions from here",
+      "text": "A short address like `Reports/q3.csv` is a **relative path**: directions from where you stand, like “two doors down”. From Documents it leads straight to the file.",
+      "add": [
+        "addr"
+      ],
+      "emphasize": [
+        "addr",
+        "tree"
+      ],
+      "set": {
+        "tree": {
+          "items": [
+            {
+              "name": "/",
+              "depth": 0,
+              "kind": "folder"
+            },
+            {
+              "name": "Users",
+              "depth": 1,
+              "kind": "folder"
+            },
+            {
+              "name": "sam",
+              "depth": 2,
+              "kind": "folder"
+            },
+            {
+              "name": "Desktop",
+              "depth": 3,
+              "kind": "folder"
+            },
+            {
+              "name": "Documents",
+              "depth": 3,
+              "kind": "folder",
+              "state": "here",
+              "note": "you are here"
+            },
+            {
+              "name": "Reports",
+              "depth": 4,
+              "kind": "folder",
+              "state": "hit",
+              "note": "Reports"
+            },
+            {
+              "name": "q3.csv",
+              "depth": 5,
+              "kind": "file",
+              "state": "hit",
+              "note": "Reports/q3.csv"
+            },
+            {
+              "name": "q4.csv",
+              "depth": 5,
+              "kind": "file"
+            },
+            {
+              "name": "todo.txt",
+              "depth": 4,
+              "kind": "file"
+            },
+            {
+              "name": "Downloads",
+              "depth": 3,
+              "kind": "folder"
+            },
+            {
+              "name": "Music",
+              "depth": 3,
+              "kind": "folder"
+            }
+          ]
+        },
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "pwd",
+              "prompt": "Documents %"
+            },
+            {
+              "kind": "out",
+              "text": "/Users/sam/Documents"
+            },
+            {
+              "kind": "cmd",
+              "text": "ls Reports",
+              "prompt": "Documents %",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "q3.csv  q4.csv",
+              "mark": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s4",
+      "title": "Same directions, wrong start",
+      "text": "Each terminal window has its own “you are here”. This second window is in `/Users/sam`, and from there the same directions lead nowhere: there's no `Reports` folder in `sam`.",
+      "add": [
+        "term2"
+      ],
+      "emphasize": [
+        "term2"
+      ],
+      "dim": [
+        "addr"
+      ],
+      "set": {
+        "tree": {
+          "items": [
+            {
+              "name": "/",
+              "depth": 0,
+              "kind": "folder"
+            },
+            {
+              "name": "Users",
+              "depth": 1,
+              "kind": "folder"
+            },
+            {
+              "name": "sam",
+              "depth": 2,
+              "kind": "folder",
+              "state": "here",
+              "note": "window 2"
+            },
+            {
+              "name": "Desktop",
+              "depth": 3,
+              "kind": "folder"
+            },
+            {
+              "name": "Documents",
+              "depth": 3,
+              "kind": "folder",
+              "state": "here",
+              "note": "window 1"
+            },
+            {
+              "name": "Reports",
+              "depth": 4,
+              "kind": "folder"
+            },
+            {
+              "name": "q3.csv",
+              "depth": 5,
+              "kind": "file"
+            },
+            {
+              "name": "q4.csv",
+              "depth": 5,
+              "kind": "file"
+            },
+            {
+              "name": "todo.txt",
+              "depth": 4,
+              "kind": "file"
+            },
+            {
+              "name": "Downloads",
+              "depth": 3,
+              "kind": "folder"
+            },
+            {
+              "name": "Music",
+              "depth": 3,
+              "kind": "folder"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s5",
+      "title": "A full address works anywhere",
+      "text": "A **full path** starts at `/`, the top of the disk, and names every folder on the way down. Like a complete postal address, it works wherever you are.",
+      "emphasize": [
+        "term2",
+        "addr"
+      ],
+      "set": {
+        "tree": {
+          "items": [
+            {
+              "name": "/",
+              "depth": 0,
+              "kind": "folder",
+              "state": "hit",
+              "note": "start at the top"
+            },
+            {
+              "name": "Users",
+              "depth": 1,
+              "kind": "folder",
+              "state": "hit"
+            },
+            {
+              "name": "sam",
+              "depth": 2,
+              "kind": "folder",
+              "state": "hit",
+              "note": "window 2"
+            },
+            {
+              "name": "Desktop",
+              "depth": 3,
+              "kind": "folder"
+            },
+            {
+              "name": "Documents",
+              "depth": 3,
+              "kind": "folder",
+              "state": "hit",
+              "note": "window 1"
+            },
+            {
+              "name": "Reports",
+              "depth": 4,
+              "kind": "folder",
+              "state": "hit",
+              "note": "arrive"
+            },
+            {
+              "name": "q3.csv",
+              "depth": 5,
+              "kind": "file"
+            },
+            {
+              "name": "q4.csv",
+              "depth": 5,
+              "kind": "file"
+            },
+            {
+              "name": "todo.txt",
+              "depth": 4,
+              "kind": "file"
+            },
+            {
+              "name": "Downloads",
+              "depth": 3,
+              "kind": "folder"
+            },
+            {
+              "name": "Music",
+              "depth": 3,
+              "kind": "folder"
+            }
+          ]
+        },
+        "term2": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "pwd"
+            },
+            {
+              "kind": "out",
+              "text": "/Users/sam"
+            },
+            {
+              "kind": "cmd",
+              "text": "ls /Users/sam/Documents/Reports",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "q3.csv  q4.csv",
+              "mark": true
+            }
+          ]
+        },
+        "addr": {
+          "items": [
+            "**Relative path** `Reports/q3.csv`: directions from where you are",
+            "**Full path** `/Users/sam/Documents/Reports`: from the top, `/`, so it works from anywhere"
+          ]
+        }
+      }
+    },
+    {
+      "id": "s6",
+      "title": "Two shortcuts: ~ and ..",
+      "text": "`~` (tilde) means your home folder, so `~/Documents/Reports` works from anywhere too. And `..` means one level up: from Documents, `ls ..` lists Sam's home folder.",
+      "add": [
+        "short"
+      ],
+      "emphasize": [
+        "term",
+        "term2",
+        "short"
+      ],
+      "set": {
+        "tree": {
+          "items": [
+            {
+              "name": "/",
+              "depth": 0,
+              "kind": "folder"
+            },
+            {
+              "name": "Users",
+              "depth": 1,
+              "kind": "folder"
+            },
+            {
+              "name": "sam",
+              "depth": 2,
+              "kind": "folder",
+              "state": "here",
+              "note": "~ · window 2"
+            },
+            {
+              "name": "Desktop",
+              "depth": 3,
+              "kind": "folder"
+            },
+            {
+              "name": "Documents",
+              "depth": 3,
+              "kind": "folder",
+              "state": "here",
+              "note": "window 1"
+            },
+            {
+              "name": "Reports",
+              "depth": 4,
+              "kind": "folder"
+            },
+            {
+              "name": "q3.csv",
+              "depth": 5,
+              "kind": "file"
+            },
+            {
+              "name": "q4.csv",
+              "depth": 5,
+              "kind": "file"
+            },
+            {
+              "name": "todo.txt",
+              "depth": 4,
+              "kind": "file"
+            },
+            {
+              "name": "Downloads",
+              "depth": 3,
+              "kind": "folder"
+            },
+            {
+              "name": "Music",
+              "depth": 3,
+              "kind": "folder"
+            }
+          ]
+        },
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "pwd",
+              "prompt": "Documents %"
+            },
+            {
+              "kind": "out",
+              "text": "/Users/sam/Documents"
+            },
+            {
+              "kind": "cmd",
+              "text": "ls ..",
+              "prompt": "Documents %",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "Desktop  Documents  Downloads  Music",
+              "mark": true
+            }
+          ]
+        },
+        "term2": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "pwd"
+            },
+            {
+              "kind": "out",
+              "text": "/Users/sam"
+            },
+            {
+              "kind": "cmd",
+              "text": "ls ~/Documents/Reports",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "q3.csv  q4.csv",
+              "mark": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s7",
+      "title": "Build a new folder",
+      "text": "`mkdir Invoices` (make directory) builds a new folder *here*, in Documents. It prints nothing when it works; `ls` shows the new folder.",
+      "emphasize": [
+        "term",
+        "tree"
+      ],
+      "dim": [
+        "term2",
+        "addr",
+        "short"
+      ],
+      "set": {
+        "tree": {
+          "items": [
+            {
+              "name": "/",
+              "depth": 0,
+              "kind": "folder"
+            },
+            {
+              "name": "Users",
+              "depth": 1,
+              "kind": "folder"
+            },
+            {
+              "name": "sam",
+              "depth": 2,
+              "kind": "folder",
+              "state": "here",
+              "note": "~ · window 2"
+            },
+            {
+              "name": "Desktop",
+              "depth": 3,
+              "kind": "folder"
+            },
+            {
+              "name": "Documents",
+              "depth": 3,
+              "kind": "folder",
+              "state": "here",
+              "note": "window 1"
+            },
+            {
+              "name": "Invoices",
+              "depth": 4,
+              "kind": "folder",
+              "state": "new",
+              "note": "new"
+            },
+            {
+              "name": "Reports",
+              "depth": 4,
+              "kind": "folder"
+            },
+            {
+              "name": "q3.csv",
+              "depth": 5,
+              "kind": "file"
+            },
+            {
+              "name": "q4.csv",
+              "depth": 5,
+              "kind": "file"
+            },
+            {
+              "name": "todo.txt",
+              "depth": 4,
+              "kind": "file"
+            },
+            {
+              "name": "Downloads",
+              "depth": 3,
+              "kind": "folder"
+            },
+            {
+              "name": "Music",
+              "depth": 3,
+              "kind": "folder"
+            }
+          ]
+        },
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "mkdir Invoices",
+              "prompt": "Documents %",
+              "mark": true
+            },
+            {
+              "kind": "cmd",
+              "text": "ls",
+              "prompt": "Documents %"
+            },
+            {
+              "kind": "out",
+              "text": "Invoices  Reports  todo.txt",
+              "mark": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s8",
+      "title": "Where Claude Code starts",
+      "text": "Claude Code has a “you are here” too: the folder you start it in. It works in that folder and the ones inside it, and reaches files elsewhere only with your permission, so start it in the right place.",
+      "show": "*",
+      "emphasize": [
+        "claude"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+<div class="pl-card box">
+  <div class="bar"><span class="ic" aria-hidden="true"></span><span class="ttl">{{title}}</span>{{#if note}}<span class="note">{{note}}</span>{{/if}}</div>
+  <ol class="lines">{{#each lines}}<li class="ln st-{{state}}"><span class="n">{{@number}}</span><span class="tx">{{#each parts}}{{#if mark}}<mark class="m-{{mark}}">{{t}}</mark>{{else}}{{t}}{{/if}}{{/each}}</span></li>{{/each}}</ol>
+</div>

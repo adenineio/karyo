@@ -1,0 +1,644 @@
+{
+  "karyo": "explainer/1",
+  "id": "c3-codenames",
+  "title": "Codenames: one name per thing",
+  "summary": "Words leak between what you build and the machinery you build it with. One name per thing, and a codename for the machinery, keeps Claude (and grep) from mixing them up.",
+  "note": "Names, companies and files here are **made-up examples**.",
+  "narration": "side",
+  "uses": [
+    "file-tree",
+    "chat-turn",
+    "terminal",
+    "try-it"
+  ],
+  "layout": {
+    "kind": "free"
+  },
+  "categories": [
+    {
+      "id": "you",
+      "label": "you"
+    },
+    {
+      "id": "computer",
+      "label": "the computer"
+    },
+    {
+      "id": "shop",
+      "label": "the shop (what you build)"
+    },
+    {
+      "id": "workshop",
+      "label": "your workshop (machinery)"
+    }
+  ],
+  "elements": [
+    {
+      "id": "shop-tree",
+      "type": "file-tree",
+      "category": "shop",
+      "label": "The shop's files",
+      "props": {
+        "title": "The shop: what you're building",
+        "items": [
+          {
+            "name": "README.md"
+          },
+          {
+            "name": "orders",
+            "kind": "folder"
+          },
+          {
+            "name": "run.py",
+            "depth": 1
+          },
+          {
+            "name": "validator.py",
+            "depth": 1
+          },
+          {
+            "name": "tests",
+            "kind": "folder"
+          },
+          {
+            "name": "test_orders.py",
+            "depth": 1
+          },
+          {
+            "name": "rejected",
+            "kind": "folder",
+            "note": "bad orders land here"
+          }
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 0,
+        "w": 460
+      }
+    },
+    {
+      "id": "ws-tree",
+      "type": "file-tree",
+      "category": "workshop",
+      "label": "The workshop's files",
+      "props": {
+        "title": "Your workshop: how you build it",
+        "items": [
+          {
+            "name": "CLAUDE.md",
+            "note": "standing instructions"
+          },
+          {
+            "name": ".claude",
+            "kind": "folder"
+          },
+          {
+            "name": "settings.json",
+            "depth": 1,
+            "note": "turns hooks on"
+          },
+          {
+            "name": "hooks",
+            "kind": "folder",
+            "depth": 1
+          },
+          {
+            "name": "validator.sh",
+            "depth": 2,
+            "note": "a check on Claude"
+          }
+        ]
+      },
+      "at": {
+        "x": 540,
+        "y": 0,
+        "w": 460
+      }
+    },
+    {
+      "id": "shop-val",
+      "type": "card",
+      "category": "shop",
+      "props": {
+        "kicker": "In the shop",
+        "title": "the validator",
+        "body": "Checks each incoming order: it has a date, the amount is a number, the email looks like an email. Bad orders go to `rejected/`."
+      },
+      "at": {
+        "x": 0,
+        "y": 270,
+        "w": 460
+      }
+    },
+    {
+      "id": "dev-val",
+      "type": "card",
+      "category": "workshop",
+      "props": {
+        "kicker": "In your workshop",
+        "title": "the validator",
+        "body": "A **hook** that checks Claude's work: when Claude finishes, it runs the tests and compares the output with a known-good sample. If they differ, Claude has to keep working."
+      },
+      "at": {
+        "x": 540,
+        "y": 270,
+        "w": 460
+      }
+    },
+    {
+      "id": "ask",
+      "type": "chat-turn",
+      "category": "you",
+      "label": "Your request",
+      "props": {
+        "who": "you",
+        "text": "The validator is too strict. Loosen it."
+      },
+      "at": {
+        "x": 340,
+        "y": 60,
+        "w": 320
+      }
+    },
+    {
+      "id": "risk",
+      "type": "callout",
+      "props": {
+        "tone": "warn",
+        "title": "Either wrong guess hurts",
+        "md": "Loosen the shop's: orders with bad emails start getting through. Loosen the workshop's: your safety check on Claude quietly gets weaker, and nothing tells you."
+      },
+      "at": {
+        "x": 0,
+        "y": 460,
+        "w": 1000
+      }
+    },
+    {
+      "id": "gloss",
+      "type": "kv",
+      "category": "workshop",
+      "label": "CLAUDE.md glossary",
+      "props": {
+        "title": "CLAUDE.md · Glossary",
+        "pairs": [
+          {
+            "k": "DEV_VALIDATOR",
+            "v": "the hook that checks Claude's work (not orders)"
+          }
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 460,
+        "w": 460
+      }
+    },
+    {
+      "id": "biz",
+      "type": "card",
+      "props": {
+        "kicker": "Not just code",
+        "title": "QA_PREFLIGHT",
+        "body": "A customer's onboarding checklist and your own checklist before you send work out are both *the checklist*. Call yours `QA_PREFLIGHT`."
+      },
+      "at": {
+        "x": 540,
+        "y": 460,
+        "w": 460
+      }
+    },
+    {
+      "id": "term",
+      "type": "terminal",
+      "category": "computer",
+      "label": "Terminal",
+      "props": {
+        "prompt": "shop %",
+        "badge": "before the codename",
+        "lines": [
+          {
+            "kind": "cmd",
+            "text": "grep -r \"validator\" ."
+          },
+          {
+            "kind": "out",
+            "text": "./tests/test_orders.py:import validator"
+          },
+          {
+            "kind": "out",
+            "text": "./tests/test_orders.py:def test_validator_needs_a_date():"
+          },
+          {
+            "kind": "out",
+            "text": "./tests/test_orders.py:    assert not validator.check(NO_DATE)"
+          },
+          {
+            "kind": "out",
+            "text": "./.claude/settings.json:      \"command\": \"${CLAUDE_PROJECT_DIR}/.claude/hooks/validator.sh\"",
+            "mark": true
+          },
+          {
+            "kind": "out",
+            "text": "./.claude/hooks/validator.sh:# validator: run the tests, compare with good.txt",
+            "mark": true
+          },
+          {
+            "kind": "out",
+            "text": "./README.md:Every order passes the validator before it's saved."
+          },
+          {
+            "kind": "out",
+            "text": "./README.md:Orders the validator refuses go to rejected/."
+          },
+          {
+            "kind": "out",
+            "text": "./orders/validator.py:# validator: checks each new order"
+          },
+          {
+            "kind": "out",
+            "text": "./orders/run.py:import validator"
+          },
+          {
+            "kind": "out",
+            "text": "./orders/run.py:    if validator.check(order):"
+          },
+          {
+            "kind": "out",
+            "text": "./CLAUDE.md:The validator must pass after every edit.",
+            "mark": true
+          }
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 0,
+        "w": 720
+      }
+    },
+    {
+      "id": "count",
+      "type": "metric",
+      "category": "computer",
+      "props": {
+        "label": "lines found",
+        "value": 11,
+        "delta": "8 shop, 3 workshop, mixed",
+        "tone": "down"
+      },
+      "at": {
+        "x": 780,
+        "y": 0,
+        "w": 220
+      }
+    },
+    {
+      "id": "syn",
+      "type": "card",
+      "props": {
+        "kicker": "One person",
+        "title": "three names",
+        "body": "*customer*, *client*, *account*: Claude may treat them as three different people, and a search for one misses the others."
+      },
+      "at": {
+        "x": 780,
+        "y": 170,
+        "w": 220
+      }
+    },
+    {
+      "id": "rule",
+      "type": "list",
+      "props": {
+        "title": "The rule",
+        "items": [
+          "**One thing, one name**, used everywhere.",
+          "**Machinery gets a prefix**: `DEV_`, `QA_`.",
+          "**Every codename goes in the glossary** in CLAUDE.md."
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 100,
+        "w": 460
+      }
+    },
+    {
+      "id": "token",
+      "type": "callout",
+      "props": {
+        "tone": "note",
+        "title": "We tripped over this too",
+        "md": "Writing this series, *token* meant two things: the chunks of text a model reads, and a coined name like `DEV_VALIDATOR`. Now *token* means only the first. The second is a **codename**."
+      },
+      "at": {
+        "x": 540,
+        "y": 100,
+        "w": 460
+      }
+    },
+    {
+      "id": "try",
+      "type": "try-it",
+      "props": {
+        "title": "Find your double meanings",
+        "ask": "List any words in this project that seem to mean two different things, or two words that seem to mean the same thing.",
+        "expect": "Ask Claude Code in a project folder. You pick the names; Claude can add them to the glossary."
+      },
+      "at": {
+        "x": 540,
+        "y": 460,
+        "w": 460
+      }
+    }
+  ],
+  "links": [
+    {
+      "id": "ask-shop",
+      "from": "ask",
+      "to": "shop-val",
+      "label": "this one?",
+      "style": "warn"
+    },
+    {
+      "id": "ask-dev",
+      "from": "ask",
+      "to": "dev-val",
+      "label": "or this one?",
+      "style": "warn"
+    }
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "title": "Two layers",
+      "text": "Every project has two layers. On the left, the thing you're building: an order system for an online shop. On the right, the machinery you build it with: CLAUDE.md, settings, and small scripts that keep Claude's work in check.",
+      "show": [
+        "shop-tree",
+        "ws-tree"
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "One word, two things",
+      "text": "Both layers have something called **the validator**. The shop's checks each incoming order. The workshop's is a **hook**, a command Claude Code runs automatically at a set moment: it checks Claude's own work.",
+      "add": [
+        "shop-val",
+        "dev-val"
+      ],
+      "emphasize": [
+        "shop-val",
+        "dev-val"
+      ],
+      "set": {
+        "shop-tree": {
+          "items": [
+            {
+              "name": "README.md"
+            },
+            {
+              "name": "orders",
+              "kind": "folder"
+            },
+            {
+              "name": "run.py",
+              "depth": 1
+            },
+            {
+              "name": "validator.py",
+              "depth": 1,
+              "state": "hit",
+              "note": "the validator"
+            },
+            {
+              "name": "tests",
+              "kind": "folder"
+            },
+            {
+              "name": "test_orders.py",
+              "depth": 1
+            },
+            {
+              "name": "rejected",
+              "kind": "folder",
+              "note": "bad orders land here"
+            }
+          ]
+        },
+        "ws-tree": {
+          "items": [
+            {
+              "name": "CLAUDE.md",
+              "note": "standing instructions"
+            },
+            {
+              "name": ".claude",
+              "kind": "folder"
+            },
+            {
+              "name": "settings.json",
+              "depth": 1,
+              "note": "turns hooks on"
+            },
+            {
+              "name": "hooks",
+              "kind": "folder",
+              "depth": 1
+            },
+            {
+              "name": "validator.sh",
+              "depth": 2,
+              "state": "hit",
+              "note": "also the validator"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s3",
+      "title": "Which validator?",
+      "text": "You type: *the validator is too strict, loosen it.* Claude has to work out which one you mean. It usually gets it right, but usually isn't always, and either wrong guess does real harm.",
+      "show": [
+        "ask",
+        "shop-val",
+        "dev-val",
+        "risk"
+      ],
+      "emphasize": [
+        "ask"
+      ],
+      "connect": [
+        "ask-shop",
+        "ask-dev"
+      ]
+    },
+    {
+      "id": "s4",
+      "title": "A codename for the machinery",
+      "text": "Rename the workshop's one to something nobody would say by accident: `DEV_VALIDATOR`. Define it once, in the glossary in CLAUDE.md, which Claude reads at the start of every session. A **codename** is a deliberately unusual name for one thing.",
+      "show": [
+        "shop-val",
+        "dev-val",
+        "gloss",
+        "biz"
+      ],
+      "emphasize": [
+        "dev-val",
+        "gloss"
+      ],
+      "set": {
+        "dev-val": {
+          "title": "DEV_VALIDATOR"
+        }
+      }
+    },
+    {
+      "id": "s5",
+      "title": "Search the plain word",
+      "text": "Before the codename, `grep -r \"validator\" .` found 11 lines: 8 about orders and 3 about the hook (lit), mixed together. That muddle is what Claude had to sort out, with its best guess.",
+      "show": [
+        "term",
+        "count"
+      ],
+      "emphasize": [
+        "term"
+      ]
+    },
+    {
+      "id": "s6",
+      "title": "Search the codename",
+      "text": "After it, `grep -r \"DEV_VALIDATOR\" .` finds exactly the 3 workshop lines and nothing about orders, every time. And *validator* on its own now finds only the 8 shop lines.",
+      "show": [
+        "term",
+        "count"
+      ],
+      "emphasize": [
+        "count"
+      ],
+      "set": {
+        "term": {
+          "badge": "after the codename",
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "grep -r \"DEV_VALIDATOR\" ."
+            },
+            {
+              "kind": "out",
+              "text": "./.claude/settings.json:      \"command\": \"${CLAUDE_PROJECT_DIR}/.claude/hooks/DEV_VALIDATOR.sh\"",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "./.claude/hooks/DEV_VALIDATOR.sh:# DEV_VALIDATOR: run the tests, compare with good.txt",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "./CLAUDE.md:- DEV_VALIDATOR: the hook that checks Claude's work (not orders).",
+              "mark": true
+            }
+          ]
+        },
+        "count": {
+          "value": 3,
+          "delta": "all workshop",
+          "tone": "up"
+        }
+      }
+    },
+    {
+      "id": "s7",
+      "title": "One person, three names",
+      "text": "The quieter problem is the reverse: one thing with several names. The README says *customer*, the order loop says *client*, the weekly report says *accounts*. Search for one and you find 2 lines of 6.",
+      "show": [
+        "term",
+        "count",
+        "syn"
+      ],
+      "emphasize": [
+        "syn"
+      ],
+      "set": {
+        "term": {
+          "badge": "synonyms",
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "grep -r \"customer\" ."
+            },
+            {
+              "kind": "out",
+              "text": "./README.md:Each customer gets a receipt by email.",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "./orders/receipts.py:# Email the customer a receipt for their order.",
+              "mark": true
+            },
+            {
+              "kind": "note",
+              "text": "Not found: the 4 lines that call the same person a client or an account."
+            },
+            {
+              "kind": "cmd",
+              "text": "grep -rE \"client|account\" ."
+            },
+            {
+              "kind": "out",
+              "text": "./tests/test_orders.py:def test_client_receipt_needs_an_email():"
+            },
+            {
+              "kind": "out",
+              "text": "./orders/run.py:        send_receipt(order[\"client_email\"])"
+            },
+            {
+              "kind": "out",
+              "text": "./reports/weekly.md:New accounts this week: 42"
+            },
+            {
+              "kind": "out",
+              "text": "./reports/weekly.md:Top accounts by spend: see sales.csv"
+            }
+          ]
+        },
+        "count": {
+          "label": "lines found by “customer”",
+          "value": 2,
+          "delta": "of 6 about one person",
+          "tone": "down"
+        }
+      }
+    },
+    {
+      "id": "s8",
+      "title": "One thing, one name",
+      "text": "Pick one name per thing, give machinery a prefix, and list every codename in CLAUDE.md. Mix-ups become far less likely, not impossible: Claude is still probabilistic (very likely right, not guaranteed). Making something certain takes a hook (see *Hooks: from request to rule*).",
+      "show": [
+        "rule",
+        "token",
+        "shop-val",
+        "dev-val",
+        "gloss",
+        "try"
+      ],
+      "set": {
+        "gloss": {
+          "pairs": [
+            {
+              "k": "DEV_VALIDATOR",
+              "v": "the hook that checks Claude's work (not orders)"
+            },
+            {
+              "k": "customer",
+              "v": "a person who places an order (not client, not account)"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

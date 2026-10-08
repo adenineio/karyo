@@ -1,0 +1,5 @@
+# notes: every command lives here
+
+# Run the tests
+test:
+    uv run pytest -q

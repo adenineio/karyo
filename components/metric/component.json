@@ -1,0 +1,69 @@
+{
+  "name": "metric",
+  "description": "One number with a label, unit and delta. The value counts up when it appears or changes (step `set`).",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": [
+      "label",
+      "value"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "label": {
+        "type": "string"
+      },
+      "value": {
+        "type": "number"
+      },
+      "unit": {
+        "type": "string",
+        "description": "after the number, e.g. %, ms, / yr"
+      },
+      "prefix": {
+        "type": "string",
+        "description": "before the number, e.g. $"
+      },
+      "delta": {
+        "type": "string",
+        "description": "e.g. +12% vs last year"
+      },
+      "tone": {
+        "enum": [
+          "plain",
+          "up",
+          "down"
+        ],
+        "default": "plain",
+        "description": "colour of the delta"
+      },
+      "decimals": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 6,
+        "description": "default: as many as the values have"
+      },
+      "grouping": {
+        "type": "boolean",
+        "default": true,
+        "description": "thousands separators from 1,000 up (turn off for years)"
+      }
+    }
+  },
+  "size": {
+    "w": 240
+  },
+  "motion": [
+    "appear",
+    "emphasize",
+    "count"
+  ],
+  "example": {
+    "label": "Balance",
+    "prefix": "$",
+    "value": 1628.89,
+    "decimals": 2,
+    "delta": "+62.9% in 10 years",
+    "tone": "up"
+  }
+}

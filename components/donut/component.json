@@ -1,0 +1,118 @@
+{
+  "name": "donut",
+  "description": "A donut: parts of a whole (six or fewer reads best), with the total in the middle and a legend of values and shares. Arcs sweep in when it appears and resize when a step sets new values; emphasizing a slice pulls it out and puts its value in the middle.",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": [
+      "slices"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "title": {
+        "type": "string",
+        "description": "shown above the chart, and the data table's caption"
+      },
+      "caption": {
+        "type": "string",
+        "description": "markdown-lite, under the chart"
+      },
+      "slices": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 12,
+        "items": {
+          "type": "object",
+          "required": [
+            "label",
+            "value"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[^/@]+$",
+              "description": "the slice's name in steps (\"chart/<id>\"); default: its label"
+            },
+            "label": {
+              "type": "string"
+            },
+            "value": {
+              "type": "number",
+              "minimum": 0
+            },
+            "category": {
+              "type": "string",
+              "description": "a category id from the spec: its colour"
+            }
+          }
+        }
+      },
+      "total": {
+        "type": "string",
+        "default": "total",
+        "description": "the word under the number in the middle"
+      },
+      "unit": {
+        "type": "string",
+        "description": "after values: a word (kWh) titles the value axis; a symbol (%, °C) rides on the ticks"
+      },
+      "prefix": {
+        "type": "string",
+        "description": "before values, e.g. $"
+      },
+      "format": {
+        "enum": [
+          "number",
+          "percent",
+          "compact"
+        ],
+        "default": "number",
+        "description": "percent: 0.25 shows as 25%; compact: 12,400 as 12.4K"
+      },
+      "decimals": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 6,
+        "description": "default: as many as the values have (at most 2)"
+      },
+      "grouping": {
+        "type": "boolean",
+        "default": true,
+        "description": "thousands separators"
+      },
+      "summary": {
+        "type": "string",
+        "description": "what a screen reader hears instead of the generated summary"
+      }
+    }
+  },
+  "size": {
+    "w": 560,
+    "h": 300
+  },
+  "motion": [
+    "appear",
+    "emphasize",
+    "count"
+  ],
+  "example": {
+    "title": "Where a day goes",
+    "slices": [
+      {
+        "label": "Sleep",
+        "value": 8
+      },
+      {
+        "label": "Work",
+        "value": 8
+      },
+      {
+        "label": "Other",
+        "value": 8
+      }
+    ],
+    "unit": "h",
+    "total": "hours"
+  }
+}

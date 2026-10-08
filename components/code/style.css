@@ -1,0 +1,10 @@
+.box { height: 100%; margin: 0; padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+.head { flex: none; display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--pl-card-border); font: 12.5px/1 var(--pl-font-mono); color: var(--pl-fg); white-space: nowrap; }
+.file { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.lang { margin-left: auto; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--pl-muted); }
+.src.pl-code { flex: 1; margin: 0; padding: 10px 0; border: 0; border-radius: 0; background: transparent; font-size: 13.5px; line-height: 21px; tab-size: 4; overflow: hidden; }
+.src .ln { margin: 0; padding: 0 16px 0 0; border-radius: 0; }
+.src .ln.is-lit { box-shadow: inset 3px 0 0 var(--pl-accent); }
+.src .no { display: inline-block; width: 40px; padding-right: 14px; text-align: right; color: var(--pl-muted); opacity: 0.55; user-select: none; -webkit-user-select: none; }
+.src .ln.is-lit .no { color: var(--pl-accent); opacity: 1; }
+:host(.is-lit) .box { border-color: var(--pl-accent); }

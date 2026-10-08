@@ -1,0 +1,13 @@
+.box { box-sizing: border-box; height: 100%; display: flex; flex-direction: column; gap: 14px; padding: 16px 20px 18px; }
+.head { font-family: var(--pl-font); }
+.parts { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 18px; }
+.part { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.w { font: 700 26px/1.2 var(--pl-font-mono); color: var(--pl-fg); white-space: pre; padding: 2px 6px 6px; border-bottom: 4px solid var(--c); border-radius: 4px 4px 0 0; background: color-mix(in srgb, var(--c) 10%, transparent); }
+.lab { font: 700 11.5px/1.25 var(--pl-font); letter-spacing: 0.05em; text-transform: uppercase; color: var(--c); padding: 0 6px; white-space: nowrap; }
+.r-verb { --c: var(--pl-accent); }
+.r-option { --c: var(--pl-accent-2); }
+.r-object { --c: var(--pl-ok); }
+.f-verb .part:not(.r-verb), .f-option .part:not(.r-option), .f-object .part:not(.r-object) { opacity: 0.3; }
+.gloss { font-size: 17px; line-height: 1.4; color: var(--pl-fg); }
+.gloss p { margin: 0; }
+:host(.is-lit) .box { border-color: var(--pl-accent); }

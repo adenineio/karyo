@@ -1,0 +1,412 @@
+{
+  "karyo": "explainer/1",
+  "id": "a7-scripts",
+  "title": "Scripts: commands you saved",
+  "summary": "Anything you type twice can become a file you run with one line. Same steps, same result, every time, and Claude can write it for you. Builds on: pipes (A6).",
+  "note": "Names, companies and files here are **made-up examples**.",
+  "narration": "side",
+  "uses": [
+    "terminal",
+    "chat-turn",
+    "try-it"
+  ],
+  "layout": {
+    "kind": "free"
+  },
+  "categories": [
+    {
+      "id": "computer",
+      "label": "the computer"
+    },
+    {
+      "id": "claude",
+      "label": "Claude"
+    },
+    {
+      "id": "you",
+      "label": "you"
+    },
+    {
+      "id": "saved",
+      "label": "saved in a file"
+    }
+  ],
+  "elements": [
+    {
+      "id": "term",
+      "type": "terminal",
+      "category": "computer",
+      "label": "Terminal window",
+      "props": {
+        "title": "Terminal — zsh",
+        "lines": [
+          {
+            "kind": "cmd",
+            "text": "cd ~/Documents/Sales"
+          },
+          {
+            "kind": "cmd",
+            "prompt": "Sales %",
+            "text": "grep \"Acme\" orders.csv > acme.csv"
+          },
+          {
+            "kind": "cmd",
+            "prompt": "Sales %",
+            "text": "wc -l acme.csv"
+          },
+          {
+            "kind": "out",
+            "text": "       8 acme.csv"
+          },
+          {
+            "kind": "cmd",
+            "prompt": "Sales %",
+            "text": "cut -d, -f3 acme.csv | sort | uniq -c"
+          },
+          {
+            "kind": "out",
+            "text": "   3 North\n   5 South"
+          },
+          {
+            "kind": "cmd",
+            "prompt": "Sales %",
+            "text": "cp acme.csv ~/Desktop/acme-weekly.csv"
+          }
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 0,
+        "w": 540
+      }
+    },
+    {
+      "id": "script",
+      "type": "code",
+      "category": "saved",
+      "label": "The script file",
+      "props": {
+        "title": "~/Documents/Sales/monday-report.sh",
+        "lang": "bash",
+        "code": "#!/bin/bash\n# Monday report: Acme orders, by region\ncd ~/Documents/Sales\ngrep \"Acme\" orders.csv > acme.csv\nwc -l acme.csv\ncut -d, -f3 acme.csv | sort | uniq -c\ncp acme.csv ~/Desktop/acme-weekly.csv",
+        "focus": [
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 268,
+        "w": 540
+      }
+    },
+    {
+      "id": "recipe",
+      "type": "card",
+      "category": "saved",
+      "props": {
+        "kicker": "Like a recipe card",
+        "title": "Write the steps down once",
+        "body": "A script is a recipe card for the computer: the same steps, in the same order, kept in a file."
+      },
+      "at": {
+        "x": 580,
+        "y": 0,
+        "w": 480
+      }
+    },
+    {
+      "id": "menu",
+      "type": "code",
+      "category": "saved",
+      "label": "The justfile",
+      "props": {
+        "title": "~/Documents/Sales/justfile",
+        "lang": "just",
+        "code": "# Acme orders, by region\nreport:\n    bash monday-report.sh\n# Delete the working copy\nclean:\n    rm -f acme.csv\n# Copy orders.csv into Backups\nbackup:\n    mkdir -p ~/Backups\n    cp orders.csv ~/Backups/"
+      },
+      "at": {
+        "x": 580,
+        "y": 160,
+        "w": 480
+      }
+    },
+    {
+      "id": "you",
+      "type": "chat-turn",
+      "category": "you",
+      "label": "Your request",
+      "props": {
+        "who": "you",
+        "text": "Make the Monday report stop with a clear message if orders.csv is missing."
+      },
+      "at": {
+        "x": 580,
+        "y": 440,
+        "w": 480
+      }
+    },
+    {
+      "id": "claude",
+      "type": "chat-turn",
+      "category": "claude",
+      "label": "Claude's answer",
+      "props": {
+        "who": "claude",
+        "text": "I added a check near the top of **monday-report.sh**: without orders.csv it now stops and says so. With it, the report runs as before.",
+        "actions": [
+          "Read: monday-report.sh",
+          "Edit: monday-report.sh",
+          "Bash: just report"
+        ]
+      },
+      "at": {
+        "x": 580,
+        "y": 535,
+        "w": 480
+      }
+    },
+    {
+      "id": "try",
+      "type": "try-it",
+      "props": {
+        "title": "Have Claude write one",
+        "ask": "Write a script that lists every CSV in this folder with its line count, then show me what it does before running it.",
+        "expect": "Claude writes a short script and explains it line by line. Read it, then let it run: it gives the same list every time, until the folder changes."
+      },
+      "at": {
+        "x": 0,
+        "y": 580,
+        "w": 540
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "title": "Every Monday, by hand",
+      "text": "Every Monday you type the same five commands to pull this week's Acme orders out of the sales export. (`>` saves what a command prints into a file.) Five lines to remember, and to get right, every week.",
+      "show": [
+        "term"
+      ],
+      "emphasize": [
+        "term"
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "Write them down once",
+      "text": "A **script** is a file of commands you can run with one line. These are the same five commands, saved as `monday-report.sh`. The first line says which shell runs it (bash, which also comes with every Mac); lines starting with `#` are notes for people.",
+      "add": [
+        "script",
+        "recipe"
+      ],
+      "emphasize": [
+        "script"
+      ],
+      "dim": [
+        "term"
+      ]
+    },
+    {
+      "id": "s3",
+      "title": "Run it with one line",
+      "text": "Now Monday is one line: `bash monday-report.sh`. It runs every command in the file, in order. (Run `chmod +x monday-report.sh` once and `./monday-report.sh` works too: `chmod +x` marks a file as runnable.)",
+      "emphasize": [
+        "term"
+      ],
+      "set": {
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "cd ~/Documents/Sales"
+            },
+            {
+              "kind": "cmd",
+              "prompt": "Sales %",
+              "text": "bash monday-report.sh",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "       8 acme.csv\n   3 North\n   5 South"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s4",
+      "title": "Same result, every time",
+      "text": "Run it next week, or ten times today: it does exactly the same thing. That's **deterministic** again (same input, same result, every time), and it's why a script beats remembering.",
+      "emphasize": [
+        "term",
+        "recipe"
+      ],
+      "dim": [
+        "script"
+      ],
+      "set": {
+        "recipe": {
+          "title": "Same steps, same result",
+          "body": "Follow the card and you get the same dish every time. A script is **deterministic**: same input, same result, every time."
+        },
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "prompt": "Sales %",
+              "text": "bash monday-report.sh"
+            },
+            {
+              "kind": "out",
+              "text": "       8 acme.csv\n   3 North\n   5 South",
+              "mark": true
+            },
+            {
+              "kind": "cmd",
+              "prompt": "Sales %",
+              "text": "bash monday-report.sh"
+            },
+            {
+              "kind": "out",
+              "text": "       8 acme.csv\n   3 North\n   5 South",
+              "mark": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s5",
+      "title": "It doesn't notice what changed",
+      "text": "This week the export arrived as `orders-october.csv`. A cook would notice the missing flour; the script just carries on. `grep` complains, and an empty report lands on your Desktop. Read a script before you run it.",
+      "emphasize": [
+        "term",
+        "recipe"
+      ],
+      "dim": [
+        "script"
+      ],
+      "set": {
+        "recipe": {
+          "kicker": "Where the analogy stops",
+          "title": "It follows the card, even when things changed",
+          "body": "A cook would notice the flour is missing. A script does exactly what it says, even when the situation is different."
+        },
+        "term": {
+          "lines": [
+            {
+              "kind": "note",
+              "text": "(this week the file is called orders-october.csv)"
+            },
+            {
+              "kind": "cmd",
+              "prompt": "Sales %",
+              "text": "bash monday-report.sh"
+            },
+            {
+              "kind": "err",
+              "text": "grep: orders.csv: No such file or directory",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "       0 acme.csv",
+              "mark": true
+            },
+            {
+              "kind": "note",
+              "text": "(an empty acme-weekly.csv is now on your Desktop)"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s6",
+      "title": "A menu of recipes",
+      "text": "A **justfile** collects a folder's scripts and commands into a menu. `just --list` shows the menu; `just report` runs one recipe. `just` isn't built into macOS: install it once, with Homebrew (`brew install just`).",
+      "add": [
+        "menu"
+      ],
+      "emphasize": [
+        "menu",
+        "term"
+      ],
+      "dim": [
+        "script",
+        "recipe"
+      ],
+      "set": {
+        "recipe": {
+          "kicker": "Like a recipe card",
+          "title": "A box of recipe cards",
+          "body": "Each recipe has a name and a one-line note. `just --list` reads you the menu; you pick one by name."
+        },
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "prompt": "Sales %",
+              "text": "just --list"
+            },
+            {
+              "kind": "out",
+              "text": "Available recipes:\n    backup # Copy orders.csv into Backups\n    clean  # Delete the working copy\n    report # Acme orders, by region"
+            },
+            {
+              "kind": "cmd",
+              "prompt": "Sales %",
+              "text": "just report",
+              "mark": true
+            },
+            {
+              "kind": "note",
+              "text": "(it runs bash monday-report.sh: the same report as before)"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s7",
+      "title": "Claude writes, you keep the script",
+      "text": "You don't have to write scripts yourself. Ask Claude Code to write or fix one, then read what it changed. Claude does the writing (probabilistic); the saved script then runs the same way every time (deterministic).",
+      "add": [
+        "you",
+        "claude"
+      ],
+      "emphasize": [
+        "claude",
+        "script"
+      ],
+      "dim": [
+        "term",
+        "menu",
+        "recipe"
+      ],
+      "set": {
+        "script": {
+          "code": "#!/bin/bash\n# Monday report: Acme orders, by region\ncd ~/Documents/Sales\nif [ ! -f orders.csv ]; then\n    echo \"Stopped: orders.csv is missing\"\n    exit 1\nfi\ngrep \"Acme\" orders.csv > acme.csv\nwc -l acme.csv\ncut -d, -f3 acme.csv | sort | uniq -c\ncp acme.csv ~/Desktop/acme-weekly.csv",
+          "focus": [
+            4,
+            5,
+            6,
+            7
+          ]
+        }
+      }
+    },
+    {
+      "id": "s8",
+      "title": "The whole picture",
+      "text": "Type it twice, save it once. Scripts and a justfile hold the steps that must be the same every time; Claude helps write them and judges what's new. Your part: read before you run.",
+      "show": "*"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "title": "Claude Code, explained",
+  "description": "Twenty-one short explainers in five tracks, from the terminal to MCP, and a map of the order to read them in.",
+  "landing": "index/index.explainer.json",
+  "components": "components",
+  "specs": [
+    "explainers/a1-terminal/a1-terminal.explainer.json",
+    "explainers/a2-paths/a2-paths.explainer.json",
+    "explainers/a3-commands/a3-commands.explainer.json",
+    "explainers/a4-grep/a4-grep.explainer.json",
+    "explainers/a5-patterns/a5-patterns.explainer.json",
+    "explainers/a6-pipes/a6-pipes.explainer.json",
+    "explainers/a7-scripts/a7-scripts.explainer.json",
+    "explainers/a8-apis/a8-apis.explainer.json",
+    "explainers/b1-loop/b1-loop.explainer.json",
+    "explainers/b2-searching/b2-searching.explainer.json",
+    "explainers/b3-desk/b3-desk.explainer.json",
+    "explainers/b4-smart-vs-brute/b4-smart-vs-brute.explainer.json",
+    "explainers/b5-permissions/b5-permissions.explainer.json",
+    "explainers/c1-claude-md/c1-claude-md.explainer.json",
+    "explainers/c2-folders/c2-folders.explainer.json",
+    "explainers/c3-codenames/c3-codenames.explainer.json",
+    "explainers/c4-signposts/c4-signposts.explainer.json",
+    "explainers/c5-hooks/c5-hooks.explainer.json",
+    "explainers/d1-mcp/d1-mcp.explainer.json",
+    "explainers/d2-many-apis/d2-many-apis.explainer.json",
+    "explainers/s1-three-claudes/s1-three-claudes.explainer.json"
+  ]
+}

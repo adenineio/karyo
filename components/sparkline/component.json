@@ -1,0 +1,111 @@
+{
+  "name": "sparkline",
+  "description": "A sparkline: a small axis-free trend with a label and a value, sized to sit beside cards, metrics and key/value lists. It draws on when it appears and morphs when a step sets new values.",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": [
+      "values"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "label": {
+        "type": "string"
+      },
+      "values": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 200,
+        "items": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "value": {
+        "type": "number",
+        "description": "the number beside it (counts when set); e.g. the latest value"
+      },
+      "unit": {
+        "type": "string",
+        "description": "after values: a word (kWh) titles the value axis; a symbol (%, °C) rides on the ticks"
+      },
+      "prefix": {
+        "type": "string",
+        "description": "before values, e.g. $"
+      },
+      "decimals": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 6,
+        "description": "default: as many as the values have (at most 2)"
+      },
+      "format": {
+        "enum": [
+          "number",
+          "percent",
+          "compact"
+        ],
+        "default": "number",
+        "description": "percent: 0.25 shows as 25%; compact: 12,400 as 12.4K"
+      },
+      "grouping": {
+        "type": "boolean",
+        "default": true,
+        "description": "thousands separators"
+      },
+      "area": {
+        "type": "boolean",
+        "default": true,
+        "description": "a soft wash under the line"
+      },
+      "category": {
+        "type": "string",
+        "description": "a category id from the spec: its colour"
+      },
+      "zero": {
+        "type": "boolean",
+        "default": false,
+        "description": "start the scale at 0 (default: the values' own range)"
+      },
+      "min": {
+        "type": "number"
+      },
+      "max": {
+        "type": "number"
+      },
+      "frame": {
+        "type": "boolean",
+        "default": true,
+        "description": "draw the card frame around it"
+      },
+      "summary": {
+        "type": "string",
+        "description": "what a screen reader hears instead of the generated summary"
+      }
+    }
+  },
+  "size": {
+    "w": 380
+  },
+  "motion": [
+    "appear",
+    "emphasize",
+    "count",
+    "draw"
+  ],
+  "example": {
+    "label": "Daily steps",
+    "values": [
+      6200,
+      7400,
+      5100,
+      8800,
+      9100,
+      7600,
+      10300
+    ],
+    "value": 10300
+  }
+}

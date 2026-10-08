@@ -1,0 +1,7 @@
+<div class="pl-card box k-{{kind}} st-{{state}}">
+  {{#if kicker}}<div class="pl-label">{{kicker}}</div>{{/if}}
+  <div class="nm">{{name}}</div>
+  {{#if description}}<div class="ds">{{description}}</div>{{/if}}
+  {{#if inputs}}<div class="ins">{{#each inputs}}<span class="in">{{this}}</span>{{/each}}</div>{{/if}}
+  {{#if api}}<div class="api"><span class="dot" aria-hidden="true"></span><span class="an">{{api}}</span>{{#if note}}<span class="note">{{note}}</span>{{/if}}</div>{{/if}}
+</div>

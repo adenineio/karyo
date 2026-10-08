@@ -1,0 +1,6 @@
+:host { white-space: nowrap; }
+.chip { font-size: 13px; padding: 7px 11px; }
+.tone-accent { border-color: var(--pl-accent); color: var(--pl-accent); }
+.tone-warn { border-color: var(--pl-accent-2); color: var(--pl-accent-2); }
+.tone-ok { border-color: var(--pl-ok); color: var(--pl-ok); }
+:host(.is-lit) .chip { border-color: var(--pl-accent); color: var(--pl-accent); }

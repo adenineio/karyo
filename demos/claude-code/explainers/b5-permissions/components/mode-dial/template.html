@@ -1,0 +1,7 @@
+<div class="pl-card box">
+  <div class="dhead"><span class="pl-label">{{title}}</span>{{#if hint}}<span class="hint">{{hint}}</span>{{/if}}</div>
+  <ul class="modes">
+    {{#each modes}}<li class="m{{#if on}} is-on{{/if}}{{#if dim}} is-dim{{/if}}"><span class="knob" aria-hidden="true"></span><span class="nm">{{name}}{{#if tag}} <span class="tag">{{tag}}</span>{{/if}}</span><span class="runs">{{runs}}</span>{{#if on}}<span class="onchip">on</span>{{/if}}</li>
+    {{/each}}
+  </ul>
+</div>

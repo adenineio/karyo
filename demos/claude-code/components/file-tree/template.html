@@ -1,0 +1,7 @@
+<div class="pl-card box">
+  {{#if title}}<div class="pl-label head">{{title}}</div>{{/if}}
+  <ul class="tree">
+    {{#each items}}<li class="row kind-{{kind}} st-{{state}}" style="--d: {{depth}}"><span class="ic" aria-hidden="true"></span><span class="nm">{{name}}</span>{{#if note}}<span class="note">{{note}}</span>{{/if}}</li>
+    {{/each}}
+  </ul>
+</div>

@@ -1,0 +1,10 @@
+.box { display: grid; gap: 6px; padding: 2px 0; }
+.top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 14px; line-height: 1.3; }
+.lbl { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.val { font: 600 14px/1.3 var(--pl-font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.track { height: 12px; border-radius: min(var(--pl-radius), 6px); background: color-mix(in srgb, var(--pl-line) 35%, transparent); overflow: hidden; }
+.fill { height: 100%; background: var(--pl-accent); transform-origin: 0 50%; transform: scaleX(var(--k, 1)); border-radius: inherit; }
+.tone-muted .fill { background: var(--pl-muted); }
+.tone-warn .fill { background: var(--pl-accent-2); }
+.tone-ok .fill { background: var(--pl-ok); }
+:host(.is-lit) .val { color: var(--pl-accent); }

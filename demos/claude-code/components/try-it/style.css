@@ -1,0 +1,9 @@
+.box { box-sizing: border-box; height: 100%; display: flex; flex-direction: column; gap: 9px; padding: 16px 18px; border-radius: max(var(--pl-radius), 10px); border: 2px dashed color-mix(in srgb, var(--pl-ok) 70%, var(--pl-card-border)); background: color-mix(in srgb, var(--pl-ok) 7%, var(--pl-card)); }
+.kick { font: 800 12px/1 var(--pl-font); letter-spacing: 0.1em; text-transform: uppercase; color: var(--pl-ok); }
+.ttl { font-size: 19px; }
+.cmd { font: 600 15px/1.4 var(--pl-font-mono); padding: 8px 12px; border-radius: 6px; background: color-mix(in srgb, var(--pl-fg) 6%, var(--pl-card)); color: var(--pl-fg); white-space: pre-wrap; overflow-wrap: anywhere; }
+.pr { color: var(--pl-accent); margin-right: 0.6em; }
+.ask { font-size: 16px; line-height: 1.45; font-style: italic; color: var(--pl-fg); padding-left: 12px; border-left: 3px solid var(--pl-accent); }
+.exp { font-size: 14px; line-height: 1.45; color: var(--pl-muted); }
+.exp p { margin: 0; }
+:host(.is-lit) .box { border-color: var(--pl-ok); }

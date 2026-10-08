@@ -1,0 +1,754 @@
+{
+  "karyo": "explainer/1",
+  "id": "a6-pipes",
+  "title": "Small tools joined by pipes",
+  "summary": "The power is in the chain: each small tool's output becomes the next one's input. Claude chains them all the time.",
+  "note": "Names, companies and files here are **made-up examples**.",
+  "narration": "side",
+  "uses": [
+    "pipeline",
+    "terminal",
+    "chat-turn",
+    "try-it"
+  ],
+  "layout": {
+    "kind": "free"
+  },
+  "categories": [
+    {
+      "id": "computer",
+      "label": "the computer"
+    },
+    {
+      "id": "claude",
+      "label": "Claude"
+    }
+  ],
+  "elements": [
+    {
+      "id": "line",
+      "type": "pipeline",
+      "category": "computer",
+      "label": "The assembly line",
+      "props": {
+        "title": "The assembly line",
+        "stations": [
+          {
+            "cmd": "orders.csv",
+            "count": "9,001 lines",
+            "note": "the whole export",
+            "state": "now"
+          },
+          {
+            "cmd": "grep \"Acme\"",
+            "count": "917 lines",
+            "note": "only Acme's orders",
+            "state": "todo"
+          },
+          {
+            "cmd": "cut -d, -f3",
+            "count": "917 lines",
+            "note": "just the product",
+            "state": "todo"
+          },
+          {
+            "cmd": "sort",
+            "count": "917 lines",
+            "note": "same ones together",
+            "state": "todo"
+          },
+          {
+            "cmd": "uniq -c",
+            "count": "12 lines",
+            "note": "one per product, counted",
+            "state": "todo"
+          },
+          {
+            "cmd": "sort -rn",
+            "count": "12 lines",
+            "note": "biggest count first",
+            "state": "todo"
+          },
+          {
+            "cmd": "head -5",
+            "count": "5 lines",
+            "note": "the top five",
+            "state": "todo"
+          }
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 0,
+        "w": 1080
+      }
+    },
+    {
+      "id": "term",
+      "type": "terminal",
+      "category": "computer",
+      "label": "Terminal window",
+      "props": {
+        "prompt": "Sales %",
+        "lines": [
+          {
+            "kind": "cmd",
+            "text": "wc -l orders.csv"
+          },
+          {
+            "kind": "out",
+            "text": "    9001 orders.csv",
+            "mark": true
+          },
+          {
+            "kind": "cmd",
+            "text": "head -3 orders.csv"
+          },
+          {
+            "kind": "out",
+            "text": "order_id,customer,product,qty,total"
+          },
+          {
+            "kind": "out",
+            "text": "40021,Globex,paper,20,80.00"
+          },
+          {
+            "kind": "out",
+            "text": "40022,Globex,paper,6,66.00"
+          }
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 185,
+        "w": 690
+      }
+    },
+    {
+      "id": "count",
+      "type": "metric",
+      "category": "computer",
+      "label": "Lines coming out",
+      "props": {
+        "label": "Lines coming out",
+        "value": 9001,
+        "delta": "9,000 orders and a header line"
+      },
+      "at": {
+        "x": 730,
+        "y": 185,
+        "w": 350
+      }
+    },
+    {
+      "id": "idea",
+      "type": "card",
+      "label": "An assembly line",
+      "props": {
+        "kicker": "The idea",
+        "title": "An assembly line",
+        "body": "Each station does one small job and passes its result on. Where it stops: text flows **one way only**, left to right; no station can hand anything back."
+      },
+      "at": {
+        "x": 730,
+        "y": 330,
+        "w": 350
+      }
+    },
+    {
+      "id": "claude",
+      "type": "chat-turn",
+      "category": "claude",
+      "label": "Claude's answer",
+      "props": {
+        "who": "claude",
+        "text": "Paper, by a distance: **222** of Acme's 917 orders. Then toner (150) and pens (141).",
+        "actions": [
+          "Bash: grep \"Acme\" orders.csv | cut -d, -f3 | sort | uniq -c | sort -rn | head -5"
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 545,
+        "w": 690
+      }
+    },
+    {
+      "id": "try",
+      "type": "try-it",
+      "label": "Try it",
+      "props": {
+        "title": "Count what's in a folder",
+        "command": "ls ~/Documents | wc -l",
+        "expect": "One number: how many items are in Documents. `ls` lists the names, one per line when piped; `wc -l` counts the lines."
+      },
+      "at": {
+        "x": 730,
+        "y": 545,
+        "w": 350
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "title": "9,000 orders",
+      "text": "Your shop's export, `orders.csv`, has 9,000 orders, one per line. The question: *what does Acme order most?* `wc -l` counts the lines: 9,001, because the first line is the column names.",
+      "show": [
+        "line",
+        "term",
+        "count"
+      ],
+      "emphasize": [
+        "term"
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "grep keeps Acme",
+      "text": "The first station, `grep \"Acme\"`, lets through only the lines that mention Acme. 917 of 9,001 make it.",
+      "emphasize": [
+        "line",
+        "count"
+      ],
+      "set": {
+        "line": {
+          "title": "The assembly line",
+          "stations": [
+            {
+              "cmd": "orders.csv",
+              "count": "9,001 lines",
+              "note": "the whole export"
+            },
+            {
+              "cmd": "grep \"Acme\"",
+              "count": "917 lines",
+              "note": "only Acme's orders",
+              "state": "now"
+            },
+            {
+              "cmd": "cut -d, -f3",
+              "count": "917 lines",
+              "note": "just the product",
+              "state": "todo"
+            },
+            {
+              "cmd": "sort",
+              "count": "917 lines",
+              "note": "same ones together",
+              "state": "todo"
+            },
+            {
+              "cmd": "uniq -c",
+              "count": "12 lines",
+              "note": "one per product, counted",
+              "state": "todo"
+            },
+            {
+              "cmd": "sort -rn",
+              "count": "12 lines",
+              "note": "biggest count first",
+              "state": "todo"
+            },
+            {
+              "cmd": "head -5",
+              "count": "5 lines",
+              "note": "the top five",
+              "state": "todo"
+            }
+          ]
+        },
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "grep \"Acme\" orders.csv"
+            },
+            {
+              "kind": "out",
+              "text": "40027,Acme,labels,20,200.00"
+            },
+            {
+              "kind": "out",
+              "text": "40029,Acme,pens,15,82.50"
+            },
+            {
+              "kind": "out",
+              "text": "40033,Acme,pens,10,85.00"
+            },
+            {
+              "kind": "note",
+              "text": "… 917 lines in all"
+            }
+          ]
+        },
+        "count": {
+          "value": 917,
+          "delta": "only Acme's orders"
+        }
+      }
+    },
+    {
+      "id": "s3",
+      "title": "A pipe joins them",
+      "text": "A **pipe**, `|`, sends the output of one command into the next. `cut -d, -f3` keeps the third column, the product. Same number of lines, each much shorter.",
+      "add": [
+        "idea"
+      ],
+      "emphasize": [
+        "line",
+        "idea"
+      ],
+      "set": {
+        "line": {
+          "title": "The assembly line",
+          "stations": [
+            {
+              "cmd": "orders.csv",
+              "count": "9,001 lines",
+              "note": "the whole export"
+            },
+            {
+              "cmd": "grep \"Acme\"",
+              "count": "917 lines",
+              "note": "only Acme's orders"
+            },
+            {
+              "cmd": "cut -d, -f3",
+              "count": "917 lines",
+              "note": "just the product",
+              "state": "now"
+            },
+            {
+              "cmd": "sort",
+              "count": "917 lines",
+              "note": "same ones together",
+              "state": "todo"
+            },
+            {
+              "cmd": "uniq -c",
+              "count": "12 lines",
+              "note": "one per product, counted",
+              "state": "todo"
+            },
+            {
+              "cmd": "sort -rn",
+              "count": "12 lines",
+              "note": "biggest count first",
+              "state": "todo"
+            },
+            {
+              "cmd": "head -5",
+              "count": "5 lines",
+              "note": "the top five",
+              "state": "todo"
+            }
+          ]
+        },
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "grep \"Acme\" orders.csv | cut -d, -f3"
+            },
+            {
+              "kind": "out",
+              "text": "labels"
+            },
+            {
+              "kind": "out",
+              "text": "pens"
+            },
+            {
+              "kind": "out",
+              "text": "pens"
+            },
+            {
+              "kind": "out",
+              "text": "binders"
+            },
+            {
+              "kind": "note",
+              "text": "… still 917 lines, one word each"
+            }
+          ]
+        },
+        "count": {
+          "delta": "each line is now one word"
+        }
+      }
+    },
+    {
+      "id": "s4",
+      "title": "sort lines them up",
+      "text": "`sort` puts the lines in order, so every *pens* sits next to every other *pens*. The next station only counts neighbours, so this matters.",
+      "emphasize": [
+        "line",
+        "term"
+      ],
+      "dim": [
+        "idea"
+      ],
+      "set": {
+        "line": {
+          "title": "The assembly line",
+          "stations": [
+            {
+              "cmd": "orders.csv",
+              "count": "9,001 lines",
+              "note": "the whole export"
+            },
+            {
+              "cmd": "grep \"Acme\"",
+              "count": "917 lines",
+              "note": "only Acme's orders"
+            },
+            {
+              "cmd": "cut -d, -f3",
+              "count": "917 lines",
+              "note": "just the product"
+            },
+            {
+              "cmd": "sort",
+              "count": "917 lines",
+              "note": "same ones together",
+              "state": "now"
+            },
+            {
+              "cmd": "uniq -c",
+              "count": "12 lines",
+              "note": "one per product, counted",
+              "state": "todo"
+            },
+            {
+              "cmd": "sort -rn",
+              "count": "12 lines",
+              "note": "biggest count first",
+              "state": "todo"
+            },
+            {
+              "cmd": "head -5",
+              "count": "5 lines",
+              "note": "the top five",
+              "state": "todo"
+            }
+          ]
+        },
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "grep \"Acme\" orders.csv | cut -d, -f3 | sort"
+            },
+            {
+              "kind": "out",
+              "text": "binders"
+            },
+            {
+              "kind": "out",
+              "text": "binders"
+            },
+            {
+              "kind": "out",
+              "text": "binders"
+            },
+            {
+              "kind": "out",
+              "text": "binders"
+            },
+            {
+              "kind": "note",
+              "text": "… 917 lines, the same products now side by side"
+            }
+          ]
+        },
+        "count": {
+          "delta": "now in alphabetical order"
+        }
+      }
+    },
+    {
+      "id": "s5",
+      "title": "uniq -c counts",
+      "text": "`uniq -c` folds each run of identical lines into one and writes how many there were. 917 lines become 12: one per product, with its count.",
+      "emphasize": [
+        "line",
+        "count"
+      ],
+      "dim": [
+        "idea"
+      ],
+      "set": {
+        "line": {
+          "title": "The assembly line",
+          "stations": [
+            {
+              "cmd": "orders.csv",
+              "count": "9,001 lines",
+              "note": "the whole export"
+            },
+            {
+              "cmd": "grep \"Acme\"",
+              "count": "917 lines",
+              "note": "only Acme's orders"
+            },
+            {
+              "cmd": "cut -d, -f3",
+              "count": "917 lines",
+              "note": "just the product"
+            },
+            {
+              "cmd": "sort",
+              "count": "917 lines",
+              "note": "same ones together"
+            },
+            {
+              "cmd": "uniq -c",
+              "count": "12 lines",
+              "note": "one per product, counted",
+              "state": "now"
+            },
+            {
+              "cmd": "sort -rn",
+              "count": "12 lines",
+              "note": "biggest count first",
+              "state": "todo"
+            },
+            {
+              "cmd": "head -5",
+              "count": "5 lines",
+              "note": "the top five",
+              "state": "todo"
+            }
+          ]
+        },
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "grep \"Acme\" orders.csv | cut -d, -f3 | sort | uniq -c"
+            },
+            {
+              "kind": "out",
+              "text": "  33 binders"
+            },
+            {
+              "kind": "out",
+              "text": "  24 chairs"
+            },
+            {
+              "kind": "out",
+              "text": "  53 envelopes"
+            },
+            {
+              "kind": "out",
+              "text": "  57 folders"
+            },
+            {
+              "kind": "out",
+              "text": "  40 labels"
+            },
+            {
+              "kind": "out",
+              "text": "  27 markers"
+            },
+            {
+              "kind": "note",
+              "text": "… 12 lines, one per product"
+            }
+          ]
+        },
+        "count": {
+          "value": 12,
+          "delta": "one per product"
+        }
+      }
+    },
+    {
+      "id": "s6",
+      "title": "The top five",
+      "text": "`sort -rn` sorts by the number, biggest first (`-n` number, `-r` reverse), and `head -5` keeps the first five lines. The answer: paper, then toner and pens.",
+      "emphasize": [
+        "line",
+        "term"
+      ],
+      "dim": [
+        "idea"
+      ],
+      "set": {
+        "line": {
+          "title": "The assembly line",
+          "stations": [
+            {
+              "cmd": "orders.csv",
+              "count": "9,001 lines",
+              "note": "the whole export"
+            },
+            {
+              "cmd": "grep \"Acme\"",
+              "count": "917 lines",
+              "note": "only Acme's orders"
+            },
+            {
+              "cmd": "cut -d, -f3",
+              "count": "917 lines",
+              "note": "just the product"
+            },
+            {
+              "cmd": "sort",
+              "count": "917 lines",
+              "note": "same ones together"
+            },
+            {
+              "cmd": "uniq -c",
+              "count": "12 lines",
+              "note": "one per product, counted"
+            },
+            {
+              "cmd": "sort -rn",
+              "count": "12 lines",
+              "note": "biggest count first",
+              "state": "now"
+            },
+            {
+              "cmd": "head -5",
+              "count": "5 lines",
+              "note": "the top five",
+              "state": "now"
+            }
+          ]
+        },
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "grep \"Acme\" orders.csv | cut -d, -f3 | sort | uniq -c | sort -rn | head -5"
+            },
+            {
+              "kind": "out",
+              "text": " 222 paper",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": " 150 toner",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": " 141 pens",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "  90 notebooks",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "  59 staplers",
+              "mark": true
+            }
+          ]
+        },
+        "count": {
+          "value": 5,
+          "delta": "the answer"
+        }
+      }
+    },
+    {
+      "id": "s7",
+      "title": "Claude chains them",
+      "text": "Ask Claude Code the question and it may well write this exact line. Six small tools do the counting in a moment, with the same answer every time; Claude reads the five lines that come out and puts them into words.",
+      "add": [
+        "claude"
+      ],
+      "emphasize": [
+        "claude",
+        "term"
+      ],
+      "dim": [
+        "idea",
+        "count"
+      ],
+      "set": {
+        "line": {
+          "title": "The assembly line",
+          "stations": [
+            {
+              "cmd": "orders.csv",
+              "count": "9,001 lines",
+              "note": "the whole export"
+            },
+            {
+              "cmd": "grep \"Acme\"",
+              "count": "917 lines",
+              "note": "only Acme's orders"
+            },
+            {
+              "cmd": "cut -d, -f3",
+              "count": "917 lines",
+              "note": "just the product"
+            },
+            {
+              "cmd": "sort",
+              "count": "917 lines",
+              "note": "same ones together"
+            },
+            {
+              "cmd": "uniq -c",
+              "count": "12 lines",
+              "note": "one per product, counted"
+            },
+            {
+              "cmd": "sort -rn",
+              "count": "12 lines",
+              "note": "biggest count first"
+            },
+            {
+              "cmd": "head -5",
+              "count": "5 lines",
+              "note": "the top five"
+            }
+          ]
+        },
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "grep \"Acme\" orders.csv | cut -d, -f3 | sort | uniq -c | sort -rn | head -5"
+            },
+            {
+              "kind": "out",
+              "text": " 222 paper"
+            },
+            {
+              "kind": "out",
+              "text": " 150 toner"
+            },
+            {
+              "kind": "out",
+              "text": " 141 pens"
+            },
+            {
+              "kind": "out",
+              "text": "  90 notebooks"
+            },
+            {
+              "kind": "out",
+              "text": "  59 staplers"
+            }
+          ],
+          "badge": "run by Claude"
+        }
+      }
+    },
+    {
+      "id": "s8",
+      "title": "The whole line",
+      "text": "Small tools that each do one job, joined by pipes, answer big questions about big files. You don't need to write the chain; you need to recognise one when Claude runs it.",
+      "show": "*"
+    }
+  ]
+}

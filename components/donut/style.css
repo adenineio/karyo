@@ -1,0 +1,7 @@
+/* the chart itself (axes, marks, legend, tooltip) is drawn by the engine's chart layer from theme tokens */
+.box { height: 100%; box-sizing: border-box; margin: 0; padding: 14px 18px 12px; display: flex; flex-direction: column; gap: 10px; }
+.ttl { font: 600 15px/1.25 var(--pl-font-display); }
+.plot { flex: 1 1 auto; min-height: 80px; }
+.cap { font-size: 12.5px; line-height: 1.35; color: var(--pl-muted); }
+.cap p { margin: 0; }
+:host(.is-lit) .box { border-color: var(--pl-accent); }

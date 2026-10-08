@@ -1,0 +1,6 @@
+/* the card fills the element's box; with a fixed at.h the picture scales to fit inside it (never cropped) */
+.box { height: 100%; box-sizing: border-box; margin: 0; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+.framed { padding: 10px; }
+img { display: block; width: 100%; height: auto; min-height: 0; flex: 0 1 auto; object-fit: contain; border-radius: min(var(--pl-radius), 6px); }
+figcaption { flex: none; font-size: 13px; line-height: 1.35; color: var(--pl-muted); }
+:host(.is-lit) .framed { border-color: var(--pl-accent); }

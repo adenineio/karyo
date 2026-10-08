@@ -1,0 +1,5 @@
+<div class="pl-card box">
+  <div class="pl-label">{{label}}</div>
+  <div class="num">{{#if prefix}}<span class="pre">{{prefix}}</span>{{/if}}<span class="v" data-k-num="value" data-k-decimals="{{decimals}}" data-k-group="{{#if grouping}}true{{else}}false{{/if}}">{{value}}</span>{{#if unit}}<span class="unit">{{unit}}</span>{{/if}}</div>
+  {{#if delta}}<div class="delta tone-{{tone}}">{{delta}}</div>{{/if}}
+</div>

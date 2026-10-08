@@ -1,0 +1,51 @@
+{
+  "name": "text-file",
+  "description": "The inside of a plain-text file, line by line with line numbers, where words can be highlighted like a highlighter pen (a match) or marked as a near miss, and whole lines can be lit or dimmed.",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": ["title", "lines"],
+    "additionalProperties": false,
+    "properties": {
+      "title": { "type": "string", "minLength": 1, "description": "the file's name, e.g. `notes.txt`" },
+      "note": { "type": "string", "description": "a short note at the right of the title bar, e.g. `2 matches`" },
+      "lines": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 12,
+        "items": {
+          "type": "object",
+          "required": ["parts"],
+          "additionalProperties": false,
+          "properties": {
+            "state": { "enum": ["plain", "lit", "dim"], "default": "plain", "description": "lit: a line that matched; dim: a line that didn't" },
+            "parts": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": ["t"],
+                "additionalProperties": false,
+                "properties": {
+                  "t": { "type": "string", "description": "a run of text (spaces kept)" },
+                  "mark": { "enum": ["hit", "miss"], "description": "hit: highlighted, a match; miss: underlined, close but not a match" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "size": { "w": 460 },
+  "motion": ["appear", "emphasize"],
+  "example": {
+    "title": "notes.txt",
+    "note": "2 matches",
+    "lines": [
+      { "state": "lit", "parts": [{ "t": "Call " }, { "t": "Acme", "mark": "hit" }, { "t": " on Friday." }] },
+      { "state": "dim", "parts": [{ "t": "Lunch with Priya on Tuesday." }] },
+      { "parts": [{ "t": "Send " }, { "t": "ACME", "mark": "miss" }, { "t": " the contract." }] }
+    ]
+  }
+}

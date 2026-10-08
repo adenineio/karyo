@@ -1,0 +1,805 @@
+{
+  "karyo": "explainer/1",
+  "id": "c2-folders",
+  "title": "Shape your folders",
+  "summary": "Structure is an instruction: a tidy layout with telling names shows Claude, and people, where things are and where new things go.",
+  "note": "Names, companies and files here are **made-up examples**.",
+  "narration": "side",
+  "uses": [
+    "file-tree",
+    "context-meter",
+    "terminal",
+    "brief-note",
+    "try-it"
+  ],
+  "layout": {
+    "kind": "free"
+  },
+  "categories": [
+    {
+      "id": "files",
+      "label": "your files"
+    },
+    {
+      "id": "desk",
+      "label": "Claude's desk"
+    },
+    {
+      "id": "computer",
+      "label": "the computer"
+    }
+  ],
+  "elements": [
+    {
+      "id": "messy",
+      "type": "file-tree",
+      "category": "files",
+      "label": "The junk drawer",
+      "props": {
+        "title": "~/Acme stuff",
+        "items": [
+          {
+            "name": "final_v2_REAL.docx"
+          },
+          {
+            "name": "final_v2.docx"
+          },
+          {
+            "name": "Untitled (3).xlsx"
+          },
+          {
+            "name": "scan0042.pdf"
+          },
+          {
+            "name": "data.csv"
+          },
+          {
+            "name": "data (1).csv"
+          },
+          {
+            "name": "report NEW.docx"
+          }
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 0,
+        "w": 310
+      }
+    },
+    {
+      "id": "meter",
+      "type": "context-meter",
+      "category": "desk",
+      "label": "Context window",
+      "props": {
+        "title": "Context window",
+        "used": 2,
+        "caption": "illustrative",
+        "items": [
+          {
+            "label": "your request",
+            "share": "1%",
+            "tone": "chat"
+          }
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 225,
+        "w": 310
+      }
+    },
+    {
+      "id": "tidy",
+      "type": "file-tree",
+      "category": "files",
+      "label": "The labelled cabinet",
+      "props": {
+        "title": "~/Acme-reports",
+        "items": [
+          {
+            "name": "README.md",
+            "depth": 0
+          },
+          {
+            "name": "CLAUDE.md",
+            "depth": 0
+          },
+          {
+            "name": "data",
+            "kind": "folder",
+            "depth": 0
+          },
+          {
+            "name": "raw",
+            "kind": "folder",
+            "depth": 1
+          },
+          {
+            "name": "2026-03-31_acme_invoices.csv",
+            "depth": 2,
+            "state": "plain"
+          },
+          {
+            "name": "2026-03-31_bluebird_invoices.csv",
+            "depth": 2
+          },
+          {
+            "name": "clean",
+            "kind": "folder",
+            "depth": 1
+          },
+          {
+            "name": "2026-03-31_acme_invoices.csv",
+            "depth": 2,
+            "state": "plain"
+          },
+          {
+            "name": "scripts",
+            "kind": "folder",
+            "depth": 0
+          },
+          {
+            "name": "clean_invoices.sh",
+            "depth": 1
+          },
+          {
+            "name": "reports",
+            "kind": "folder",
+            "depth": 0
+          },
+          {
+            "name": "2026-03_acme_summary.docx",
+            "depth": 1,
+            "state": "plain"
+          }
+        ]
+      },
+      "at": {
+        "x": 335,
+        "y": 0,
+        "w": 430
+      }
+    },
+    {
+      "id": "rule",
+      "type": "card",
+      "props": {
+        "kicker": "The rule",
+        "title": "Raw in, scripts out",
+        "body": "**data/raw** holds exports exactly as they arrived. Nobody edits them.\n\n**scripts** turn them into **data/clean** and **reports**, the same way every time. Lose an output? Run the script again."
+      },
+      "at": {
+        "x": 335,
+        "y": 410,
+        "w": 430
+      }
+    },
+    {
+      "id": "term",
+      "type": "terminal",
+      "category": "computer",
+      "label": "Terminal",
+      "props": {
+        "lines": [
+          {
+            "kind": "cmd",
+            "prompt": "Invoices %",
+            "text": "ls -1"
+          },
+          {
+            "kind": "out",
+            "text": "invoices-april.csv"
+          },
+          {
+            "kind": "out",
+            "text": "invoices-february.csv"
+          },
+          {
+            "kind": "out",
+            "text": "invoices-january.csv"
+          },
+          {
+            "kind": "out",
+            "text": "invoices-march.csv"
+          },
+          {
+            "kind": "note",
+            "text": "(the same files, renamed date first)"
+          },
+          {
+            "kind": "cmd",
+            "prompt": "Invoices %",
+            "text": "ls -1"
+          },
+          {
+            "kind": "out",
+            "text": "2026-01-31_invoices.csv",
+            "mark": true
+          },
+          {
+            "kind": "out",
+            "text": "2026-02-28_invoices.csv",
+            "mark": true
+          },
+          {
+            "kind": "out",
+            "text": "2026-03-31_invoices.csv",
+            "mark": true
+          },
+          {
+            "kind": "out",
+            "text": "2026-04-30_invoices.csv",
+            "mark": true
+          }
+        ]
+      },
+      "at": {
+        "x": 790,
+        "y": 0,
+        "w": 420
+      }
+    },
+    {
+      "id": "map",
+      "type": "brief-note",
+      "category": "files",
+      "label": "CLAUDE.md",
+      "props": {
+        "h1": "Acme reports",
+        "sections": [
+          {
+            "heading": "Where things go",
+            "lines": [
+              "`data/raw/`: exports as received. Never edit.",
+              "`data/clean/`, `reports/`: made by `scripts/`."
+            ]
+          },
+          {
+            "heading": "Names",
+            "lines": [
+              "`YYYY-MM-DD_client_what.csv`"
+            ]
+          }
+        ]
+      },
+      "at": {
+        "x": 790,
+        "y": 345,
+        "w": 420
+      }
+    },
+    {
+      "id": "try",
+      "type": "try-it",
+      "props": {
+        "title": "Ask for a plan first",
+        "ask": "Suggest a folder structure for these files. Show me the plan; don't move anything yet.",
+        "expect": "You get a proposed layout to read and adjust. Moving the files comes later, once you agree."
+      },
+      "at": {
+        "x": 0,
+        "y": 225,
+        "w": 310
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "title": "A junk drawer",
+      "text": "A folder that grew by accident: three versions of the report, two `data` files, a scan named by the scanner. You might remember which is which. Claude, starting fresh, can't.",
+      "show": [
+        "messy"
+      ],
+      "emphasize": [
+        "messy"
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "Claude opens everything",
+      "text": "Ask for \"the March invoices for Acme\": no name gives a clue, and a plain-text search can't see inside Word and Excel files (they're zipped up), so Claude opens file after file. Everything it opens lands on its desk, the **context window**, and most of it is the wrong file.",
+      "add": [
+        "meter"
+      ],
+      "emphasize": [
+        "meter"
+      ],
+      "set": {
+        "meter": {
+          "used": 50,
+          "items": [
+            {
+              "label": "opened final_v2_REAL.docx",
+              "share": "11%",
+              "tone": "waste"
+            },
+            {
+              "label": "opened data.csv",
+              "share": "14%",
+              "tone": "waste"
+            },
+            {
+              "label": "opened data (1).csv",
+              "share": "14%",
+              "tone": "waste"
+            },
+            {
+              "label": "opened Untitled (3).xlsx: found",
+              "share": "9%",
+              "tone": "file"
+            },
+            {
+              "label": "your request",
+              "share": "1%",
+              "tone": "chat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s3",
+      "title": "A labelled cabinet",
+      "text": "The same work, laid out like a labelled filing cabinet: a short note at the top, the data, the scripts, the reports. Structure is an instruction: it says where things are and where new things go.",
+      "add": [
+        "tidy"
+      ],
+      "emphasize": [
+        "tidy"
+      ],
+      "dim": [
+        "messy",
+        "meter"
+      ]
+    },
+    {
+      "id": "s4",
+      "title": "Raw stays raw",
+      "text": "Keep the files you were given exactly as they arrived, and let **scripts** make everything else from them. The outputs are then deterministic: same input, same result, every time, and a mistake never reaches the originals.",
+      "add": [
+        "rule"
+      ],
+      "emphasize": [
+        "rule",
+        "tidy"
+      ],
+      "dim": [
+        "messy",
+        "meter"
+      ],
+      "set": {
+        "tidy": {
+          "items": [
+            {
+              "name": "README.md",
+              "depth": 0
+            },
+            {
+              "name": "CLAUDE.md",
+              "depth": 0
+            },
+            {
+              "name": "data",
+              "kind": "folder",
+              "depth": 0
+            },
+            {
+              "name": "raw",
+              "kind": "folder",
+              "depth": 1,
+              "note": "never edited",
+              "state": "here"
+            },
+            {
+              "name": "2026-03-31_acme_invoices.csv",
+              "depth": 2,
+              "state": "plain"
+            },
+            {
+              "name": "2026-03-31_bluebird_invoices.csv",
+              "depth": 2
+            },
+            {
+              "name": "clean",
+              "kind": "folder",
+              "depth": 1,
+              "note": "made by scripts"
+            },
+            {
+              "name": "2026-03-31_acme_invoices.csv",
+              "depth": 2,
+              "state": "plain"
+            },
+            {
+              "name": "scripts",
+              "kind": "folder",
+              "depth": 0
+            },
+            {
+              "name": "clean_invoices.sh",
+              "depth": 1
+            },
+            {
+              "name": "reports",
+              "kind": "folder",
+              "depth": 0,
+              "note": "made by scripts"
+            },
+            {
+              "name": "2026-03_acme_summary.docx",
+              "depth": 1,
+              "state": "plain"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s5",
+      "title": "Names that sort",
+      "text": "Your computer sorts names letter by letter, so month names come out April, February, January (`ls -1` lists one name per line). Start each name with the date, year first, and the list sorts into time order by itself.",
+      "add": [
+        "term"
+      ],
+      "emphasize": [
+        "term"
+      ],
+      "dim": [
+        "messy",
+        "meter",
+        "tidy",
+        "rule"
+      ],
+      "set": {
+        "tidy": {
+          "items": [
+            {
+              "name": "README.md",
+              "depth": 0
+            },
+            {
+              "name": "CLAUDE.md",
+              "depth": 0
+            },
+            {
+              "name": "data",
+              "kind": "folder",
+              "depth": 0
+            },
+            {
+              "name": "raw",
+              "kind": "folder",
+              "depth": 1
+            },
+            {
+              "name": "2026-03-31_acme_invoices.csv",
+              "depth": 2,
+              "state": "plain"
+            },
+            {
+              "name": "2026-03-31_bluebird_invoices.csv",
+              "depth": 2
+            },
+            {
+              "name": "clean",
+              "kind": "folder",
+              "depth": 1
+            },
+            {
+              "name": "2026-03-31_acme_invoices.csv",
+              "depth": 2,
+              "state": "plain"
+            },
+            {
+              "name": "scripts",
+              "kind": "folder",
+              "depth": 0
+            },
+            {
+              "name": "clean_invoices.sh",
+              "depth": 1
+            },
+            {
+              "name": "reports",
+              "kind": "folder",
+              "depth": 0
+            },
+            {
+              "name": "2026-03_acme_summary.docx",
+              "depth": 1,
+              "state": "plain"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s6",
+      "title": "Names do the searching",
+      "text": "Now a name says what's inside, so a search by name finds the right files without opening any. Claude Code on a Mac searches with exactly this kind of `find` command, and only the matches reach the desk.",
+      "emphasize": [
+        "term",
+        "tidy",
+        "meter"
+      ],
+      "dim": [
+        "messy",
+        "rule"
+      ],
+      "set": {
+        "term": {
+          "badge": "run by Claude",
+          "lines": [
+            {
+              "kind": "cmd",
+              "prompt": "Acme-reports %",
+              "text": "find . -name \"*acme*\""
+            },
+            {
+              "kind": "out",
+              "text": "./data/clean/2026-03-31_acme_invoices.csv",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "./data/raw/2026-03-31_acme_invoices.csv",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "./reports/2026-03_acme_summary.docx",
+              "mark": true
+            }
+          ]
+        },
+        "tidy": {
+          "items": [
+            {
+              "name": "README.md",
+              "depth": 0
+            },
+            {
+              "name": "CLAUDE.md",
+              "depth": 0
+            },
+            {
+              "name": "data",
+              "kind": "folder",
+              "depth": 0
+            },
+            {
+              "name": "raw",
+              "kind": "folder",
+              "depth": 1
+            },
+            {
+              "name": "2026-03-31_acme_invoices.csv",
+              "depth": 2,
+              "state": "hit"
+            },
+            {
+              "name": "2026-03-31_bluebird_invoices.csv",
+              "depth": 2,
+              "state": "dim"
+            },
+            {
+              "name": "clean",
+              "kind": "folder",
+              "depth": 1
+            },
+            {
+              "name": "2026-03-31_acme_invoices.csv",
+              "depth": 2,
+              "state": "hit"
+            },
+            {
+              "name": "scripts",
+              "kind": "folder",
+              "depth": 0
+            },
+            {
+              "name": "clean_invoices.sh",
+              "depth": 1,
+              "state": "dim"
+            },
+            {
+              "name": "reports",
+              "kind": "folder",
+              "depth": 0
+            },
+            {
+              "name": "2026-03_acme_summary.docx",
+              "depth": 1,
+              "state": "hit"
+            }
+          ]
+        },
+        "meter": {
+          "used": 5,
+          "items": [
+            {
+              "label": "find: 3 matching names",
+              "share": "1%",
+              "tone": "output"
+            },
+            {
+              "label": "2026-03-31_acme_invoices.csv",
+              "share": "3%",
+              "tone": "file"
+            },
+            {
+              "label": "your request",
+              "share": "1%",
+              "tone": "chat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s7",
+      "title": "Write the map down",
+      "text": "Describe the layout in **CLAUDE.md**, which Claude reads at the start of every session, so it knows where things go before it opens anything. A **README.md** does the same job for people; Claude reads that only if it opens it.",
+      "add": [
+        "map"
+      ],
+      "emphasize": [
+        "map"
+      ],
+      "dim": [
+        "messy",
+        "meter",
+        "rule",
+        "term"
+      ],
+      "set": {
+        "tidy": {
+          "items": [
+            {
+              "name": "README.md",
+              "depth": 0,
+              "state": "new",
+              "note": "the map"
+            },
+            {
+              "name": "CLAUDE.md",
+              "depth": 0,
+              "state": "new",
+              "note": "the map"
+            },
+            {
+              "name": "data",
+              "kind": "folder",
+              "depth": 0
+            },
+            {
+              "name": "raw",
+              "kind": "folder",
+              "depth": 1
+            },
+            {
+              "name": "2026-03-31_acme_invoices.csv",
+              "depth": 2,
+              "state": "plain"
+            },
+            {
+              "name": "2026-03-31_bluebird_invoices.csv",
+              "depth": 2
+            },
+            {
+              "name": "clean",
+              "kind": "folder",
+              "depth": 1
+            },
+            {
+              "name": "2026-03-31_acme_invoices.csv",
+              "depth": 2,
+              "state": "plain"
+            },
+            {
+              "name": "scripts",
+              "kind": "folder",
+              "depth": 0
+            },
+            {
+              "name": "clean_invoices.sh",
+              "depth": 1
+            },
+            {
+              "name": "reports",
+              "kind": "folder",
+              "depth": 0
+            },
+            {
+              "name": "2026-03_acme_summary.docx",
+              "depth": 1,
+              "state": "plain"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s8",
+      "title": "The whole picture",
+      "text": "A junk drawer makes Claude open everything; a labelled cabinet lets one search find the right file. Raw data stays raw, scripts make the rest, names start with the date, and a short CLAUDE.md explains the layout.",
+      "show": [
+        "messy",
+        "tidy",
+        "rule",
+        "term",
+        "map",
+        "try"
+      ],
+      "set": {
+        "tidy": {
+          "items": [
+            {
+              "name": "README.md",
+              "depth": 0
+            },
+            {
+              "name": "CLAUDE.md",
+              "depth": 0
+            },
+            {
+              "name": "data",
+              "kind": "folder",
+              "depth": 0
+            },
+            {
+              "name": "raw",
+              "kind": "folder",
+              "depth": 1,
+              "note": "never edited",
+              "state": "here"
+            },
+            {
+              "name": "2026-03-31_acme_invoices.csv",
+              "depth": 2,
+              "state": "plain"
+            },
+            {
+              "name": "2026-03-31_bluebird_invoices.csv",
+              "depth": 2
+            },
+            {
+              "name": "clean",
+              "kind": "folder",
+              "depth": 1,
+              "note": "made by scripts"
+            },
+            {
+              "name": "2026-03-31_acme_invoices.csv",
+              "depth": 2,
+              "state": "plain"
+            },
+            {
+              "name": "scripts",
+              "kind": "folder",
+              "depth": 0
+            },
+            {
+              "name": "clean_invoices.sh",
+              "depth": 1
+            },
+            {
+              "name": "reports",
+              "kind": "folder",
+              "depth": 0,
+              "note": "made by scripts"
+            },
+            {
+              "name": "2026-03_acme_summary.docx",
+              "depth": 1,
+              "state": "plain"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

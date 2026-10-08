@@ -1,0 +1,26 @@
+[project]
+name = "karyo-mcp"
+version = "0.1.0"
+description = "MCP server for Claude Desktop / Cowork: author, preview and ship Karyo explainers through the karyo CLI."
+requires-python = ">=3.12"
+dependencies = [
+    "mcp>=2.2,<3",
+    "pillow>=10",
+]
+
+[project.scripts]
+karyo-mcp = "karyo_mcp.__main__:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "anyio>=4"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["karyo_mcp*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: runs the real karyo CLI (bun, headless Chrome); skipped when the explainer core is missing"]

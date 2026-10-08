@@ -1,0 +1,528 @@
+{
+  "karyo": "explainer/1",
+  "id": "d1-mcp",
+  "title": "Connectors (MCP)",
+  "summary": "An MCP server puts a menu of tools in front of a service. Claude picks a tool and fills in its form; the server makes the real call.",
+  "note": "Names, companies and files here are **made-up examples**.",
+  "narration": "side",
+  "uses": [
+    "chat-turn",
+    "context-meter",
+    "try-it",
+    "tool-menu"
+  ],
+  "layout": {
+    "kind": "free"
+  },
+  "categories": [
+    {
+      "id": "you",
+      "label": "you"
+    },
+    {
+      "id": "claude",
+      "label": "Claude"
+    },
+    {
+      "id": "server",
+      "label": "the MCP server"
+    },
+    {
+      "id": "service",
+      "label": "the service"
+    }
+  ],
+  "elements": [
+    {
+      "id": "you",
+      "type": "chat-turn",
+      "category": "you",
+      "label": "Your question",
+      "props": {
+        "who": "you",
+        "text": "Is Acme up for renewal this quarter?"
+      },
+      "at": {
+        "x": 0,
+        "y": 0,
+        "w": 360
+      }
+    },
+    {
+      "id": "claude",
+      "type": "chat-turn",
+      "category": "claude",
+      "label": "Claude's reply",
+      "props": {
+        "who": "claude",
+        "text": "I can't see your CRM from here. Could you paste Acme's record?"
+      },
+      "at": {
+        "x": 0,
+        "y": 96,
+        "w": 360
+      }
+    },
+    {
+      "id": "paste",
+      "type": "callout",
+      "props": {
+        "tone": "note",
+        "title": "You are the go-between",
+        "md": "Copy from the CRM, paste into the chat, copy the answer back. Claude knows only what you pasted."
+      },
+      "at": {
+        "x": 0,
+        "y": 270,
+        "w": 360
+      }
+    },
+    {
+      "id": "server",
+      "type": "card",
+      "category": "server",
+      "props": {
+        "kicker": "MCP server",
+        "title": "crm",
+        "body": "A small program that offers Claude a **menu of tools** for one service, and makes the real calls. Unlike a human interpreter, it does only what's on its menu."
+      },
+      "at": {
+        "x": 490,
+        "y": 0,
+        "w": 380
+      }
+    },
+    {
+      "id": "key",
+      "type": "chip",
+      "category": "server",
+      "label": "API key",
+      "props": {
+        "text": "API key: kept in the server's settings",
+        "tone": "accent"
+      },
+      "at": {
+        "x": 490,
+        "y": 186
+      }
+    },
+    {
+      "id": "menu",
+      "type": "tool-menu",
+      "category": "server",
+      "label": "The server's tool menu",
+      "props": {
+        "title": "crm · its tool menu",
+        "tools": [
+          {
+            "name": "find_customer",
+            "description": "Look up one customer by name: status, owner and renewal date.",
+            "open": true,
+            "fields": [
+              {
+                "name": "name",
+                "kind": "text",
+                "required": true
+              },
+              {
+                "name": "include_deals",
+                "kind": "yes / no"
+              }
+            ]
+          },
+          {
+            "name": "list_deals",
+            "description": "List a customer's open deals."
+          },
+          {
+            "name": "log_call",
+            "description": "Add a note about a call to a customer's record."
+          }
+        ]
+      },
+      "at": {
+        "x": 490,
+        "y": 244,
+        "w": 380
+      }
+    },
+    {
+      "id": "service",
+      "type": "card",
+      "category": "service",
+      "props": {
+        "kicker": "the service",
+        "title": "Your CRM",
+        "body": "Your customer records, online, with an **API** at `api.example.com`: it answers only fixed-format requests that carry a key."
+      },
+      "at": {
+        "x": 1010,
+        "y": 0,
+        "w": 290
+      }
+    },
+    {
+      "id": "reply",
+      "type": "code",
+      "category": "service",
+      "label": "The API's reply",
+      "props": {
+        "title": "the API's reply (JSON)",
+        "lang": "json",
+        "code": "{\n  \"name\": \"Acme\",\n  \"status\": \"active\",\n  \"renews\": \"2026-11-15\"\n}"
+      },
+      "at": {
+        "x": 1010,
+        "y": 244,
+        "w": 290
+      }
+    },
+    {
+      "id": "local",
+      "type": "card",
+      "category": "server",
+      "props": {
+        "kicker": "local · stdio",
+        "title": "On your Mac",
+        "body": "Claude Code starts the server as a program on your computer and talks to it through its text in and text out (**stdio**). Good for your own files and scripts."
+      },
+      "at": {
+        "x": 0,
+        "y": 760,
+        "w": 400
+      }
+    },
+    {
+      "id": "remote",
+      "type": "card",
+      "category": "server",
+      "props": {
+        "kicker": "remote · HTTP",
+        "title": "On the service's computers",
+        "body": "Claude Code reaches it over the internet (**HTTP**), often after you sign in once. The recommended way to connect to an online service."
+      },
+      "at": {
+        "x": 460,
+        "y": 760,
+        "w": 400
+      }
+    },
+    {
+      "id": "upfront",
+      "type": "context-meter",
+      "label": "Every definition up front",
+      "props": {
+        "title": "Every definition up front",
+        "used": 22,
+        "caption": "illustrative: 3 servers, 60 tools",
+        "items": [
+          {
+            "label": "CLAUDE.md",
+            "share": "2%",
+            "tone": "brief"
+          },
+          {
+            "label": "60 full tool definitions",
+            "share": "19%",
+            "tone": "waste"
+          },
+          {
+            "label": "your question",
+            "share": "1%",
+            "tone": "chat"
+          }
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 760,
+        "w": 400
+      }
+    },
+    {
+      "id": "search",
+      "type": "context-meter",
+      "label": "With tool search",
+      "props": {
+        "title": "With tool search (the default)",
+        "used": 5,
+        "caption": "illustrative: the same 60 tools",
+        "items": [
+          {
+            "label": "CLAUDE.md",
+            "share": "2%",
+            "tone": "brief"
+          },
+          {
+            "label": "60 tool names",
+            "share": "1%",
+            "tone": "file"
+          },
+          {
+            "label": "find_customer, fetched in full",
+            "share": "1%",
+            "tone": "file"
+          },
+          {
+            "label": "your question",
+            "share": "1%",
+            "tone": "chat"
+          }
+        ]
+      },
+      "at": {
+        "x": 460,
+        "y": 760,
+        "w": 400
+      }
+    },
+    {
+      "id": "trust",
+      "type": "callout",
+      "category": "you",
+      "props": {
+        "tone": "warn",
+        "title": "Connect only servers you trust",
+        "md": "A server typically acts with whatever access its key or sign-in allows, and text it fetches (a web page, an email) can carry hidden instructions: **prompt injection**. Your permission settings still decide what needs your OK."
+      },
+      "at": {
+        "x": 0,
+        "y": 270,
+        "w": 360
+      }
+    },
+    {
+      "id": "try",
+      "type": "try-it",
+      "props": {
+        "title": "See your connectors",
+        "expect": "Start Claude Code, type `/mcp` and press Return. It lists the servers you've connected, whether each one is connected, and how many tools each offers."
+      },
+      "at": {
+        "x": 1010,
+        "y": 244,
+        "w": 290
+      }
+    }
+  ],
+  "links": [
+    {
+      "id": "l-paste",
+      "from": "service",
+      "to": "you",
+      "label": "copy, paste",
+      "style": "dashed"
+    },
+    {
+      "id": "l-conn",
+      "from": "claude",
+      "to": "server",
+      "label": "one connection"
+    },
+    {
+      "id": "l-call",
+      "from": "server",
+      "to": "service",
+      "label": "API request + key",
+      "style": "accent"
+    },
+    {
+      "id": "l-reply",
+      "from": "service",
+      "to": "reply",
+      "label": "reply"
+    }
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "title": "Copy and paste",
+      "text": "Claude Code can't see your CRM, the online system that holds your customer records. Without a connector, you are the go-between, and Claude knows only what you pasted.",
+      "show": [
+        "you",
+        "claude",
+        "service",
+        "paste"
+      ],
+      "connect": [
+        "l-paste"
+      ],
+      "emphasize": [
+        "paste"
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "A server at the counter",
+      "text": "An **MCP server** stands at the service's counter like an interpreter holding a printed menu. **MCP** is the open standard for this. Claude Code is the *host*. For each server it makes an MCP *client*: not a customer, but the part of Claude Code that keeps one connection to that server.",
+      "show": [
+        "you",
+        "claude",
+        "server",
+        "service"
+      ],
+      "connect": [
+        "l-conn",
+        "l-call"
+      ],
+      "emphasize": [
+        "server"
+      ],
+      "set": {
+        "claude": {
+          "text": "I can reach your CRM through the **crm** server now."
+        }
+      }
+    },
+    {
+      "id": "s3",
+      "title": "The menu",
+      "text": "Each tool has a **name**, a **description** in plain words and an **input form**: the boxes to fill in, with * on the required ones. (Servers can also offer files to read and ready-made prompts; this page sticks to tools.)",
+      "add": [
+        "menu"
+      ],
+      "connect": [
+        "l-conn",
+        "l-call"
+      ],
+      "emphasize": [
+        "menu"
+      ],
+      "dim": [
+        "you",
+        "claude",
+        "service"
+      ]
+    },
+    {
+      "id": "s4",
+      "title": "Claude picks and fills in",
+      "text": "Claude matches your question to the descriptions, picks `find_customer` and fills in the form: very likely the right choice, not guaranteed, so clear descriptions matter. Claude Code names the call after the server, then the tool.",
+      "emphasize": [
+        "claude",
+        "menu"
+      ],
+      "dim": [
+        "service"
+      ],
+      "connect": [
+        "l-conn",
+        "l-call"
+      ],
+      "set": {
+        "claude": {
+          "text": "I'll look Acme up in the CRM.",
+          "actions": [
+            "mcp__crm__find_customer  name: \"Acme\""
+          ]
+        },
+        "menu": {
+          "tools": [
+            {
+              "name": "find_customer",
+              "description": "Look up one customer by name: status, owner and renewal date.",
+              "open": true,
+              "state": "picked",
+              "fields": [
+                {
+                  "name": "name",
+                  "kind": "text",
+                  "required": true,
+                  "value": "Acme"
+                },
+                {
+                  "name": "include_deals",
+                  "kind": "yes / no"
+                }
+              ]
+            },
+            {
+              "name": "list_deals",
+              "description": "List a customer's open deals.",
+              "state": "dim"
+            },
+            {
+              "name": "log_call",
+              "description": "Add a note about a call to a customer's record.",
+              "state": "dim"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s5",
+      "title": "The server makes the call",
+      "text": "The server turns the form into a real **API** request, adds the key and hands the reply back to Claude. The key stays in the server's settings: Claude's form has no box for it. Servers are usually built so the same form makes the same request every time: that's design, not an MCP rule.",
+      "add": [
+        "key",
+        "reply"
+      ],
+      "emphasize": [
+        "key",
+        "reply",
+        "claude"
+      ],
+      "dim": [
+        "menu"
+      ],
+      "connect": [
+        "l-conn",
+        "l-call",
+        "l-reply"
+      ],
+      "set": {
+        "claude": {
+          "text": "Yes: Acme renews on **15 November**, and the account is active.",
+          "actions": [
+            "mcp__crm__find_customer  name: \"Acme\""
+          ]
+        }
+      }
+    },
+    {
+      "id": "s6",
+      "title": "Local or remote",
+      "text": "A **local** server is a program Claude Code starts on your Mac and talks to through text in and out (*stdio*). A **remote** server runs on the service's own computers and is reached over the internet (*HTTP*).",
+      "show": [
+        "local",
+        "remote"
+      ],
+      "emphasize": []
+    },
+    {
+      "id": "s7",
+      "title": "Menus take desk space",
+      "text": "Every tool definition takes room on Claude's desk, its **context window**. **Tool search**, on by default, loads only the tool names at the start and fetches a tool's full definition when Claude needs it.",
+      "show": [
+        "upfront",
+        "search"
+      ],
+      "emphasize": [
+        "search"
+      ]
+    },
+    {
+      "id": "s8",
+      "title": "Trust what you connect",
+      "text": "The whole picture: you ask, Claude picks a tool and fills in the form, the server makes the call. Connect only servers you trust; Claude Code's permissions still apply (see *Permissions and undo*).",
+      "show": [
+        "you",
+        "claude",
+        "server",
+        "key",
+        "menu",
+        "service",
+        "trust",
+        "try"
+      ],
+      "connect": [
+        "l-conn",
+        "l-call"
+      ],
+      "emphasize": [
+        "trust"
+      ]
+    }
+  ]
+}

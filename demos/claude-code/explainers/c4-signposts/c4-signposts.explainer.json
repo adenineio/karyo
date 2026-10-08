@@ -1,0 +1,531 @@
+{
+  "karyo": "explainer/1",
+  "id": "c4-signposts",
+  "title": "Signposts for grep",
+  "summary": "Put the same markers in your files, written the same way every time, and one grep finds them all. Claude can then answer from a few lines instead of reading everything.",
+  "note": "Names, companies and files here are **made-up examples**.",
+  "narration": "side",
+  "uses": [
+    "terminal",
+    "file-tree",
+    "chat-turn",
+    "try-it"
+  ],
+  "layout": {
+    "kind": "free"
+  },
+  "categories": [
+    {
+      "id": "people",
+      "label": "you"
+    },
+    {
+      "id": "claude",
+      "label": "Claude"
+    },
+    {
+      "id": "computer",
+      "label": "the computer"
+    },
+    {
+      "id": "files",
+      "label": "your files"
+    }
+  ],
+  "elements": [
+    {
+      "id": "term",
+      "type": "terminal",
+      "category": "computer",
+      "label": "Terminal",
+      "props": {
+        "prompt": "acme %",
+        "lines": [
+          {
+            "kind": "cmd",
+            "text": "cat notes/2026-09-16-pricing.md"
+          },
+          {
+            "kind": "out",
+            "text": "Long call with Acme about pricing. Per-project quotes keep"
+          },
+          {
+            "kind": "out",
+            "text": "slowing things down, so in the end we agreed to bill them",
+            "mark": true
+          },
+          {
+            "kind": "out",
+            "text": "monthly instead. Sam will send the revised quote.",
+            "mark": true
+          }
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 0,
+        "w": 700
+      }
+    },
+    {
+      "id": "tree",
+      "type": "file-tree",
+      "category": "files",
+      "label": "The notes folder",
+      "props": {
+        "title": "~/acme",
+        "items": [
+          {
+            "name": "CLAUDE.md"
+          },
+          {
+            "name": "notes",
+            "kind": "folder"
+          },
+          {
+            "name": "2026-09-02-kickoff.md",
+            "depth": 1
+          },
+          {
+            "name": "2026-09-16-pricing.md",
+            "depth": 1
+          },
+          {
+            "name": "2026-09-23-globex.md",
+            "depth": 1
+          },
+          {
+            "name": "2026-09-30-review.md",
+            "depth": 1
+          }
+        ]
+      },
+      "at": {
+        "x": 760,
+        "y": 0,
+        "w": 320
+      }
+    },
+    {
+      "id": "markers",
+      "type": "kv",
+      "category": "files",
+      "label": "The markers",
+      "props": {
+        "title": "Signposts",
+        "pairs": [
+          {
+            "k": "Client: Acme",
+            "v": "who it's for"
+          },
+          {
+            "k": "Status: draft",
+            "v": "where it stands"
+          },
+          {
+            "k": "#decision",
+            "v": "something we decided"
+          },
+          {
+            "k": "TODO(sam):",
+            "v": "Sam's next job"
+          }
+        ]
+      },
+      "at": {
+        "x": 760,
+        "y": 240,
+        "w": 320
+      }
+    },
+    {
+      "id": "limit",
+      "type": "callout",
+      "props": {
+        "tone": "warn",
+        "title": "grep is exact",
+        "md": "`#Decision` isn't `#decision`, and `status: Draft` isn't `Status: draft`. `-i` would forgive the capitals, not the other differences. Consistency is the whole trick."
+      },
+      "at": {
+        "x": 0,
+        "y": 335,
+        "w": 700
+      }
+    },
+    {
+      "id": "you",
+      "type": "chat-turn",
+      "category": "people",
+      "label": "Your question",
+      "props": {
+        "who": "you",
+        "text": "What did we decide about pricing?"
+      },
+      "at": {
+        "x": 300,
+        "y": 335,
+        "w": 400
+      }
+    },
+    {
+      "id": "claude",
+      "type": "chat-turn",
+      "category": "claude",
+      "label": "Claude's answer",
+      "props": {
+        "who": "claude",
+        "text": "Two decisions: bill Acme **monthly**, not per project (16 Sep), and prices rise **5%** from January (30 Sep).",
+        "actions": [
+          "Bash: grep -r \"#decision\" notes"
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 425,
+        "w": 700
+      }
+    },
+    {
+      "id": "try",
+      "type": "try-it",
+      "props": {
+        "title": "Put up two signposts",
+        "ask": "List every #decision in this folder.",
+        "expect": "First add `#decision` to the start of a line in two of your notes, then ask Claude Code. It should find both with one search."
+      },
+      "at": {
+        "x": 760,
+        "y": 440,
+        "w": 320
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "title": "Buried in prose",
+      "text": "Your notes record what was decided, but somewhere inside a paragraph. To answer *what did we decide about pricing?*, someone, or Claude, has to open every note and read it.",
+      "show": [
+        "term",
+        "tree"
+      ],
+      "emphasize": [
+        "term"
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "Add signposts",
+      "text": "Now the same note starts with labelled lines, and the decision gets a marker at the start of its line. Like index tabs on pages: the words a search can find, written the same way every time.",
+      "add": [
+        "markers"
+      ],
+      "emphasize": [
+        "markers"
+      ],
+      "set": {
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "cat notes/2026-09-16-pricing.md"
+            },
+            {
+              "kind": "out",
+              "text": "Client: Acme",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "Status: draft",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": " "
+            },
+            {
+              "kind": "out",
+              "text": "Long call about pricing. Per-project quotes keep slowing things down."
+            },
+            {
+              "kind": "out",
+              "text": "#decision Bill Acme monthly, not per project.",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "TODO(sam): send the revised quote",
+              "mark": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s3",
+      "title": "One search finds them",
+      "text": "`grep -r \"#decision\" notes` prints every line that carries the marker, with the note it's in. Three decisions, three files, without reading a single note in full.",
+      "show": [
+        "term",
+        "tree"
+      ],
+      "emphasize": [
+        "term"
+      ],
+      "set": {
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "grep -r \"#decision\" notes"
+            },
+            {
+              "kind": "out",
+              "text": "notes/2026-09-02-kickoff.md:#decision Reports go out Mondays by 9am.",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "notes/2026-09-16-pricing.md:#decision Bill Acme monthly, not per project.",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "notes/2026-09-23-globex.md:#decision Reuse Acme's report for Globex.",
+              "mark": true
+            }
+          ]
+        },
+        "tree": {
+          "title": "~/acme",
+          "items": [
+            {
+              "name": "CLAUDE.md"
+            },
+            {
+              "name": "notes",
+              "kind": "folder"
+            },
+            {
+              "name": "2026-09-02-kickoff.md",
+              "depth": 1,
+              "state": "hit"
+            },
+            {
+              "name": "2026-09-16-pricing.md",
+              "depth": 1,
+              "state": "hit"
+            },
+            {
+              "name": "2026-09-23-globex.md",
+              "depth": 1,
+              "state": "hit"
+            },
+            {
+              "name": "2026-09-30-review.md",
+              "depth": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s4",
+      "title": "A different spelling hides",
+      "text": "One note was written differently: `#Decision:` with a capital. grep matches the letters you typed, exactly, so the price rise never showed up. Nothing warned you.",
+      "show": [
+        "term",
+        "tree",
+        "limit"
+      ],
+      "emphasize": [
+        "tree",
+        "limit"
+      ],
+      "set": {
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "grep -r \"#decision\" notes"
+            },
+            {
+              "kind": "out",
+              "text": "notes/2026-09-02-kickoff.md:#decision Reports go out Mondays by 9am."
+            },
+            {
+              "kind": "out",
+              "text": "notes/2026-09-16-pricing.md:#decision Bill Acme monthly, not per project."
+            },
+            {
+              "kind": "out",
+              "text": "notes/2026-09-23-globex.md:#decision Reuse Acme's report for Globex."
+            },
+            {
+              "kind": "cmd",
+              "text": "cat notes/2026-09-30-review.md"
+            },
+            {
+              "kind": "out",
+              "text": "client - acme",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "status: Draft",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": " "
+            },
+            {
+              "kind": "out",
+              "text": "September review. Acme accepted the new rates."
+            },
+            {
+              "kind": "out",
+              "text": "#Decision: prices rise 5% from January.",
+              "mark": true
+            }
+          ]
+        },
+        "tree": {
+          "title": "~/acme",
+          "items": [
+            {
+              "name": "CLAUDE.md"
+            },
+            {
+              "name": "notes",
+              "kind": "folder"
+            },
+            {
+              "name": "2026-09-02-kickoff.md",
+              "depth": 1,
+              "state": "hit"
+            },
+            {
+              "name": "2026-09-16-pricing.md",
+              "depth": 1,
+              "state": "hit"
+            },
+            {
+              "name": "2026-09-23-globex.md",
+              "depth": 1,
+              "state": "hit"
+            },
+            {
+              "name": "2026-09-30-review.md",
+              "depth": 1,
+              "state": "dim",
+              "note": "missed"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s5",
+      "title": "Write the markers down",
+      "text": "List the markers in CLAUDE.md, so you, your colleagues and Claude all write them the same way. Fix the stray note, and the same search finds all four.",
+      "show": [
+        "term",
+        "tree",
+        "markers"
+      ],
+      "emphasize": [
+        "markers"
+      ],
+      "set": {
+        "markers": {
+          "title": "CLAUDE.md · Markers we use"
+        },
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "grep -r \"#decision\" notes"
+            },
+            {
+              "kind": "out",
+              "text": "notes/2026-09-30-review.md:#decision Prices rise 5% from January.",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "notes/2026-09-02-kickoff.md:#decision Reports go out Mondays by 9am."
+            },
+            {
+              "kind": "out",
+              "text": "notes/2026-09-16-pricing.md:#decision Bill Acme monthly, not per project."
+            },
+            {
+              "kind": "out",
+              "text": "notes/2026-09-23-globex.md:#decision Reuse Acme's report for Globex."
+            }
+          ]
+        },
+        "tree": {
+          "title": "~/acme",
+          "items": [
+            {
+              "name": "CLAUDE.md"
+            },
+            {
+              "name": "notes",
+              "kind": "folder"
+            },
+            {
+              "name": "2026-09-02-kickoff.md",
+              "depth": 1,
+              "state": "hit"
+            },
+            {
+              "name": "2026-09-16-pricing.md",
+              "depth": 1,
+              "state": "hit"
+            },
+            {
+              "name": "2026-09-23-globex.md",
+              "depth": 1,
+              "state": "hit"
+            },
+            {
+              "name": "2026-09-30-review.md",
+              "depth": 1,
+              "state": "hit",
+              "note": "fixed"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s6",
+      "title": "Claude reads only the matches",
+      "text": "Ask Claude, and it can run the same search and read 4 lines instead of 4 whole notes. grep finds the decisions, the same ones every time; Claude judges which are about pricing. With hundreds of notes, that's a few lines instead of a full **context window** (everything Claude can see at once).",
+      "show": [
+        "term",
+        "you",
+        "claude"
+      ],
+      "emphasize": [
+        "claude"
+      ]
+    },
+    {
+      "id": "s7",
+      "title": "The whole picture",
+      "text": "Consistent markers turn your notes into something one exact search can answer, every time. Pick them, write them down in CLAUDE.md, and use them the same way everywhere.",
+      "show": [
+        "term",
+        "tree",
+        "markers",
+        "claude",
+        "try"
+      ]
+    }
+  ]
+}

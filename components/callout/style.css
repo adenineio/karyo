@@ -1,0 +1,14 @@
+.box { height: 100%; display: flex; gap: 12px; padding: 14px 16px 14px 14px; box-shadow: none; }
+.mark { flex: none; width: 4px; border-radius: 2px; background: var(--pl-accent); }
+.tone-warn .mark { background: var(--pl-accent-2); }
+.tone-ok .mark { background: var(--pl-ok); }
+.tone-note { background: color-mix(in srgb, var(--pl-accent) 6%, var(--pl-card)); }
+.tone-warn { background: color-mix(in srgb, var(--pl-accent-2) 8%, var(--pl-card)); }
+.tone-ok { background: color-mix(in srgb, var(--pl-ok) 8%, var(--pl-card)); }
+.in { min-width: 0; display: grid; gap: 4px; align-content: start; }
+.t { font: 700 15px/1.25 var(--pl-font-display); }
+.tone-warn .t { color: var(--pl-accent-2); }
+.md { font-size: 14.5px; line-height: 1.45; }
+.md p { margin: 0 0 6px; }
+.md p:last-child { margin-bottom: 0; }
+:host(.is-lit) .box { border-color: var(--pl-accent); }

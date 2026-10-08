@@ -1,0 +1,23 @@
+{
+  "name": "chat-turn",
+  "description": "One turn of a conversation with Claude: who is speaking (you or Claude), what they said, and, for Claude, the actions it took (tool calls such as a command it ran or a file it read) as small chips.",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": ["who", "text"],
+    "additionalProperties": false,
+    "properties": {
+      "who": { "enum": ["you", "claude"] },
+      "name": { "type": "string", "description": "the speaker label (default: You / Claude)" },
+      "text": { "type": "string", "description": "markdown-lite" },
+      "actions": { "type": "array", "maxItems": 5, "items": { "type": "string" }, "description": "Claude's tool calls, e.g. `Bash: grep -rl \"Acme\" .` or `Read: notes.md`" }
+    }
+  },
+  "size": { "w": 400 },
+  "motion": ["appear", "emphasize"],
+  "example": {
+    "who": "claude",
+    "text": "I found **3 files** that mention Acme.",
+    "actions": ["Bash: grep -rl \"Acme\" Clients/"]
+  }
+}

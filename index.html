@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Karyo</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64' width='64' height='64' role='img' aria-label='Karyo'%3E%3Cstyle%3E .a %7B fill: %231b9aa5 %7D .b %7B stroke: %23127a83 %7D %40media (prefers-color-scheme: dark) %7B .a %7B fill: %2368d2d9 %7D .b %7B stroke: %233e9aa3 %7D %7D %3C/style%3E%3Cmask id='cut'%3E%3Crect width='64' height='64' fill='%23fff'/%3E%3Crect x='28.8' y='28.8' width='6.4' height='6.4' rx='1.4' transform='rotate(45 32 32)' fill='%23000'/%3E%3C/mask%3E%3Cg mask='url(%23cut)'%3E%3Cpath class='b' d='M12 8 32 32 52 56M52 8 32 32 12 56' fill='none' stroke-width='3.6' stroke-linecap='round'/%3E%3Cg class='a'%3E%3Crect x='5' y='2' width='13' height='13' rx='3'/%3E%3Crect x='46' y='2' width='13' height='13' rx='3'/%3E%3Crect x='5' y='49' width='13' height='13' rx='3'/%3E%3Crect x='46' y='49' width='13' height='13' rx='3'/%3E%3Crect x='24' y='24' width='16' height='16' rx='3.5' transform='rotate(45 32 32)'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E">
+<style>
+  :root { --page-bg: #eceef1; --page-fg: #14171c; --page-muted: #5a6371; --page-rule: #d4d9df; color-scheme: light; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --page-bg: #0a0c10; --page-fg: #e7eaee; --page-muted: #8c96a4; --page-rule: #232932; color-scheme: dark; } }
+  :root[data-theme="dark"] { --page-bg: #0a0c10; --page-fg: #e7eaee; --page-muted: #8c96a4; --page-rule: #232932; color-scheme: dark; }
+  :root[data-plate-theme="adenine"] { --page-bg: #000000; --page-fg: #f0f0f0; --page-muted: #a1a4a5; --page-rule: #191b1e; --page-display: Geist, Inter, system-ui, sans-serif; --page-mono: "Geist Mono", ui-monospace, monospace; color-scheme: dark; }
+  :root[data-plate-theme="fresh"] { --page-bg: #07080a; --page-fg: #ffffff; --page-muted: #9c9c9d; --page-rule: #1b1c1e; --page-display: Inter, system-ui, sans-serif; --page-mono: "Geist Mono", ui-monospace, monospace; color-scheme: dark; }
+  body { margin: 0; background: var(--page-bg); color: var(--page-fg); font: 14px/1.5 ui-sans-serif, system-ui, sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding-inline: 16px; padding-block: 32px 64px; display: grid; gap: 40px; }
+  header.page { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 12px 24px; }
+  header.page h1 { margin: 0; font: 800 28px/1.1 var(--page-display, "Archivo", system-ui, sans-serif); letter-spacing: -0.01em; }
+  header.page p { margin: 4px 0 0; color: var(--page-muted); max-width: 60ch; }
+  #gallery { display: grid; gap: 40px; }
+  figure.entry { margin: 0; display: grid; gap: 10px; min-width: 0; }
+  figcaption { display: flex; justify-content: space-between; gap: 12px; color: var(--page-muted); font-size: 13px; }
+  .entry-title { color: var(--page-fg); font-weight: 600; }
+  html.export body { background: #000; }
+  html.export main { padding: 0; max-width: none; gap: 0; }
+  html.export header.page, html.export figcaption { display: none; }
+  html.export #gallery { gap: 0; }
+</style>
+</head>
+<body>
+<main>
+  <header class="page">
+    <div>
+      <h1>Karyo</h1>
+      <p>Explainer animations made of real HTML elements, with a three.js layer for wires, light and sparks. Every frame is a function of time: scrub, step or loop any of them.</p>
+    </div>
+    <div id="theme-slot"></div>
+  </header>
+  <div id="gallery"></div>
+</main>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>

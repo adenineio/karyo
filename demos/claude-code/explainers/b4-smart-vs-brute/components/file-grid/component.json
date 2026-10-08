@@ -1,0 +1,59 @@
+{
+  "name": "file-grid",
+  "description": "A folder of many files drawn as a grid of small squares, one per file: which ones Claude has opened (filled row by row), which were boiled down to a summary, and where the matches are (found or missed).",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": ["title"],
+    "additionalProperties": false,
+    "properties": {
+      "title": { "type": "string", "minLength": 1, "description": "the label above the grid, e.g. `invoices/ · 500 files`" },
+      "total": { "type": "integer", "minimum": 1, "default": 500, "description": "how many files (squares); should equal cols × rows" },
+      "cols": { "type": "integer", "minimum": 1, "maximum": 40, "default": 25 },
+      "rows": { "type": "integer", "minimum": 1, "maximum": 40, "default": 20 },
+      "read": { "type": "number", "minimum": 0, "default": 0, "description": "files Claude has opened, filled row by row from the top left; counts and grows between steps (use whole rows: a multiple of cols)" },
+      "faded": { "type": "number", "minimum": 0, "default": 0, "description": "of those, how many were boiled down to a summary (compaction), from the top left; a multiple of cols" },
+      "hits": {
+        "type": "array",
+        "maxItems": 40,
+        "description": "the files that hold a match, by column and row (0-based)",
+        "items": {
+          "type": "object",
+          "required": ["c", "r"],
+          "additionalProperties": false,
+          "properties": {
+            "c": { "type": "integer", "minimum": 0 },
+            "r": { "type": "integer", "minimum": 0 },
+            "state": { "enum": ["found", "missed"], "default": "found", "description": "found: the match was reported; missed: it was there but not reported" }
+          }
+        }
+      },
+      "stat": { "type": "string", "description": "text after the counted number of opened files, e.g. `of 500 files opened by Claude`" },
+      "legend": {
+        "type": "array",
+        "maxItems": 4,
+        "description": "a key under the grid",
+        "items": {
+          "type": "object",
+          "required": ["tone", "label"],
+          "additionalProperties": false,
+          "properties": {
+            "tone": { "enum": ["plain", "read", "faded", "found", "missed"] },
+            "label": { "type": "string", "minLength": 1 }
+          }
+        }
+      },
+      "note": { "type": "string", "description": "markdown-lite line under the grid" }
+    }
+  },
+  "size": { "w": 380 },
+  "motion": ["appear", "emphasize", "count"],
+  "example": {
+    "title": "invoices/ · 500 files",
+    "read": 350,
+    "faded": 0,
+    "stat": "of 500 files opened by Claude",
+    "hits": [{ "c": 24, "r": 1, "state": "found" }, { "c": 0, "r": 3, "state": "missed" }],
+    "legend": [{ "tone": "read", "label": "opened" }, { "tone": "found", "label": "match found" }]
+  }
+}

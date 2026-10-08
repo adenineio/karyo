@@ -1,0 +1,15 @@
+node_modules
+dist
+out
+__pycache__
+.venv
+*.egg-info
+.pytest_cache
+.ruff_cache
+.DS_Store
+.claude/settings.local.json
+
+*-workspace/
+
+# upstream font files (dev/scripts/subset-fonts.py trims them into src/engine/fonts/; not shipped)
+vendor/fonts-src/

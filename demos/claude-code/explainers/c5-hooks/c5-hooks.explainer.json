@@ -1,0 +1,541 @@
+{
+  "karyo": "explainer/1",
+  "id": "c5-hooks",
+  "title": "Hooks: from request to rule",
+  "summary": "CLAUDE.md asks; a hook makes sure. Hooks are small commands Claude Code runs at fixed moments, every time, so the things that must happen do.",
+  "note": "Names, companies and files here are **made-up examples**.",
+  "narration": "side",
+  "uses": [
+    "terminal",
+    "chat-turn",
+    "context-meter",
+    "try-it"
+  ],
+  "layout": {
+    "kind": "free"
+  },
+  "categories": [
+    {
+      "id": "request",
+      "label": "CLAUDE.md: a request"
+    },
+    {
+      "id": "claude",
+      "label": "Claude"
+    },
+    {
+      "id": "hook",
+      "label": "hooks: rules"
+    }
+  ],
+  "elements": [
+    {
+      "id": "m-start",
+      "type": "card",
+      "category": "hook",
+      "props": {
+        "kicker": "SessionStart",
+        "title": "When a session starts"
+      },
+      "at": {
+        "x": 0,
+        "y": 0,
+        "w": 235,
+        "h": 178
+      }
+    },
+    {
+      "id": "m-pre",
+      "type": "card",
+      "category": "hook",
+      "props": {
+        "kicker": "PreToolUse",
+        "title": "Before a tool runs"
+      },
+      "at": {
+        "x": 258,
+        "y": 0,
+        "w": 235,
+        "h": 178
+      }
+    },
+    {
+      "id": "m-post",
+      "type": "card",
+      "category": "hook",
+      "props": {
+        "kicker": "PostToolUse",
+        "title": "After a tool runs"
+      },
+      "at": {
+        "x": 516,
+        "y": 0,
+        "w": 235,
+        "h": 178
+      }
+    },
+    {
+      "id": "m-stop",
+      "type": "card",
+      "category": "hook",
+      "props": {
+        "kicker": "Stop",
+        "title": "When Claude finishes"
+      },
+      "at": {
+        "x": 774,
+        "y": 0,
+        "w": 235,
+        "h": 178
+      }
+    },
+    {
+      "id": "claudemd",
+      "type": "card",
+      "category": "request",
+      "label": "A line in CLAUDE.md",
+      "props": {
+        "kicker": "CLAUDE.md · a request",
+        "title": "Run the formatter after every edit.",
+        "body": "Read at the start of every session. Claude usually does it. Usually."
+      },
+      "at": {
+        "x": 0,
+        "y": 240,
+        "w": 480
+      }
+    },
+    {
+      "id": "q-advisory",
+      "type": "quote",
+      "props": {
+        "text": "Claude reads it and tries to follow it, but there's no guarantee of strict compliance, especially for vague or conflicting instructions.",
+        "cite": "Claude Code docs, on CLAUDE.md"
+      },
+      "at": {
+        "x": 540,
+        "y": 240,
+        "w": 470
+      }
+    },
+    {
+      "id": "q-advisory2",
+      "type": "quote",
+      "props": {
+        "text": "Unlike CLAUDE.md instructions which are advisory, hooks are deterministic and guarantee the action happens.",
+        "cite": "Claude Code docs, Best practices"
+      },
+      "at": {
+        "x": 0,
+        "y": 240,
+        "w": 1009
+      }
+    },
+    {
+      "id": "blk-claude",
+      "type": "chat-turn",
+      "category": "claude",
+      "label": "Claude tries an edit",
+      "props": {
+        "who": "claude",
+        "text": "I'll fix the typo in the raw export.",
+        "actions": [
+          "Edit: data/raw/sales.csv"
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 240,
+        "w": 480
+      }
+    },
+    {
+      "id": "blk-hook",
+      "type": "callout",
+      "category": "hook",
+      "props": {
+        "tone": "warn",
+        "title": "PreToolUse hook: protect-raw.sh",
+        "md": "`Blocked: data/raw is read-only. Write to data/clean instead.`\n\nExit code 2: the edit never happens, and Claude reads the reason."
+      },
+      "at": {
+        "x": 540,
+        "y": 240,
+        "w": 470
+      }
+    },
+    {
+      "id": "tidy-claude",
+      "type": "chat-turn",
+      "category": "claude",
+      "label": "Claude edits a file",
+      "props": {
+        "who": "claude",
+        "text": "I've updated the summary.",
+        "actions": [
+          "Edit: reports/q3-summary.md"
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 240,
+        "w": 480
+      }
+    },
+    {
+      "id": "tidy-hook",
+      "type": "callout",
+      "category": "hook",
+      "props": {
+        "tone": "ok",
+        "title": "PostToolUse hook: the formatter",
+        "md": "Runs on `reports/q3-summary.md` straight after the edit, every time. Pointed at Claude's edit tools, it won't see a file changed by a command."
+      },
+      "at": {
+        "x": 540,
+        "y": 240,
+        "w": 470
+      }
+    },
+    {
+      "id": "inf-term",
+      "type": "terminal",
+      "category": "hook",
+      "label": "What the hook runs",
+      "props": {
+        "title": "What the SessionStart hook runs",
+        "prompt": "acme %",
+        "lines": [
+          {
+            "kind": "cmd",
+            "text": "grep -r \"TODO(sam)\" notes"
+          },
+          {
+            "kind": "out",
+            "text": "notes/2026-09-02-kickoff.md:TODO(sam): ask Acme for last year's numbers",
+            "mark": true
+          },
+          {
+            "kind": "out",
+            "text": "notes/2026-09-16-pricing.md:TODO(sam): send the revised quote",
+            "mark": true
+          }
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 240,
+        "w": 600
+      }
+    },
+    {
+      "id": "inf-meter",
+      "type": "context-meter",
+      "category": "claude",
+      "label": "Claude's context window",
+      "props": {
+        "used": 3,
+        "caption": "a new session; illustrative",
+        "items": [
+          {
+            "label": "CLAUDE.md",
+            "share": "2%",
+            "tone": "brief"
+          },
+          {
+            "label": "the hook's output: Sam's 2 tasks",
+            "share": "tiny",
+            "tone": "output"
+          }
+        ]
+      },
+      "at": {
+        "x": 640,
+        "y": 240,
+        "w": 369
+      }
+    },
+    {
+      "id": "chk-claude",
+      "type": "chat-turn",
+      "category": "claude",
+      "label": "Claude says it's done",
+      "props": {
+        "who": "claude",
+        "text": "Done: the order checker now accepts dates like 2026-10-01."
+      },
+      "at": {
+        "x": 0,
+        "y": 240,
+        "w": 480
+      }
+    },
+    {
+      "id": "chk-hook",
+      "type": "callout",
+      "category": "hook",
+      "props": {
+        "tone": "warn",
+        "title": "Stop hook: DEV_VALIDATOR",
+        "md": "Runs the tests and compares the output with a known-good sample. They differ: `Output changed`, exit code 2, and Claude keeps working instead of stopping."
+      },
+      "at": {
+        "x": 540,
+        "y": 240,
+        "w": 470
+      }
+    },
+    {
+      "id": "settings",
+      "type": "code",
+      "category": "hook",
+      "label": "The hook in settings.json",
+      "props": {
+        "title": ".claude/settings.json",
+        "lang": "json",
+        "code": "{\n  \"hooks\": {\n    \"PreToolUse\": [{\n      \"matcher\": \"Edit|Write\",\n      \"hooks\": [{\n        \"type\": \"command\",\n        \"command\": \"${CLAUDE_PROJECT_DIR}/.claude/hooks/protect-raw.sh\"\n      }]\n    }]\n  }\n}",
+        "focus": [
+          3,
+          4,
+          7
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 240,
+        "w": 670
+      }
+    },
+    {
+      "id": "safety",
+      "type": "callout",
+      "props": {
+        "tone": "warn",
+        "title": "They run as you",
+        "md": "“Command hooks execute shell commands with your full user permissions… Review and test all hook commands before adding them to your configuration.”"
+      },
+      "at": {
+        "x": 700,
+        "y": 240,
+        "w": 309
+      }
+    },
+    {
+      "id": "typo",
+      "type": "callout",
+      "props": {
+        "tone": "note",
+        "title": "Only what you wrote",
+        "md": "“A mistyped path in `settings.json` leaves the gate silently disabled.” The action goes ahead."
+      },
+      "at": {
+        "x": 700,
+        "y": 432,
+        "w": 309
+      }
+    },
+    {
+      "id": "q-rule",
+      "type": "quote",
+      "props": {
+        "text": "Hooks are user-defined shell commands. Claude Code runs them at specific points in its lifecycle, which gives you deterministic control: certain actions always happen rather than relying on the LLM to choose to run them.",
+        "cite": "Claude Code docs, Hooks guide"
+      },
+      "at": {
+        "x": 0,
+        "y": 240,
+        "w": 560
+      }
+    },
+    {
+      "id": "try",
+      "type": "try-it",
+      "props": {
+        "title": "See your hooks",
+        "ask": "Explain what hooks are configured in this project, if any.",
+        "expect": "Or type `/hooks` in Claude Code: a read-only list of every hook, when it fires and which file it came from. To add one, ask Claude, then read it before you accept it."
+      },
+      "at": {
+        "x": 600,
+        "y": 240,
+        "w": 409
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "title": "A request",
+      "text": "CLAUDE.md can ask Claude to run the formatter after every edit, and it usually will. But it's a request, like a *please knock* sign: Claude reads it and tries to follow it, with no guarantee.",
+      "show": [
+        "claudemd",
+        "q-advisory"
+      ],
+      "emphasize": [
+        "claudemd"
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "A rule",
+      "text": "A **hook** is a command Claude Code runs automatically at a set moment, every time. Claude doesn't choose to run it; Claude Code does. That's a door that locks itself, and it's deterministic: same moment, same command.",
+      "show": [
+        "m-start",
+        "m-pre",
+        "m-post",
+        "m-stop",
+        "q-advisory2"
+      ],
+      "emphasize": [
+        "m-start",
+        "m-pre",
+        "m-post",
+        "m-stop"
+      ]
+    },
+    {
+      "id": "s3",
+      "title": "Block",
+      "text": "Before Claude edits a file, a hook checks the path. For `data/raw` it prints a reason and ends with **exit code 2**: the number a program hands back when it finishes, which for this hook means *stop*. The edit never happens.",
+      "show": [
+        "m-start",
+        "m-pre",
+        "m-post",
+        "m-stop",
+        "blk-claude",
+        "blk-hook"
+      ],
+      "emphasize": [
+        "m-pre",
+        "blk-hook"
+      ],
+      "dim": [
+        "m-start",
+        "m-post",
+        "m-stop"
+      ],
+      "set": {
+        "m-pre": {
+          "body": "**Block:** exit code 2 stops the edit. `data/raw` stays untouched."
+        }
+      }
+    },
+    {
+      "id": "s4",
+      "title": "Tidy",
+      "text": "After each edit, a hook runs the formatter (a tool that tidies a file's layout) on that file. Nobody has to remember. It sees only what you point it at: tied to Claude's edit tools, it misses a file changed by a command.",
+      "show": [
+        "m-start",
+        "m-pre",
+        "m-post",
+        "m-stop",
+        "tidy-claude",
+        "tidy-hook"
+      ],
+      "emphasize": [
+        "m-post",
+        "tidy-hook"
+      ],
+      "dim": [
+        "m-start",
+        "m-pre",
+        "m-stop"
+      ],
+      "set": {
+        "m-post": {
+          "body": "**Tidy:** runs the formatter on the file Claude just edited."
+        }
+      }
+    },
+    {
+      "id": "s5",
+      "title": "Inform",
+      "text": "When a session starts, a hook can run a command and hand what it prints to Claude. This one searches the notes for `TODO(sam)`, so Claude begins with Sam's open tasks already in its **context window**, everything it can see at once.",
+      "show": [
+        "m-start",
+        "m-pre",
+        "m-post",
+        "m-stop",
+        "inf-term",
+        "inf-meter"
+      ],
+      "emphasize": [
+        "m-start",
+        "inf-meter"
+      ],
+      "dim": [
+        "m-pre",
+        "m-post",
+        "m-stop"
+      ],
+      "set": {
+        "m-start": {
+          "body": "**Inform:** adds Sam's open tasks to Claude's context."
+        }
+      }
+    },
+    {
+      "id": "s6",
+      "title": "Check",
+      "text": "`DEV_VALIDATOR`, from *Codenames*, is a Stop hook. When Claude says it's done, the hook runs the tests and compares the output with a known-good sample. If they differ, exit code 2 sends Claude back to work.",
+      "show": [
+        "m-start",
+        "m-pre",
+        "m-post",
+        "m-stop",
+        "chk-claude",
+        "chk-hook"
+      ],
+      "emphasize": [
+        "m-stop",
+        "chk-hook"
+      ],
+      "dim": [
+        "m-start",
+        "m-pre",
+        "m-post"
+      ],
+      "set": {
+        "m-stop": {
+          "body": "**Check:** `DEV_VALIDATOR` runs the tests; exit code 2 keeps Claude working."
+        }
+      }
+    },
+    {
+      "id": "s7",
+      "title": "Where they live",
+      "text": "Hooks are written in a settings file: `.claude/settings.json` for one project, `~/.claude/settings.json` for all of yours. They run with your permissions, so read one before you add it. And a hook runs only what you wrote: a mistyped path quietly does nothing.",
+      "show": [
+        "m-start",
+        "m-pre",
+        "m-post",
+        "m-stop",
+        "settings",
+        "safety",
+        "typo"
+      ],
+      "emphasize": [
+        "settings"
+      ],
+      "dim": [
+        "m-start",
+        "m-pre",
+        "m-post",
+        "m-stop"
+      ]
+    },
+    {
+      "id": "s8",
+      "title": "From request to rule",
+      "text": "Use CLAUDE.md for guidance and hooks for whatever must happen every time. The hooks are deterministic, Claude is probabilistic: the hybrid uses each for what it's good at.",
+      "show": [
+        "m-start",
+        "m-pre",
+        "m-post",
+        "m-stop",
+        "q-rule",
+        "try"
+      ]
+    }
+  ]
+}

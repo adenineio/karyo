@@ -1,0 +1,242 @@
+{
+  "name": "bars",
+  "description": "A bar chart: categories with one or more series, grouped or stacked, vertical or horizontal. Bars grow when it appears and glide when a step sets new data (a switch between grouped and stacked slides).",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": [
+      "x",
+      "series"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "title": {
+        "type": "string",
+        "description": "shown above the chart, and the data table's caption"
+      },
+      "caption": {
+        "type": "string",
+        "description": "markdown-lite, under the chart"
+      },
+      "x": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 40,
+        "items": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "description": "the categories"
+      },
+      "series": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 8,
+        "items": {
+          "type": "object",
+          "required": [
+            "values"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[^/@]+$",
+              "description": "the series' name in steps (\"chart/<id>\"); default: its label"
+            },
+            "label": {
+              "type": "string",
+              "description": "legend and tooltip name (default: its category's label)"
+            },
+            "category": {
+              "type": "string",
+              "description": "a category id from the spec: its colour and legend label"
+            },
+            "values": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "description": "one per x (null: a gap)"
+            }
+          }
+        }
+      },
+      "stacked": {
+        "type": "boolean",
+        "default": false,
+        "description": "stack the series in each category (otherwise side by side)"
+      },
+      "orient": {
+        "enum": [
+          "vertical",
+          "horizontal"
+        ],
+        "default": "vertical",
+        "description": "horizontal: categories down the left (long names read better)"
+      },
+      "labels": {
+        "enum": [
+          "auto",
+          "tip",
+          "none"
+        ],
+        "default": "auto",
+        "description": "the value at each bar's tip (auto: one series, or stacked totals; only where it fits)"
+      },
+      "min": {
+        "type": "number"
+      },
+      "max": {
+        "type": "number"
+      },
+      "unit": {
+        "type": "string",
+        "description": "after values: a word (kWh) titles the value axis; a symbol (%, °C) rides on the ticks"
+      },
+      "prefix": {
+        "type": "string",
+        "description": "before values, e.g. $"
+      },
+      "format": {
+        "enum": [
+          "number",
+          "percent",
+          "compact"
+        ],
+        "default": "number",
+        "description": "percent: 0.25 shows as 25%; compact: 12,400 as 12.4K"
+      },
+      "decimals": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 6,
+        "description": "default: as many as the values have (at most 2)"
+      },
+      "grouping": {
+        "type": "boolean",
+        "default": true,
+        "description": "thousands separators"
+      },
+      "annotations": {
+        "type": "array",
+        "maxItems": 8,
+        "description": "reference lines and bands (y: a value, or x: a position) and callouts on a point (series + x)",
+        "items": {
+          "type": "object",
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "keeps one annotation the same across steps (it glides when it moves)"
+            },
+            "type": {
+              "enum": [
+                "line",
+                "band",
+                "callout"
+              ]
+            },
+            "y": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "description": "a value"
+                },
+                {
+                  "type": "array",
+                  "prefixItems": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ],
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "description": "[from, to]"
+                }
+              ]
+            },
+            "x": {
+              "anyOf": [
+                {
+                  "type": [
+                    "string",
+                    "number"
+                  ],
+                  "description": "an x value"
+                },
+                {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": [
+                      "string",
+                      "number"
+                    ]
+                  },
+                  "description": "[from, to]"
+                }
+              ]
+            },
+            "series": {
+              "type": "string",
+              "description": "callout: the series (default: the first)"
+            },
+            "label": {
+              "type": "string",
+              "description": "the note shown beside it (a callout without one shows the value)"
+            }
+          }
+        }
+      },
+      "summary": {
+        "type": "string",
+        "description": "what a screen reader hears instead of the generated summary"
+      }
+    }
+  },
+  "size": {
+    "w": 720,
+    "h": 420
+  },
+  "motion": [
+    "appear",
+    "emphasize",
+    "count"
+  ],
+  "example": {
+    "title": "Orders by day",
+    "x": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri"
+    ],
+    "series": [
+      {
+        "id": "orders",
+        "label": "Orders",
+        "values": [
+          32,
+          41,
+          38,
+          52,
+          64
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://karyo.dev/schema/karyo-curation-1.json",
+  "title": "Karyo curation",
+  "description": "What matters in a model and how it is grouped, without touching the code (docs/MODEL.md, Curation): karyo/curation.json next to the model, applied at build time. Entries name nodes by their stable ids; * in a selector matches any run of characters. An entry that matches nothing is a curation-unresolved warning in the model's checks.",
+  "type": "object",
+  "required": [
+    "karyo"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "karyo": {
+      "const": "curation/1"
+    },
+    "note": {
+      "type": "string",
+      "description": "Prose for people: why the curation is what it is"
+    },
+    "top": {
+      "$ref": "#/$defs/selectors",
+      "description": "Nodes drawn as their own cards (unfolded). Wins over fold"
+    },
+    "fold": {
+      "$ref": "#/$defs/selectors",
+      "description": "Nodes drawn folded into their parent (only nodes that have one)"
+    },
+    "hide": {
+      "$ref": "#/$defs/selectors",
+      "description": "Nodes left out of the model with their relationships; what a recorded run reached is kept (curation-kept)"
+    },
+    "start": {
+      "enum": ["groups", "cards"],
+      "description": "What a structure board starts on: one card per group (entered level by level), or every card; default: groups when the board is big (docs/ENGINE.md, Group navigation)"
+    },
+    "groups": {
+      "type": "object",
+      "description": "Groups by id",
+      "propertyNames": {
+        "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.:/-]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "parent": {
+            "type": "string",
+            "description": "The group this one sits in (no circles)"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "members": {
+            "$ref": "#/$defs/selectors",
+            "description": "Nodes moved into this group"
+          }
+        }
+      }
+    },
+    "nodes": {
+      "type": "object",
+      "description": "Per node id (or selector): what to show instead of what the code says",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "service",
+              "function",
+              "type",
+              "store",
+              "queue",
+              "external",
+              "actor"
+            ]
+          },
+          "category": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.:/-]*$"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.:/-]*$"
+            },
+            "description": "Added to the code's tags"
+          },
+          "group": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "selectors": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Node ids, or globs where * matches any run of characters (orders.db.*)"
+    }
+  }
+}

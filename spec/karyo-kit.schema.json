@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://karyo.dev/spec/karyo-kit.schema.json",
+  "title": "Karyo kit",
+  "description": "A kit (kit.json in karyo/kits/<name>/) adds node kinds (a card template, style, details sections, a fields schema and a legend entry) and/or plate types (views composed from the engine's pieces) to any project. Kits are data and templates; a `script` plate type is the one exception: it runs the kit's own JavaScript in a sandboxed frame, and only once the user trusted that exact version of the kit (docs/KITS.md \"Code in kits\"). See docs/KITS.md. Each node kind lives in kinds/<kind>/ as a component (component.json, template.html, style.css); its component.json is checked against $defs/kind.",
+  "type": "object",
+  "required": ["karyo", "name", "description", "version"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "karyo": { "const": "kit/1", "description": "Format version." },
+    "name": { "$ref": "#/$defs/name", "description": "The kit's name: its folder's name." },
+    "description": { "type": "string", "minLength": 1, "description": "One sentence: what the kit adds." },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+", "description": "Semver of the kit." },
+    "kinds": { "type": "array", "items": { "$ref": "#/$defs/name" }, "uniqueItems": true, "description": "The node kinds this kit adds: folders under kinds/. Omitted: every folder there." },
+    "plates": { "type": "array", "items": { "$ref": "#/$defs/plate" }, "description": "Plate types: views composed from the engine's pieces, drawn from a project's model." }
+  },
+  "$defs": {
+    "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "description": "lowercase letters, digits and -" },
+    "plate": {
+      "type": "object",
+      "required": ["id", "title", "description", "view", "from"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/name", "description": "Unique among the plate types a project sees (a nearer kit's wins)." },
+        "title": { "type": "string", "minLength": 1, "description": "What the plate type is called in the project view and the gallery (\"Sequence\")." },
+        "description": { "type": "string", "minLength": 1 },
+        "view": { "enum": ["board", "trace", "tour", "sequence", "script"], "description": "The engine view it composes: board (the structure board), trace (a recorded flow on its map), tour (a tour's timeline), sequence (a recorded flow as lanes and messages); or script: drawn by the kit's own JavaScript (`script`), in a sandboxed frame, once the user trusts this version of the kit." },
+        "from": { "enum": ["model", "flow", "tour"], "description": "What one plate is drawn from: the whole model (one plate per model), a recorded flow (one per flow) or a tour (one per tour). board takes model; trace and sequence take flow; tour takes tour." },
+        "filter": { "$ref": "#/$defs/filter" },
+        "options": {
+          "type": "object",
+          "description": "View options. sequence: durations (bool, default true), group (bool, one band per top-level call, default true), fold ('auto', the default: fold lanes that belong together into one expandable lane when the flow has too many; 'none'; or explicit groups of node ids). board: bench (bool, open in Bench), start ('groups' or 'cards': what it starts on, docs/ENGINE.md Group navigation). script: anything; the script gets them.",
+          "properties": {
+            "fold": { "oneOf": [{ "enum": ["auto", "none"] }, { "type": "array", "items": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 2 } }] }
+          }
+        },
+        "script": { "type": "string", "pattern": "^(?:[A-Za-z0-9_][\\w.-]*/)*[A-Za-z0-9_][\\w.-]*\\.m?js$", "description": "view script: the kit's ES module that draws the plate, a .js or .mjs file inside the kit's folder (plates/radial.js). It exports render(host, ctx), and optionally update(host, ctx) and dispose(host)." },
+        "deterministic": { "type": "boolean", "description": "view script: the script draws the same picture from the same inputs (no clock, no randomness), so stills and lint render it; without it they show a notice instead." },
+        "size": { "type": "object", "required": ["w", "h"], "additionalProperties": false, "description": "view script: the plate's logical size in px (default 960 x 600).", "properties": { "w": { "type": "integer", "minimum": 320, "maximum": 2400 }, "h": { "type": "integer", "minimum": 240, "maximum": 1800 } } }
+      }
+    },
+    "filter": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Which nodes the plate draws (board and sequence): a node is kept when it matches every list given. neighbours adds the nodes one relationship away.",
+      "properties": {
+        "kinds": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "categories": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "tags": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "groups": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "neighbours": { "type": "boolean" }
+      }
+    },
+    "section": {
+      "type": "object",
+      "required": ["id", "title", "template"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/name", "description": "Not one of the board's own: summary, calls, checks." },
+        "title": { "type": "string", "minLength": 1 },
+        "noun": { "type": "string", "description": "What its items are called (items marked data-item=\"<name>\")." },
+        "keywords": { "type": "array", "items": { "type": "string" }, "description": "Other words that name it (openDetails and Jarvis match them)." },
+        "template": { "type": "string", "pattern": "\\.html$", "description": "A template file in the kind's folder: the section view shows it." },
+        "compact": { "type": "string", "pattern": "\\.html$", "description": "A shorter template for the small card panel (default: template)." }
+      }
+    },
+    "kind": {
+      "type": "object",
+      "description": "component.json of a node kind: the component format (docs/EXPLAINERS.md) plus a node block. props is the JSON Schema of the node's fields (MNode.fields); example holds example fields.",
+      "required": ["name", "description", "version", "props", "size", "node"],
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "description": { "type": "string", "minLength": 1 },
+        "version": { "type": "string" },
+        "props": { "type": "object", "description": "JSON Schema (object) of the node's fields." },
+        "size": {
+          "type": "object", "required": ["w", "h"], "additionalProperties": false,
+          "description": "The card's size on boards (px): layouts place and route by it.",
+          "properties": { "w": { "type": "integer", "minimum": 120, "maximum": 400 }, "h": { "type": "integer", "minimum": 48, "maximum": 240 } }
+        },
+        "motion": { "type": "array", "items": { "enum": ["appear", "emphasize", "count", "draw"] } },
+        "example": { "type": "object", "description": "Example fields: `karyo kit check` renders the card and sections with them." },
+        "node": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "label": { "type": "string", "minLength": 1, "description": "The kind's name on its cards (default: the kind)." },
+            "plural": { "type": "string", "minLength": 1, "description": "Its legend entry (default: label + s)." },
+            "glyph": { "type": "string", "minLength": 1, "maxLength": 2, "description": "A mark for small places (the tour's map, sequence lanes)." },
+            "category": { "$ref": "#/$defs/word", "description": "The category of its nodes that declare none." },
+            "sections": { "type": "array", "items": { "$ref": "#/$defs/section" }, "description": "Details sections, after the board's own." },
+            "mini": { "type": "string", "pattern": "\\.html$", "description": "A template for small places (default: glyph and label)." },
+            "exampleNode": {
+              "type": "object", "additionalProperties": false,
+              "description": "The node `karyo kit check` renders the example with.",
+              "properties": { "id": { "type": "string" }, "label": { "type": "string" }, "summary": { "type": "string" }, "category": { "type": "string" }, "tags": { "type": "array", "items": { "type": "string" } }, "lang": { "type": "string" }, "ref": { "type": "object" } }
+            }
+          }
+        }
+      }
+    },
+    "word": { "type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.:/-]*$" }
+  }
+}

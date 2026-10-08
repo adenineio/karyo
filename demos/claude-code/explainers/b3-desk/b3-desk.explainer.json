@@ -1,0 +1,390 @@
+{
+  "karyo": "explainer/1",
+  "id": "b3-desk",
+  "title": "The context window",
+  "summary": "Claude's working memory is a desk of fixed size. Everything it reads takes room, old papers get boiled down to a summary, and a new session starts with a clear desk.",
+  "note": "Names, companies and files here are **made-up examples**.",
+  "narration": "side",
+  "uses": [
+    "context-meter",
+    "chat-turn",
+    "terminal",
+    "try-it"
+  ],
+  "layout": {
+    "kind": "free"
+  },
+  "categories": [
+    {
+      "id": "desk",
+      "label": "the context window"
+    },
+    {
+      "id": "you",
+      "label": "you"
+    },
+    {
+      "id": "computer",
+      "label": "the computer"
+    }
+  ],
+  "elements": [
+    {
+      "id": "deskcard",
+      "type": "card",
+      "category": "desk",
+      "label": "The desk analogy",
+      "props": {
+        "kicker": "Like a desk",
+        "title": "A desk of fixed size",
+        "body": "Everything Claude is working with has to fit on it. **Where it stops:** a desk holds paper; this holds text, counted in **tokens**, chunks of about 3½ characters of English."
+      },
+      "at": {
+        "x": 0,
+        "y": 0,
+        "w": 400
+      }
+    },
+    {
+      "id": "meter",
+      "type": "context-meter",
+      "category": "desk",
+      "label": "This session's context window",
+      "props": {
+        "title": "Context window: this session",
+        "used": 3,
+        "caption": "illustrative, not measured",
+        "items": [
+          {
+            "label": "Claude Code's own instructions and tools",
+            "share": "3%",
+            "tone": "brief"
+          }
+        ]
+      },
+      "at": {
+        "x": 440,
+        "y": 0,
+        "w": 400
+      }
+    },
+    {
+      "id": "you",
+      "type": "chat-turn",
+      "category": "you",
+      "label": "Your request",
+      "props": {
+        "who": "you",
+        "text": "Why did Acme's orders drop in March?"
+      },
+      "at": {
+        "x": 0,
+        "y": 250,
+        "w": 400
+      }
+    },
+    {
+      "id": "term",
+      "type": "terminal",
+      "category": "computer",
+      "label": "A long command output",
+      "props": {
+        "title": "Terminal — zsh",
+        "badge": "run by Claude",
+        "prompt": "~/Acme %",
+        "lines": [
+          {
+            "kind": "cmd",
+            "text": "cat logs/march.log"
+          },
+          {
+            "kind": "out",
+            "text": "2026-03-02 09:14 order 20417 created"
+          },
+          {
+            "kind": "out",
+            "text": "2026-03-02 09:15 payment ok 20417"
+          },
+          {
+            "kind": "out",
+            "text": "2026-03-02 09:20 order 20418 created"
+          },
+          {
+            "kind": "note",
+            "text": "(… 400 more lines like these)"
+          }
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 350,
+        "w": 400
+      }
+    },
+    {
+      "id": "compact",
+      "type": "callout",
+      "category": "desk",
+      "label": "What compaction keeps",
+      "props": {
+        "tone": "note",
+        "title": "Compaction",
+        "md": "**Kept:** a summary: your requests, key snippets, pending tasks and current work.\n\n**Lost:** the exact text of old outputs, and possibly details of early instructions.\n\n**Re-read in full:** the project's CLAUDE.md, from disk."
+      },
+      "at": {
+        "x": 880,
+        "y": 0,
+        "w": 320
+      }
+    },
+    {
+      "id": "meter2",
+      "type": "context-meter",
+      "category": "desk",
+      "label": "A new session's context window",
+      "props": {
+        "title": "Context window: new session",
+        "used": 4,
+        "caption": "illustrative, not measured",
+        "items": [
+          {
+            "label": "Claude Code's own instructions and tools",
+            "share": "3%",
+            "tone": "brief"
+          },
+          {
+            "label": "CLAUDE.md",
+            "share": "1%",
+            "tone": "brief"
+          }
+        ]
+      },
+      "at": {
+        "x": 440,
+        "y": 330,
+        "w": 400
+      }
+    },
+    {
+      "id": "try",
+      "type": "try-it",
+      "props": {
+        "title": "Look at your own desk",
+        "expect": "In Claude Code, type `/context` and press Return. It draws your context window as a grid of coloured squares, broken down by what is using the room, with tips on what to trim."
+      },
+      "at": {
+        "x": 880,
+        "y": 330,
+        "w": 320
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "title": "A desk of fixed size",
+      "text": "Claude's working memory is its **context window**: everything it can see at once, with a fixed size. Think of a desk. Even before you type, a little is taken by Claude Code's own instructions and its list of tools.",
+      "show": [
+        "deskcard",
+        "meter"
+      ],
+      "emphasize": [
+        "meter"
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "CLAUDE.md goes on first",
+      "text": "If your project has a **CLAUDE.md** file, its standing instructions are laid on the desk at the start of every session, before your first message.",
+      "emphasize": [
+        "meter"
+      ],
+      "dim": [
+        "deskcard"
+      ],
+      "set": {
+        "meter": {
+          "used": 4,
+          "items": [
+            {
+              "label": "Claude Code's own instructions and tools",
+              "share": "3%",
+              "tone": "brief"
+            },
+            {
+              "label": "CLAUDE.md",
+              "share": "1%",
+              "tone": "brief"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s3",
+      "title": "Everything it reads",
+      "text": "Your message goes on the desk, then every file Claude reads and every reply it writes. Each one takes room.",
+      "add": [
+        "you"
+      ],
+      "emphasize": [
+        "meter",
+        "you"
+      ],
+      "dim": [
+        "deskcard"
+      ],
+      "set": {
+        "meter": {
+          "used": 14,
+          "items": [
+            {
+              "label": "Claude Code's own instructions and tools",
+              "share": "3%",
+              "tone": "brief"
+            },
+            {
+              "label": "CLAUDE.md",
+              "share": "1%",
+              "tone": "brief"
+            },
+            {
+              "label": "your request",
+              "share": "1%",
+              "tone": "chat"
+            },
+            {
+              "label": "march-orders.csv (read)",
+              "share": "6%",
+              "tone": "file"
+            },
+            {
+              "label": "notes/acme.md (read)",
+              "share": "3%",
+              "tone": "file"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s4",
+      "title": "Big printouts crowd it",
+      "text": "Keep working and the desk fills. Long outputs take the most room: a whole log, a whole spreadsheet. Claude Code caps a single command's output (past about 30,000 characters, Claude gets a preview and the rest is saved to a file), but outputs add up fast.",
+      "add": [
+        "term"
+      ],
+      "emphasize": [
+        "meter",
+        "term"
+      ],
+      "dim": [
+        "deskcard",
+        "you"
+      ],
+      "set": {
+        "meter": {
+          "used": 88,
+          "items": [
+            {
+              "label": "Claude Code's own instructions and tools",
+              "share": "3%",
+              "tone": "brief"
+            },
+            {
+              "label": "CLAUDE.md",
+              "share": "1%",
+              "tone": "brief"
+            },
+            {
+              "label": "your messages and Claude's replies",
+              "share": "7%",
+              "tone": "chat"
+            },
+            {
+              "label": "12 files read",
+              "share": "22%",
+              "tone": "file"
+            },
+            {
+              "label": "long command outputs",
+              "share": "55%",
+              "tone": "waste"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s5",
+      "title": "Old papers get boiled down",
+      "text": "As the desk nears full, Claude Code makes room by itself. It clears old outputs first, then boils the conversation down to a summary: **compaction**. Your project's CLAUDE.md is read again from disk, so it survives in full.",
+      "add": [
+        "compact"
+      ],
+      "emphasize": [
+        "meter",
+        "compact"
+      ],
+      "dim": [
+        "deskcard",
+        "you",
+        "term"
+      ],
+      "set": {
+        "meter": {
+          "used": 22,
+          "items": [
+            {
+              "label": "Claude Code's own instructions and tools",
+              "share": "3%",
+              "tone": "brief"
+            },
+            {
+              "label": "CLAUDE.md, re-read from disk",
+              "share": "1%",
+              "tone": "brief"
+            },
+            {
+              "label": "summary of the conversation",
+              "share": "8%",
+              "tone": "summary"
+            },
+            {
+              "label": "up to 5 recent files, re-read",
+              "share": "10%",
+              "tone": "file"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s6",
+      "title": "A new session: a clear desk",
+      "text": "Start a new session, or type `/clear`, and the desk is cleared. Nothing from the last conversation comes along unless it was written down. Only the standing papers are laid out again: Claude Code's own instructions, your CLAUDE.md and a few other start-up items.",
+      "add": [
+        "meter2"
+      ],
+      "emphasize": [
+        "meter2"
+      ],
+      "dim": [
+        "deskcard",
+        "you",
+        "term",
+        "meter",
+        "compact"
+      ]
+    },
+    {
+      "id": "s7",
+      "title": "The whole picture",
+      "text": "These numbers are illustrative. A real desk's size depends on the model, from 200,000 to 1 million tokens. Keep CLAUDE.md short, and keep big outputs off the desk: the next explainer shows how.",
+      "show": "*",
+      "emphasize": [
+        "try"
+      ]
+    }
+  ]
+}

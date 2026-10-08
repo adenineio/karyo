@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://karyo.dev/schema/karyo-splice-1.json",
+  "title": "Karyo splice",
+  "description": "A named what-if over a Karyo model: proposed changes (add, connect, disconnect, remove, rename, move, replace, group) drawn in place on a plate. Lives at <project>/karyo/splices/<id>.splice.json. Semantics: docs/MODEL.md, Splices. validateSplice (src/model/splice.ts) checks this shape and what it means.",
+  "type": "object",
+  "required": ["karyo", "id", "title", "base", "created", "updated", "ops"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "karyo": { "const": "splice/1" },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.-]*$", "description": "The file name stem: <id>.splice.json" },
+    "title": { "type": "string", "minLength": 1 },
+    "note": { "type": "string", "description": "Optional prose" },
+    "base": {
+      "type": "object",
+      "required": ["model", "commit"],
+      "additionalProperties": false,
+      "properties": {
+        "model": { "type": "string", "minLength": 1, "description": "The model file the splice was made against (repo-relative)" },
+        "commit": { "type": ["string", "null"], "description": "The commit it was made at; null when unknown or uncommitted" },
+        "scene": { "type": "string", "description": "The scene (plate) it was drawn on" }
+      }
+    },
+    "view": {
+      "description": "Where the splice lives: the view it was opened in (and last saved in), which reopening restores. Owned by the UI; a structure board writes the keys below. Absent (an older splice): it opens at the top level.",
+      "type": "object",
+      "properties": {
+        "nav": { "enum": ["groups", "cards"], "description": "Group navigation: one card per group (entered level by level) or every card" },
+        "at": { "type": ["string", "null"], "description": "The group entered (null: the overview); a group the splice proposes counts" },
+        "path": { "type": "array", "items": { "type": "string" }, "description": "The group labels from the top down to `at`, as the breadcrumb said them when saved" },
+        "drill": { "type": ["string", "null"], "description": "The cards view's drilled-into group" },
+        "open": { "type": ["string", "null"], "description": "The open card" },
+        "section": { "type": ["string", "null"], "description": "The open card's section view" },
+        "cursor": { "type": ["string", "null"], "description": "The selected card" },
+        "positions": { "type": "object", "description": "Cards dragged inside the splice (the real view's layout is never written)" }
+      }
+    },
+    "created": { "type": "string", "format": "date-time" },
+    "updated": { "type": "string", "format": "date-time" },
+    "ops": { "type": "array", "items": { "$ref": "#/$defs/op" }, "description": "Applied in order; later ops may name nodes earlier ops add" }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.:/-]*$" },
+    "ref": { "type": "string", "minLength": 1, "description": "A node: its id (preferred) or its label" },
+    "groupRef": { "type": "string", "minLength": 1, "description": "A group: its id (preferred) or its label" },
+    "nodeKind": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "not": { "const": "module" }, "description": "service, function, store, queue, external, actor, or a kit's node kind (docs/KITS.md)" },
+    "edgeKind": { "enum": ["calls", "reads", "writes", "publishes", "subscribes"] },
+    "node": {
+      "type": "object",
+      "required": ["label"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id", "description": "splice.<slug>; derived from the label when omitted" },
+        "label": { "type": "string", "minLength": 1 },
+        "kind": { "$ref": "#/$defs/nodeKind" },
+        "category": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "group": { "type": "string", "description": "Default: the group of the node it is placed next to" },
+        "summary": { "type": "string" }
+      }
+    },
+    "op": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["op", "node"],
+          "additionalProperties": false,
+          "properties": {
+            "op": { "const": "add" },
+            "node": { "$ref": "#/$defs/node" },
+            "between": { "type": "array", "items": { "$ref": "#/$defs/ref" }, "minItems": 2, "maxItems": 2, "description": "[a, b]: a → b (or b → a) becomes a → new → b" },
+            "before": { "$ref": "#/$defs/ref", "description": "X with one caller c (or none): c → X becomes c → new → X. X with several callers: just new → X (a step that also calls X)" },
+            "after": { "$ref": "#/$defs/ref", "description": "X with one outgoing relationship X → d (or none): X → new → d (just X → new). X fanning out to several: just X → new (a step X also calls)" },
+            "attach": {
+              "type": "object",
+              "required": ["to"],
+              "additionalProperties": false,
+              "properties": { "to": { "$ref": "#/$defs/ref" }, "dir": { "enum": ["out", "in"], "default": "out" }, "kind": { "$ref": "#/$defs/edgeKind", "default": "calls" } }
+            }
+          },
+          "not": { "anyOf": [
+            { "required": ["between", "before"] }, { "required": ["between", "after"] }, { "required": ["between", "attach"] },
+            { "required": ["before", "after"] }, { "required": ["before", "attach"] }, { "required": ["after", "attach"] }
+          ] }
+        },
+        {
+          "type": "object",
+          "required": ["op", "from", "to"],
+          "additionalProperties": false,
+          "properties": { "op": { "const": "connect" }, "from": { "$ref": "#/$defs/ref" }, "to": { "$ref": "#/$defs/ref" }, "kind": { "$ref": "#/$defs/edgeKind", "default": "calls" }, "label": { "type": "string" } }
+        },
+        {
+          "type": "object",
+          "required": ["op", "from", "to"],
+          "additionalProperties": false,
+          "properties": { "op": { "const": "disconnect" }, "from": { "$ref": "#/$defs/ref" }, "to": { "$ref": "#/$defs/ref" } }
+        },
+        {
+          "type": "object",
+          "required": ["op"],
+          "additionalProperties": false,
+          "description": "Remove a node (a ghost), or with group a group this splice proposes, with every card in it",
+          "properties": { "op": { "const": "remove" }, "node": { "$ref": "#/$defs/ref" }, "group": { "$ref": "#/$defs/groupRef" } },
+          "oneOf": [{ "required": ["node"] }, { "required": ["group"] }]
+        },
+        {
+          "type": "object",
+          "required": ["op", "label"],
+          "additionalProperties": false,
+          "description": "Rename a node, or with group a group",
+          "properties": { "op": { "const": "rename" }, "node": { "$ref": "#/$defs/ref" }, "group": { "$ref": "#/$defs/groupRef" }, "label": { "type": "string", "minLength": 1 } },
+          "oneOf": [{ "required": ["node"] }, { "required": ["group"] }]
+        },
+        {
+          "type": "object",
+          "required": ["op", "node", "group"],
+          "additionalProperties": false,
+          "properties": { "op": { "const": "move" }, "node": { "$ref": "#/$defs/ref" }, "group": { "$ref": "#/$defs/groupRef" } }
+        },
+        {
+          "type": "object",
+          "required": ["op", "node", "with"],
+          "additionalProperties": false,
+          "description": "Swap X for Y: Y takes over every relationship of X, in and out; X stays as a removed ghost, its relationships as rerouted ghosts. Later references to X (in this splice, or in splices combined after it) follow to Y.",
+          "properties": {
+            "op": { "const": "replace" },
+            "node": { "$ref": "#/$defs/ref", "description": "X, the node replaced" },
+            "with": { "oneOf": [{ "$ref": "#/$defs/node" }, { "$ref": "#/$defs/ref" }], "description": "Y: a new node (kind, category and group default to X's), or a node that exists" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "group"],
+          "additionalProperties": false,
+          "description": "Propose a new group: optionally its first card, and one relationship between the group and a node. The relationship goes to the group's entry: its first card, else a placeholder card that stands for the group until a card is proposed into it (the first one takes over its relationships).",
+          "properties": {
+            "op": { "const": "group" },
+            "group": {
+              "type": "object",
+              "required": ["label"],
+              "additionalProperties": false,
+              "properties": {
+                "id": { "$ref": "#/$defs/id", "description": "splice.<slug>; derived from the label when omitted" },
+                "label": { "type": "string", "minLength": 1 },
+                "parent": { "$ref": "#/$defs/groupRef", "description": "The group it sits in (none: the top level)" },
+                "summary": { "type": "string" }
+              }
+            },
+            "first": { "$ref": "#/$defs/node", "description": "Its first card (its group is the new group)" },
+            "attach": {
+              "type": "object",
+              "required": ["to"],
+              "additionalProperties": false,
+              "properties": {
+                "to": { "$ref": "#/$defs/ref", "description": "A node (or a group this splice proposes)" },
+                "dir": { "enum": ["in", "out"], "default": "out", "description": "in: to → the group (the group is an outlet of to); out: the group → to" },
+                "kind": { "$ref": "#/$defs/edgeKind", "default": "calls" }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

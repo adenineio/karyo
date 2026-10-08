@@ -1,0 +1,26 @@
+{
+  "karyo": "kit/1",
+  "name": "probe",
+  "description": "A test kit (tests/kit-scripts.test.ts): its script draws the model's nodes and, on purpose, tries what a hostile kit script might, writing down what happened.",
+  "version": "0.1.0",
+  "kinds": [],
+  "plates": [
+    {
+      "id": "probe",
+      "title": "Probe",
+      "description": "A kit script that tries to reach the page, the network and Karyo's local server, and says what happened.",
+      "view": "script",
+      "from": "model",
+      "script": "plates/probe.js",
+      "deterministic": true
+    },
+    {
+      "id": "probe-leave",
+      "title": "Probe (leaves its frame)",
+      "description": "A kit script that navigates its own frame away (Karyo stops it).",
+      "view": "script",
+      "from": "model",
+      "script": "plates/leave.js"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+<div class="pl-card box">
+  <div class="meter-top"><span class="pl-label">{{title}}</span><span class="pct"><span data-k-num="used" data-k-decimals="0">{{used}}</span>% full</span></div>
+  <div class="track"><div class="fill" data-k-scale="used/100"></div></div>
+  {{#if caption}}<div class="cap">{{caption}}</div>{{/if}}
+  {{#if items}}<ul class="items">
+    {{#each items}}<li class="it t-{{tone}}"><span class="sw" aria-hidden="true"></span><span class="lb">{{label}}</span>{{#if share}}<span class="sh">{{share}}</span>{{/if}}</li>
+    {{/each}}
+  </ul>{{/if}}
+</div>

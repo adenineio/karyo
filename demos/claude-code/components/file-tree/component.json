@@ -1,0 +1,41 @@
+{
+  "name": "file-tree",
+  "description": "Folders and files as an indented tree, Finder-style. Each row can be marked: `here` (you are here), `hit` (a search match), `new`, or `dim`, with a short note at its right.",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": ["items"],
+    "additionalProperties": false,
+    "properties": {
+      "title": { "type": "string", "description": "small label above the tree, e.g. a path like `~/Documents`" },
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 16,
+        "items": {
+          "type": "object",
+          "required": ["name"],
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "depth": { "type": "integer", "minimum": 0, "maximum": 6, "default": 0, "description": "how far it is indented: 0 is the top" },
+            "kind": { "enum": ["folder", "file"], "default": "file" },
+            "state": { "enum": ["plain", "here", "hit", "new", "dim"], "default": "plain", "description": "here: you are here; hit: a search match; new: just created; dim: not relevant now" },
+            "note": { "type": "string", "description": "a short note at the right of the row" }
+          }
+        }
+      }
+    }
+  },
+  "size": { "w": 320 },
+  "motion": ["appear", "emphasize"],
+  "example": {
+    "title": "~",
+    "items": [
+      { "name": "Documents", "kind": "folder", "depth": 0, "state": "here", "note": "you are here" },
+      { "name": "Reports", "kind": "folder", "depth": 1 },
+      { "name": "q3-summary.docx", "depth": 2, "state": "hit" },
+      { "name": "notes.txt", "depth": 1 }
+    ]
+  }
+}

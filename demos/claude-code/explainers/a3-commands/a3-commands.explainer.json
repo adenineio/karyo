@@ -1,0 +1,543 @@
+{
+  "karyo": "explainer/1",
+  "id": "a3-commands",
+  "title": "Anatomy of a command",
+  "summary": "A command is a short sentence: a verb, options that say how, and the thing to act on. Learn the grammar and you can read any command Claude runs.",
+  "note": "Names, companies and files here are **made-up examples**.",
+  "narration": "side",
+  "uses": [
+    "terminal",
+    "try-it",
+    "cmd-sentence"
+  ],
+  "layout": {
+    "kind": "free"
+  },
+  "categories": [
+    {
+      "id": "command",
+      "label": "the command"
+    },
+    {
+      "id": "computer",
+      "label": "the computer"
+    },
+    {
+      "id": "grammar",
+      "label": "the grammar"
+    }
+  ],
+  "elements": [
+    {
+      "id": "sent",
+      "type": "cmd-sentence",
+      "category": "command",
+      "label": "The command ls -l Reports, split into parts",
+      "props": {
+        "parts": [
+          {
+            "text": "ls",
+            "role": "verb",
+            "label": "verb · list"
+          },
+          {
+            "text": "-l",
+            "role": "option",
+            "label": "option · long form"
+          },
+          {
+            "text": "Reports",
+            "role": "object",
+            "label": "object · this folder"
+          }
+        ],
+        "focus": "all",
+        "gloss": "“List, *in long form*, **Reports**.”"
+      },
+      "at": {
+        "x": 0,
+        "y": 0,
+        "w": 520
+      }
+    },
+    {
+      "id": "term",
+      "type": "terminal",
+      "category": "computer",
+      "label": "Terminal",
+      "props": {
+        "lines": [
+          {
+            "kind": "cmd",
+            "text": "ls -l Reports",
+            "prompt": "Documents %",
+            "mark": true
+          },
+          {
+            "kind": "out",
+            "text": "total 16"
+          },
+          {
+            "kind": "out",
+            "text": "-rw-r--r--  1 sam  staff  2140 Sep 30 09:12 q3.csv"
+          },
+          {
+            "kind": "out",
+            "text": "-rw-r--r--  1 sam  staff  1876 Sep 30 09:15 q4.csv"
+          }
+        ],
+        "prompt": "Documents %"
+      },
+      "at": {
+        "x": 0,
+        "y": 157,
+        "w": 520
+      }
+    },
+    {
+      "id": "verbs",
+      "type": "list",
+      "category": "grammar",
+      "label": "Verbs you'll see",
+      "props": {
+        "title": "Verbs you'll see",
+        "frame": true,
+        "items": [
+          "`ls` list what's in a folder",
+          "`cd` change directory: move",
+          "`mkdir` make a directory",
+          "`cp` copy a file",
+          "`mv` move or rename a file"
+        ]
+      },
+      "at": {
+        "x": 560,
+        "y": 0,
+        "w": 400
+      }
+    },
+    {
+      "id": "opts",
+      "type": "list",
+      "category": "grammar",
+      "label": "Options",
+      "props": {
+        "title": "Options",
+        "frame": true,
+        "items": [
+          "`ls -l` long form: size, date, owner",
+          "`ls -a` all, even hidden files (names start with `.`)",
+          "`ls -la` both at once"
+        ]
+      },
+      "at": {
+        "x": 560,
+        "y": 205,
+        "w": 400
+      }
+    },
+    {
+      "id": "sent2",
+      "type": "cmd-sentence",
+      "category": "command",
+      "label": "Another command, split into parts",
+      "props": {
+        "title": "Two objects",
+        "parts": [
+          {
+            "text": "cp",
+            "role": "verb",
+            "label": "verb · copy"
+          },
+          {
+            "text": "q3.csv",
+            "role": "object",
+            "label": "from"
+          },
+          {
+            "text": "backup.csv",
+            "role": "object",
+            "label": "to"
+          }
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 405,
+        "w": 520
+      }
+    },
+    {
+      "id": "try",
+      "type": "try-it",
+      "props": {
+        "title": "Read a sentence, then the manual",
+        "command": "ls -la",
+        "expect": "A long list of everything in the folder, hidden files too. Then type `man ls` to read its manual, and press **q** to quit."
+      },
+      "at": {
+        "x": 560,
+        "y": 425,
+        "w": 400
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "title": "A command is a sentence",
+      "text": "Every command reads like a short sentence: a verb, sometimes options, and the thing to act on. `ls -l Reports` says “list, in long form, Reports”.",
+      "show": [
+        "sent",
+        "term"
+      ],
+      "emphasize": [
+        "sent"
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "The verb comes first",
+      "text": "The first word names the program to run. You've met `ls`, `cd` and `mkdir`; `cp` copies and `mv` moves. The computer runs exactly the verb you typed, never one it guesses you meant.",
+      "add": [
+        "verbs"
+      ],
+      "emphasize": [
+        "sent",
+        "verbs"
+      ],
+      "dim": [
+        "term"
+      ],
+      "set": {
+        "sent": {
+          "focus": "verb"
+        }
+      }
+    },
+    {
+      "id": "s3",
+      "title": "Options say how",
+      "text": "**Options** (or flags) start with a dash and change how the verb works, like adverbs. `-l` means long form; `-a` means all, even hidden files, whose names start with a dot. They combine: `-la`.",
+      "add": [
+        "opts"
+      ],
+      "emphasize": [
+        "sent",
+        "opts",
+        "term"
+      ],
+      "dim": [
+        "verbs"
+      ],
+      "set": {
+        "sent": {
+          "focus": "option"
+        },
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "ls -l Reports",
+              "prompt": "Documents %",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "total 16"
+            },
+            {
+              "kind": "out",
+              "text": "-rw-r--r--  1 sam  staff  2140 Sep 30 09:12 q3.csv"
+            },
+            {
+              "kind": "out",
+              "text": "-rw-r--r--  1 sam  staff  1876 Sep 30 09:15 q4.csv"
+            },
+            {
+              "kind": "cmd",
+              "text": "ls -a Reports",
+              "prompt": "Documents %",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": ".  ..  .DS_Store  q3.csv  q4.csv",
+              "mark": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s4",
+      "title": "The object says what to",
+      "text": "The last part is what the verb acts on, its **argument**. Leave it out and `ls` lists the folder you're in. Some verbs take two: `cp q3.csv backup.csv` copies *from* one *to* the other.",
+      "add": [
+        "sent2"
+      ],
+      "emphasize": [
+        "sent",
+        "sent2",
+        "term"
+      ],
+      "dim": [
+        "verbs",
+        "opts"
+      ],
+      "set": {
+        "sent": {
+          "focus": "object"
+        },
+        "term": {
+          "prompt": "Reports %",
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "cd Reports",
+              "prompt": "Documents %"
+            },
+            {
+              "kind": "cmd",
+              "text": "ls",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "q3.csv  q4.csv"
+            },
+            {
+              "kind": "cmd",
+              "text": "cp q3.csv backup.csv",
+              "mark": true
+            },
+            {
+              "kind": "cmd",
+              "text": "ls"
+            },
+            {
+              "kind": "out",
+              "text": "backup.csv  q3.csv  q4.csv",
+              "mark": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s5",
+      "title": "Same grammar, every verb",
+      "text": "`mkdir -p Clients/Acme/2026` follows the same pattern. Without `-p`, `mkdir` stops because `Clients` doesn't exist yet; `-p` adds “and any folders on the way”.",
+      "emphasize": [
+        "sent2",
+        "term"
+      ],
+      "dim": [
+        "verbs",
+        "opts",
+        "sent"
+      ],
+      "set": {
+        "sent": {
+          "focus": "all"
+        },
+        "sent2": {
+          "title": "Another sentence",
+          "parts": [
+            {
+              "text": "mkdir",
+              "role": "verb",
+              "label": "verb"
+            },
+            {
+              "text": "-p",
+              "role": "option",
+              "label": "option"
+            },
+            {
+              "text": "Clients/Acme/2026",
+              "role": "object",
+              "label": "object · new folders"
+            }
+          ]
+        },
+        "term": {
+          "prompt": "Documents %",
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "cd ..",
+              "prompt": "Reports %"
+            },
+            {
+              "kind": "cmd",
+              "text": "mkdir Clients/Acme/2026"
+            },
+            {
+              "kind": "err",
+              "text": "mkdir: Clients/Acme: No such file or directory"
+            },
+            {
+              "kind": "cmd",
+              "text": "mkdir -p Clients/Acme/2026",
+              "mark": true
+            },
+            {
+              "kind": "cmd",
+              "text": "ls Clients/Acme"
+            },
+            {
+              "kind": "out",
+              "text": "2026",
+              "mark": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s6",
+      "title": "Spaces split words",
+      "text": "The terminal splits a command at every space, so `ls Q3 report.docx` looks for two files, `Q3` and `report.docx`. Quotes keep a name with spaces in one piece.",
+      "emphasize": [
+        "sent2",
+        "term"
+      ],
+      "dim": [
+        "verbs",
+        "opts",
+        "sent"
+      ],
+      "set": {
+        "sent2": {
+          "title": "A name with a space",
+          "parts": [
+            {
+              "text": "ls",
+              "role": "verb",
+              "label": "verb · list"
+            },
+            {
+              "text": "\"Q3 report.docx\"",
+              "role": "object",
+              "label": "object · one file"
+            }
+          ]
+        },
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "ls Q3 report.docx"
+            },
+            {
+              "kind": "err",
+              "text": "ls: Q3: No such file or directory"
+            },
+            {
+              "kind": "err",
+              "text": "ls: report.docx: No such file or directory"
+            },
+            {
+              "kind": "cmd",
+              "text": "ls \"Q3 report.docx\"",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "Q3 report.docx",
+              "mark": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s7",
+      "title": "Look it up",
+      "text": "Options are terse, and the same letter can mean different things: `-l` is long form for `ls` but *just the file names* for `grep`. `man ls` opens the manual (press q to quit), or ask Claude what a command does.",
+      "emphasize": [
+        "term",
+        "opts"
+      ],
+      "dim": [
+        "verbs",
+        "sent",
+        "sent2"
+      ],
+      "set": {
+        "opts": {
+          "items": [
+            "`ls -l` long form: size, date, owner",
+            "`ls -a` all, even hidden files (names start with `.`)",
+            "`ls -la` both at once",
+            "`grep -l` not long form: just the names of files that match"
+          ]
+        },
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "man ls",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "NAME"
+            },
+            {
+              "kind": "out",
+              "text": "     ls – list directory contents"
+            },
+            {
+              "kind": "note",
+              "text": "… more than 40 options, each explained …"
+            },
+            {
+              "kind": "out",
+              "text": "     -l   … List files in the long format",
+              "mark": true
+            },
+            {
+              "kind": "note",
+              "text": "press q to quit"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s8",
+      "title": "The whole picture",
+      "text": "Verb, options, object: once you see the grammar, any command Claude runs reads like a sentence. You don't need to memorise options, only to recognise the shape and look up the rest.",
+      "show": "*",
+      "emphasize": [
+        "try"
+      ],
+      "set": {
+        "term": {
+          "lines": [
+            {
+              "kind": "cmd",
+              "text": "ls -l Reports",
+              "prompt": "Documents %",
+              "mark": true
+            },
+            {
+              "kind": "out",
+              "text": "total 16"
+            },
+            {
+              "kind": "out",
+              "text": "-rw-r--r--  1 sam  staff  2140 Sep 30 09:12 q3.csv"
+            },
+            {
+              "kind": "out",
+              "text": "-rw-r--r--  1 sam  staff  1876 Sep 30 09:15 q4.csv"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

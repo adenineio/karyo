@@ -1,0 +1,19 @@
+.box { height: 100%; display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; }
+.head { font-family: var(--pl-font-mono); text-transform: none; letter-spacing: 0; }
+.tree { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.row { display: flex; align-items: center; gap: 8px; padding: 3px 8px 3px calc(8px + var(--d, 0) * 20px); border-radius: 6px; font: 14.5px/1.35 var(--pl-font-mono); color: var(--pl-fg); white-space: nowrap; }
+.nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ic { flex: none; position: relative; width: 14px; height: 11px; border-radius: 2px; }
+.kind-folder .ic { background: color-mix(in srgb, var(--pl-accent) 55%, var(--pl-card)); }
+.kind-folder .ic::before { content: ""; position: absolute; left: 0; top: -3px; width: 6px; height: 4px; border-radius: 2px 2px 0 0; background: inherit; }
+.kind-folder .nm { font-weight: 600; }
+.kind-file .ic { width: 10px; height: 13px; border: 1.5px solid var(--pl-muted); border-radius: 1.5px; margin: 0 2px; }
+.note { margin-left: auto; padding-left: 10px; font: 600 11.5px/1.2 var(--pl-font); color: var(--pl-muted); }
+.st-here { background: color-mix(in srgb, var(--pl-accent) 14%, transparent); box-shadow: inset 3px 0 0 var(--pl-accent); }
+.st-here .note { color: var(--pl-accent); }
+.st-hit { background: color-mix(in srgb, var(--pl-accent-2) 18%, transparent); }
+.st-hit .nm, .st-hit .note { color: var(--pl-accent-2); font-weight: 700; }
+.st-new .nm, .st-new .note { color: var(--pl-ok); }
+.st-new { background: color-mix(in srgb, var(--pl-ok) 12%, transparent); }
+.st-dim { opacity: 0.4; }
+:host(.is-lit) .box { border-color: var(--pl-accent); }

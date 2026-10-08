@@ -1,0 +1,40 @@
+{
+  "name": "context-meter",
+  "description": "Claude's context window as a meter: how full it is (a bar that grows and a percentage that counts) and the pieces of text taking up the room, one row each with its share.",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": ["used"],
+    "additionalProperties": false,
+    "properties": {
+      "title": { "type": "string", "default": "Context window" },
+      "used": { "type": "number", "minimum": 0, "maximum": 100, "description": "percent full; counts and grows between steps" },
+      "caption": { "type": "string", "description": "a line under the bar, e.g. `illustrative, not measured`" },
+      "items": {
+        "type": "array",
+        "maxItems": 7,
+        "items": {
+          "type": "object",
+          "required": ["label"],
+          "additionalProperties": false,
+          "properties": {
+            "label": { "type": "string", "minLength": 1 },
+            "share": { "type": "string", "description": "its share, as text, e.g. `40%` or `tiny`" },
+            "tone": { "enum": ["brief", "file", "output", "chat", "summary", "waste"], "default": "file", "description": "brief: standing instructions (CLAUDE.md); file: a file it read; output: a command's output; chat: your messages and its replies; summary: a compacted summary; waste: something that didn't need to be there" }
+          }
+        }
+      }
+    }
+  },
+  "size": { "w": 380 },
+  "motion": ["appear", "emphasize", "count"],
+  "example": {
+    "used": 42,
+    "caption": "illustrative",
+    "items": [
+      { "label": "CLAUDE.md", "share": "2%", "tone": "brief" },
+      { "label": "sales.csv (all 9,000 rows)", "share": "35%", "tone": "waste" },
+      { "label": "your request", "share": "1%", "tone": "chat" }
+    ]
+  }
+}

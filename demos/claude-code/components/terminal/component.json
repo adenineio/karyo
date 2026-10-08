@@ -1,0 +1,43 @@
+{
+  "name": "terminal",
+  "description": "A Mac-style terminal window: typed commands after a prompt, the text they print back, notes and errors. Steps swap its lines with `set`; there is no typing animation.",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": ["lines"],
+    "additionalProperties": false,
+    "properties": {
+      "title": { "type": "string", "default": "Terminal — zsh", "description": "the window's title bar" },
+      "prompt": { "type": "string", "default": "~ %", "description": "the prompt before each command line, e.g. `~/Reports %` (a line's own prompt wins)" },
+      "badge": { "type": "string", "description": "a chip in the title bar, e.g. `typed by Claude`" },
+      "lines": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 14,
+        "items": {
+          "type": "object",
+          "required": ["kind", "text"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "enum": ["cmd", "out", "note", "err"], "description": "cmd: a typed command after the prompt; out: what the computer printed; note: an aside in plain words (not real output); err: an error message" },
+            "text": { "type": "string" },
+            "prompt": { "type": "string", "description": "this command line's prompt, e.g. after a `cd`" },
+            "mark": { "type": "boolean", "description": "light this line" }
+          }
+        }
+      }
+    }
+  },
+  "size": { "w": 520 },
+  "motion": ["appear", "emphasize"],
+  "example": {
+    "title": "Terminal — zsh",
+    "lines": [
+      { "kind": "cmd", "text": "ls" },
+      { "kind": "out", "text": "Desktop   Documents   Downloads" },
+      { "kind": "cmd", "text": "cd Documents", "mark": true },
+      { "kind": "cmd", "prompt": "Documents %", "text": "ls" },
+      { "kind": "out", "text": "Invoices   Reports   notes.txt" }
+    ]
+  }
+}

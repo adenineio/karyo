@@ -1,0 +1,163 @@
+/* The main themes (adenine, the default, and fresh) on the model views: structure and trace boards, tours, the Stack
+   view, splices, the legend, wire cards. Material only, as for explainers (src/explainer/glass.css).
+
+   Every selector here is scoped with :where(...), so it weighs only what follows it, and repeats its class once
+   (.bd-btn.bd-btn): that is enough to restyle a view's own base rule, written later inside the plate, while every state
+   rule a view writes with two classes or more (lit, picked, pinned, proposed, removed, a warning) still wins. */
+
+/* ============================================================== adenine */
+
+/* ---- buttons: quiet glass; a view's own on / pressed / primary states keep their accent */
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) :is(.bd-btn, .tb-btn, .st-btn, .tr-btn, .wh-open):is(.bd-btn, .tb-btn, .st-btn, .tr-btn, .wh-open) {
+  font: 500 12px/1 var(--pl-font); letter-spacing: 0; text-transform: none; color: var(--pl-fg);
+  background: linear-gradient(104deg, var(--gl-glass-from) 5%, var(--gl-glass-to) 100%); border-color: var(--gl-hair); border-radius: 10px;
+  -webkit-backdrop-filter: blur(var(--gl-blur)); backdrop-filter: blur(var(--gl-blur));
+}
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) #tr-play#tr-play { font-weight: 600; }
+
+/* ---- cards: sentence-case kinds, the display face for names, quiet paths */
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .mm-kind.mm-kind { font: 500 11px/1 var(--pl-font); letter-spacing: 0; text-transform: capitalize; color: var(--gl-faint); }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .mm-lang.mm-lang { font: 400 10.5px/1 var(--pl-font-mono); color: var(--gl-faint); }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .mm-name.mm-name { font-weight: 500; letter-spacing: -0.01em; }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .mm-ref.mm-ref { color: var(--gl-faint); }
+/* categories: a lit top edge and a faint tint (a proposed card's hatch still wins) */
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .mm-card.mm-card[data-cat]::before {
+  left: 16px; right: 16px; top: -1px; bottom: auto; width: auto; height: 1px; border-radius: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--lg-c) 85%, transparent) 30%, color-mix(in srgb, var(--lg-c) 85%, transparent) 70%, transparent);
+  box-shadow: none; opacity: calc(0.9 + 0.1 * var(--kx-lit, 0));
+}
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .mm-card[data-cat] { background-image: radial-gradient(70% 60% at 50% 0%, color-mix(in srgb, var(--lg-c) 12%, transparent) 0%, transparent 100%), linear-gradient(180deg, rgba(14, 15, 16, 0.92) 0%, rgba(4, 4, 5, 0.95) 100%); }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .tr-node.tr-node .tr-nn, :where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .bd-chip.bd-chip .nm { font-weight: 500; }
+
+/* ---- groups: section frames, a hairline that fades downward, light from above */
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) :is(.mm-group, .tr-dia):is(.mm-group, .tr-dia) { border-color: transparent; border-radius: 22px; background: radial-gradient(50% 40% at 50% 0%, rgba(255, 255, 255, 0.035) 0%, transparent 100%); }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) :is(.mm-group, .tr-dia):is(.mm-group, .tr-dia)::before {
+  content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: linear-gradient(180deg, var(--gl-hair) 0%, rgba(214, 235, 253, 0.08) 60%, transparent 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+
+/* ---- badges, tags, tabs, chips */
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .bd-badge.bd-badge, :where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .st-badge.st-badge, :where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .sp-badge.sp-badge { font: 600 10.5px/1 var(--pl-font); letter-spacing: 0; text-transform: none; }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .bd-tag.bd-tag, :where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .wh-k.wh-k, :where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .tr-tag.tr-tag { font: 500 11px/1 var(--pl-font); border-color: var(--gl-hair-soft); border-radius: 999px; }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) :is(.bd-copy, .bd-exp):is(.bd-copy, .bd-exp) { font: 500 11px/1 var(--pl-font); letter-spacing: 0; text-transform: none; border-color: var(--gl-hair); border-radius: 8px; }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .bd-tab.bd-tab { font: 500 12.5px/1 var(--pl-font); letter-spacing: 0; text-transform: none; border-color: transparent; border-radius: 10px; }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .bd-tab.bd-tab[aria-selected="true"] { background: var(--gl-field); border-color: var(--gl-accent-line); color: var(--pl-fg); }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .bd-chip.bd-chip { border-color: var(--gl-hair-soft); border-radius: 999px; background: var(--gl-field); }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .bd-wn.bd-wn { font: 600 10.5px/1 var(--pl-font); background: #000; border-color: var(--gl-hair); }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .bd-crumbs.bd-crumbs { font: 500 13px/1.2 var(--pl-font); }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .wh-warn.wh-warn { font: 600 11.5px/1 var(--pl-font); letter-spacing: 0; text-transform: none; }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .wh-t.wh-t, :where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .st-about .hd b, :where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .tb-it.tb-it { font-weight: 500; }
+
+/* ---- the foot: a hairline, the mode line as a serial, a quiet key */
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) :is(.bd-foot, .st-foot, .tb-legend):is(.bd-foot, .st-foot, .tb-legend) { border-top-style: solid; border-top-color: var(--gl-hair-soft); }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) :is(.bd-mode, .st-mode, .tb-mode, .tr-mode):is(.bd-mode, .st-mode, .tb-mode, .tr-mode) { font: 400 12px/1.3 var(--pl-font-mono); letter-spacing: 0.2px; color: var(--gl-faint); }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .mm-legend.mm-legend { font: 500 11.5px/1.2 var(--pl-font); color: var(--gl-faint); }
+
+/* ---- splices: the banner on glass, the tag in the accent */
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .sp-banner.sp-banner { font: 400 12.5px/1 var(--pl-font); background: var(--gl-menu); border-color: var(--gl-hair-soft); border-radius: 12px; -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .sp-tag.sp-tag { font: 600 11.5px/1 var(--pl-font); letter-spacing: 0; text-transform: none; color: #000; border-radius: 999px; padding: 5px 10px; }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .sp-title.sp-title { font-weight: 500; }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .sp-pal.sp-pal label { font: 500 12px/1 var(--pl-font); letter-spacing: 0; text-transform: none; }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .sp-pop.sp-pop { background: var(--gl-menu); border-color: var(--gl-hair-soft); border-radius: 14px; -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .sp-pop .sp-e .lb.lb { font: 600 10.5px/1 var(--pl-font); letter-spacing: 0; text-transform: none; }
+
+/* ---- the Stack view */
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .st-tab.st-tab { font-family: var(--pl-font); }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .st-now.st-now { color: var(--gl-text); }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) :is(.st-now .st-bdg, .st-tab .b, .st-about .st-bdg):is(.st-bdg, .b) { font: 600 10px/1 var(--pl-font); letter-spacing: 0; text-transform: none; }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .st-about.st-about, :where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .bs-ask.bs-ask { background: var(--gl-menu); border-color: var(--gl-hair-soft); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+
+/* ---- tours: the explainer's rail, narration and code (src/explainer/glass.css) */
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .tr-grp.tr-grp { font: 500 12px/14px var(--pl-font); letter-spacing: 0; color: var(--gl-faint); }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .tr-dot.tr-dot { border: 1px solid var(--gl-hair); background: #000; }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .tr-st.is-past .tr-dot.tr-dot { border-color: var(--gl-faint); background: var(--gl-faint); }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .tr-st.is-cur .tr-dot.tr-dot { border-color: var(--pl-accent); background: var(--pl-accent); }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .tr-stt.tr-stt { font: 500 13px/16px var(--pl-font); color: var(--gl-text); }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .tr-st.is-cur .tr-stt.tr-stt { color: var(--pl-accent); }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .tr-marker.tr-marker { border: 0; background: radial-gradient(circle closest-side, #fff 0 34%, var(--pl-accent) 40% 58%, rgba(112, 184, 255, 0.2) 62% 96%, transparent 100%); }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .tr-h.tr-h { font: 400 26px/1.15 var(--pl-font-display); letter-spacing: -0.03em; }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .tr-prose.tr-prose p { color: var(--gl-text); }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .tr-prose.tr-prose strong { color: var(--pl-fg); font-weight: 600; }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .tr-pre .ln.is-lit.is-lit { box-shadow: none; background: var(--gl-accent-wash); }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .tr-lang.tr-lang { font: 400 12px/1 var(--pl-font); letter-spacing: 0; text-transform: none; color: var(--pl-fg); padding: 4px 8px; border: 1px solid var(--gl-hair); border-radius: 8px; }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .tr-fact.tr-fact { border-color: var(--gl-hair-soft); border-radius: 999px; background: var(--gl-field); }
+
+/* ---- the legend: filter chips; a pinned entry is the one solid fill, in the accent */
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .lg-e.lg-e { font: 500 12.5px/1 var(--pl-font); padding: 0 11px; border-radius: 999px; border-color: var(--gl-hair-subtle); background: var(--gl-field); color: var(--gl-text); }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .lg-e.lg-e b { color: var(--gl-faint); font-weight: 500; }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .lg-e .lg-sw.lg-sw { width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 8px color-mix(in srgb, var(--lg-c) 60%, transparent); }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .lg-e.lg-e:hover, :where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .lg-e.lg-e.is-hover { background: var(--gl-hover); color: var(--pl-fg); }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .lg-e.lg-e.is-pinned { background: var(--pl-accent); border-color: var(--pl-accent); color: #000; font-weight: 600; }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .lg-e.lg-e.is-pinned b { color: #1c3a5c; }
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .lg-sep.lg-sep { background: var(--gl-hair); }
+
+/* ============================================================== fresh */
+
+/* ---- buttons: ringed; the tour's Play is porcelain with its key */
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) :is(.bd-btn, .tb-btn, .st-btn, .tr-btn, .wh-open):is(.bd-btn, .tb-btn, .st-btn, .tr-btn, .wh-open) {
+  font: 500 12px/1 var(--pl-font); letter-spacing: 0.2px; text-transform: none; color: var(--pl-fg);
+  background: linear-gradient(rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.1)); border-color: transparent; border-radius: 8px; box-shadow: var(--gl-shadow-ringed);
+}
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) #tr-play#tr-play { background: var(--gl-grey-50); color: var(--gl-grey-500); box-shadow: var(--gl-shadow-porcelain); font-weight: 600; }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) #tr-play#tr-play.is-on { background: #cdcece; }
+
+/* ---- cards: mono eyebrows for kinds, names in Inter, a coloured dot and tint for the category */
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .mm-kind.mm-kind { letter-spacing: 1.2px; color: var(--gl-text); }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .mm-name.mm-name { font-weight: 500; letter-spacing: 0.1px; }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .mm-card.mm-card[data-cat]::before { left: auto; right: 10px; top: auto; bottom: 10px; width: 6px; height: 6px; border-radius: 50%; box-shadow: 0 0 8px var(--lg-c); }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .mm-card[data-cat] { background-image: radial-gradient(100% 80% at 50% 0%, color-mix(in srgb, var(--lg-c) 12%, transparent) 0%, transparent 70%), var(--gl-graphite); }
+
+/* ---- groups: the gradient edge */
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) :is(.mm-group, .tr-dia):is(.mm-group, .tr-dia) { border-color: transparent; border-radius: 18px; }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) :is(.mm-group, .tr-dia):is(.mm-group, .tr-dia)::before {
+  content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.05));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+
+/* ---- badges, tags, tabs, chips */
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .bd-tab.bd-tab { border-color: transparent; border-radius: 8px; letter-spacing: 1px; }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .bd-tab.bd-tab[aria-selected="true"] { background: var(--gl-grey-600); border-color: var(--gl-coral-line); color: var(--pl-fg); box-shadow: var(--pl-shadow); }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .bd-chip.bd-chip { border-color: transparent; border-radius: 6px; background: var(--gl-grey-600); }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .bd-wn.bd-wn { background: var(--gl-grey-800); border-color: var(--gl-hair); }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .bd-tag.bd-tag, :where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .wh-k.wh-k, :where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .tr-tag.tr-tag { border-color: transparent; background: var(--gl-grey-600); border-radius: 4px; }
+
+/* ---- the foot */
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) :is(.bd-foot, .st-foot, .tb-legend):is(.bd-foot, .st-foot, .tb-legend) { border-top-style: solid; border-top-color: var(--gl-hair); }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) :is(.bd-mode, .st-mode, .tb-mode, .tr-mode):is(.bd-mode, .st-mode, .tb-mode, .tr-mode) { font: 500 11.5px/1.3 var(--pl-font-mono); letter-spacing: 0.3px; color: var(--gl-text); }
+
+/* ---- splices: the banner on smoked glass, the tag a coral eyebrow */
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .sp-banner.sp-banner { background: var(--gl-smoke); border-color: var(--gl-hair); border-radius: 12px; box-shadow: var(--gl-shadow-glass); -webkit-backdrop-filter: blur(var(--gl-blur)) saturate(1.5); backdrop-filter: blur(var(--gl-blur)) saturate(1.5); }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .sp-tag.sp-tag { color: var(--pl-accent); background: var(--gl-coral-wash); box-shadow: inset 0 0 0 1px var(--gl-coral-line); border-radius: 999px; }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .sp-pop.sp-pop, :where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .st-about.st-about, :where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .bs-ask.bs-ask { background: var(--gl-smoke); border-color: var(--gl-hair); -webkit-backdrop-filter: blur(var(--gl-blur)) saturate(1.5); backdrop-filter: blur(var(--gl-blur)) saturate(1.5); }
+
+/* ---- tours */
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .tr-dot.tr-dot { border: 0; background: radial-gradient(circle closest-side, #434345 0 66%, transparent 74%); }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .tr-st.is-past .tr-dot.tr-dot { background: radial-gradient(circle closest-side, #9c9c9d 0 66%, transparent 74%); }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .tr-st.is-cur .tr-dot.tr-dot { background: radial-gradient(circle closest-side, #ff6363 0 66%, transparent 74%); }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .tr-stt.tr-stt { font: 500 13px/16px var(--pl-font); letter-spacing: 0.2px; color: var(--gl-text); }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .tr-st.is-cur .tr-stt.tr-stt { color: var(--pl-fg); }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .tr-marker.tr-marker { border: 1px solid var(--gl-coral-line); background: radial-gradient(circle closest-side, #ff6363 0 40%, rgba(255, 60, 60, 0.28) 46% 100%); box-shadow: 0 0 18px 2px rgba(255, 60, 60, 0.45); }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .tr-h.tr-h { font: 500 26px/1.2 var(--pl-font-display); letter-spacing: -0.6px; }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .tr-prose.tr-prose p { font-weight: 400; color: var(--gl-text); }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .tr-prose.tr-prose strong { color: var(--pl-fg); font-weight: 500; }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .tr-pre .ln.is-lit.is-lit { box-shadow: none; background: var(--gl-coral-wash); }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .tr-lang.tr-lang { font: 500 10.5px/1 var(--pl-font-mono); letter-spacing: 1.2px; color: var(--gl-text); padding: 4px 7px; border-radius: 4px; background: var(--gl-grey-600); }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .tr-fact.tr-fact { border-color: transparent; border-radius: 6px; background: var(--gl-grey-600); }
+
+/* ---- the legend: command chips with a colour tile; a pinned one glows coral */
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .lg-e.lg-e { font: 500 12.5px/1 var(--pl-font); letter-spacing: 0.2px; padding: 0 10px 0 7px; border-radius: 6px; border-color: transparent; background: var(--gl-grey-600); color: var(--pl-fg); }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .lg-e.lg-e b { color: var(--gl-text); font-weight: 500; }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .lg-e .lg-sw.lg-sw { width: 12px; height: 12px; border-radius: 3px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35); }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .lg-e.lg-e:hover, :where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .lg-e.lg-e.is-hover { background: #222326; }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .lg-e.lg-e.is-pinned { background: var(--gl-coral-wash); border-color: var(--gl-coral-line); color: var(--pl-accent); }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .lg-e.lg-e.is-pinned b { color: var(--pl-accent); }
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .lg-sep.lg-sep { background: var(--gl-grey-500); }
+
+/* ---- light leak (src/engine/glass.css): a card with a category leaks its colour, more as it lights; in fresh only when lit */
+@supports (color: color-mix(in srgb, red calc(10% * 0.5), blue)) {
+  :where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .mm-card[data-cat] { --gl-leak: var(--lg-c); --gl-leak-k: 1; background-image: var(--gl-leak-bg); }
+  :where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .mm-card .mm-kind.mm-kind, :where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .mm-card .mm-lang.mm-lang { color: var(--gl-text); }   /* in the card's light: kept AA */
+  :where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .mm-card[data-cat].is-lit { box-shadow: inset 0 1px 0 0 color-mix(in srgb, var(--lg-c) 30%, rgba(255, 255, 255, 0.12)), 0 0 20px 3px color-mix(in srgb, var(--lg-c) 9%, transparent), 0 0 40px 20px color-mix(in srgb, var(--lg-c) 4.5%, transparent); }
+}

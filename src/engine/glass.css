@@ -1,0 +1,175 @@
+/* The surfaces of the main themes, adenine (the default) and fresh (tokens: karyo.css, "the main themes"). Only the
+   material changes here: fills, hairlines, light, radius, type and the feel of controls. Nothing here sets a size that layout reads, except where noted.
+
+   Glass is drawn three ways, so it reads the same everywhere and degrades cleanly:
+   - over the fx canvas (chrome: buttons, menus, the key help card) a real backdrop blur, where the browser has one;
+   - on the board's cards a frosted fill that needs no backdrop (the board's soft-edged view is its own backdrop
+     root, so a blur there would see nothing), with a fading hairline and light from above;
+   - with no backdrop-filter, or with reduced transparency asked for, the same fills made opaque.
+   Renders stay deterministic: blur and gradients are pure functions of what is under them. */
+
+/* ------------------------------------------------------------ both */
+:root:is([data-plate-theme="adenine"], [data-plate-theme="fresh"]) .plate, .plate:is([data-plate-theme="adenine"], [data-plate-theme="fresh"]) {
+  -webkit-font-smoothing: antialiased;
+
+  & .plate-viewport { border-radius: min(var(--pl-radius), 16px); }
+  &.is-theater .plate-viewport, &.is-fill .plate-viewport { box-shadow: 0 0 0 1px var(--gl-hair); }
+
+  & .pl-card { border-radius: var(--pl-radius); }
+  & .pl-label { color: var(--gl-text); }
+  & .pl-code { border-radius: var(--pl-radius); }
+
+  /* the page buttons beside the plate (Theater, Bench) and the zoom control */
+  & .plate-btn { padding: 8px 12px; border-radius: 10px; font: 500 12px/1 var(--pl-font); letter-spacing: 0; text-transform: none; }
+  & .plate-zoom, & .plate-keys-hint { -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+
+  /* the key help card and the pinned inspector: menus */
+  & .plate-keys { background: color-mix(in srgb, var(--pl-bg) 55%, transparent); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+  & .plate-keys-title, & .plate-dock-title { font: 600 12px/1.2 var(--pl-font); letter-spacing: 0; text-transform: none; }
+  & .plate-keys-group h3 { font: 600 12px/1.2 var(--pl-font); letter-spacing: 0; text-transform: none; }
+}
+
+/* ------------------------------------------------------------ cards, at the lowest specificity
+   A card's surface comes from the theme, but every state rule a view writes (lit, dashed for an external card, dotted
+   for one not seen running, a proposed card's hatch) still wins over it, so these selectors weigh no more than .pl-card. */
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .pl-card {
+  border-color: var(--gl-hair);
+  background-color: #070708;
+  background-image: radial-gradient(70% 55% at 50% 0%, var(--gl-glow-top) 0%, transparent 100%), linear-gradient(180deg, rgba(14, 15, 16, 0.92) 0%, rgba(4, 4, 5, 0.95) 100%);
+  box-shadow: none;
+}
+:where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .pl-card.is-lit {
+  background-image: radial-gradient(80% 70% at 50% 0%, var(--gl-accent-wash) 0%, transparent 100%), linear-gradient(180deg, rgba(14, 15, 16, 0.92) 0%, rgba(4, 4, 5, 0.95) 100%);
+  box-shadow: 0 0 18px -4px rgba(112, 184, 255, 0.35);
+}
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .pl-card {
+  border-color: var(--gl-hair);
+  background-color: #0e0f11;
+  background-image: var(--gl-graphite);
+  box-shadow: inset 0 1px 0 0 var(--gl-highlight);
+}
+:where(:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"]) .pl-card.is-lit {
+  box-shadow: inset 0 1px 0 0 rgba(255, 190, 190, 0.2), 0 0 20px 3px rgba(255, 99, 99, 0.06), 0 0 40px 20px rgba(255, 99, 99, 0.03);
+}
+
+/* light leak (adenine): a card's own colour shows through its glass, and a haze of it around the card; lit, more of
+   both. --gl-leak is the colour (a view sets a category's; the accent blue otherwise), --gl-leak-k its strength at rest
+   (1 for a card with a category, 0.5 without), and --gl-lk how lit it is: a view that tweens its lighting sets --kx-lit
+   (0-1) on the card, so the light rises and falls with it; otherwise the lit class switches it. The strengths are two
+   tokens, --gl-leak-rest and --gl-leak-lit (karyo.css); boards, tours and scenes, with many cards side by side, take
+   0.8 of them. The fill and the haze are kept as --gl-leak-bg / --gl-leak-shadow for views whose own card rules weigh
+   more (src/model/glass.css). Fresh's cards keep their graphite. */
+@supports (color: color-mix(in srgb, red calc(10% * 0.5), blue)) {
+  :where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .pl-card {
+    --gl-lk: var(--kx-lit, 0);
+    --gl-leak-bg:
+      radial-gradient(85% 70% at 50% 0%, color-mix(in srgb, var(--gl-leak, #70b8ff) calc(0.8 * (var(--gl-leak-rest) * var(--gl-leak-k, 0.5) + var(--gl-leak-lit) * var(--gl-lk))), transparent) 0%, transparent 100%),
+      radial-gradient(70% 55% at 50% 0%, rgba(255, 255, 255, calc(0.06 * (1 - var(--gl-lk)))) 0%, transparent 100%),
+      linear-gradient(180deg, rgba(14, 15, 16, 0.92) 0%, rgba(4, 4, 5, 0.95) 100%);
+    --gl-leak-shadow:
+      0 0 12px -3px color-mix(in srgb, var(--gl-leak, #70b8ff) calc(var(--gl-leak-lit) * 1.6 * var(--gl-lk)), transparent),
+      0 0 11px 1px color-mix(in srgb, var(--gl-leak, #70b8ff) calc(0.8 * (var(--gl-leak-rest) * 0.37 * var(--gl-leak-k, 0.5) + var(--gl-leak-lit) * 0.6 * var(--gl-lk))), transparent),
+      0 0 26px 9px color-mix(in srgb, var(--gl-leak, #70b8ff) calc(0.8 * (var(--gl-leak-rest) * 0.19 * var(--gl-leak-k, 0.5) + var(--gl-leak-lit) * 0.3 * var(--gl-lk))), transparent);
+    background-image: var(--gl-leak-bg);
+    box-shadow: var(--gl-leak-shadow);
+  }
+  :where(:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"]) .pl-card.is-lit { --gl-lk: var(--kx-lit, 1); }
+}
+
+/* ------------------------------------------------------------ adenine */
+:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"] {
+  /* the board stage: the black canvas, light falling from the top edge */
+  & .plate-viewport, &.is-theater, &.is-fill {
+    background: radial-gradient(60% 46% at 50% 0%, rgba(140, 190, 255, 0.075) 0%, transparent 100%), var(--pl-bg);
+  }
+
+  & .pl-label { font: 500 12px/16px var(--pl-font); letter-spacing: 0; text-transform: none; color: var(--gl-faint); }
+  & .pl-title { font-weight: 400; letter-spacing: -0.03em; color: var(--gl-title); }
+  & .pl-h1 { font-family: var(--gl-serif); font-weight: 400; letter-spacing: -0.01em; }
+  & .pl-chip {
+    font: 500 13px/1 var(--pl-font); border-radius: 999px; border-color: var(--gl-hair-subtle);
+    background: var(--gl-field); color: var(--gl-text);
+  }
+  & .pl-chip.is-lit { background: var(--pl-accent); border-color: var(--pl-accent); color: #000; font-weight: 600; }
+  & .pl-code { background: rgba(10, 10, 11, 0.9); border-color: var(--gl-hair); color: var(--gl-code); }
+  & .pl-code .tok-k { color: var(--gl-text); }
+  & .pl-code .tok-s { color: var(--gl-secondary); }
+  & .pl-code .tok-c { color: var(--gl-faint); font-style: italic; }
+  & .pl-code .tok-v { color: var(--pl-fg); }
+  & .pl-code .ln.is-lit { background: var(--gl-accent-wash); }
+  & .pl-caret { background: var(--pl-accent); }
+
+  /* chrome over the canvas: glass controls, menus */
+  & .plate-btn { color: var(--gl-text); border-color: var(--gl-hair); background: transparent; }
+  & .plate-btn:hover { color: var(--pl-fg); background: var(--gl-hover); border-color: var(--gl-hair); }
+  & .plate-zoom, & .plate-keys-card, & .plate-dock {
+    background: var(--gl-menu); border-color: var(--gl-hair-soft); box-shadow: var(--gl-shadow-menu);
+    -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+  }
+  & .plate-keys-card, & .plate-dock { border-radius: 16px; }
+  & .plate-keys kbd { background: var(--gl-hover); border: 0; border-radius: 6px; color: var(--pl-fg); font: 500 12px/1.2 var(--pl-font); }
+  & .plate-keys-group h3 { color: var(--pl-fg); }
+  & .plate-keys-hint { background: var(--gl-field); border-radius: 999px; }
+  & .plate-viewport:focus-visible { box-shadow: 0 0 0 2px var(--pl-accent); }
+}
+
+/* ------------------------------------------------------------ fresh */
+:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"] {
+  letter-spacing: 0.2px;
+
+  /* the board stage: ink, a top-lit void (one warm light from above), the film grain comes from the fx layer */
+  & .plate-viewport, &.is-theater, &.is-fill {
+    background:
+      radial-gradient(50% 50% at 50% -20%, rgba(255, 99, 99, 0.08) 0%, rgba(255, 119, 119, 0.04) 50%, transparent 100%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 30%),
+      var(--pl-bg);
+  }
+
+  & .pl-label { font: 500 11.5px/1.4 var(--pl-font-mono); letter-spacing: 1.38px; text-transform: uppercase; color: var(--gl-text); }
+  & .pl-title { font-weight: 500; letter-spacing: 0.2px; }
+  & .pl-h1 { font-weight: 600; letter-spacing: -0.5px; }
+  & .pl-chip { font: 500 13px/1 var(--pl-font); border-radius: 6px; border-color: transparent; background: var(--gl-grey-600); color: var(--pl-fg); }
+  & .pl-chip.is-lit { background: var(--gl-coral-wash); border-color: var(--gl-coral-line); color: var(--pl-accent); }
+  & .pl-code { background: linear-gradient(137deg, var(--gl-raised-700), var(--gl-raised-800)); border-color: var(--gl-hair); box-shadow: var(--gl-shadow-window); color: var(--gl-code); }
+  & .pl-code .tok-k { color: var(--gl-sky); }
+  & .pl-code .tok-s { color: var(--pl-ok); }
+  & .pl-code .tok-c { color: var(--gl-text); font-style: italic; }
+  & .pl-code .tok-v { color: var(--pl-accent-2); }
+  & .pl-code .ln.is-lit { background: var(--gl-coral-wash); }
+
+  /* chrome over the canvas: smoked glass, ringed buttons, key caps */
+  & .plate-btn { color: var(--pl-fg); border: 0; background: linear-gradient(rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.1)); box-shadow: var(--gl-shadow-ringed); border-radius: 8px; }
+  & .plate-btn:hover { background: linear-gradient(rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.14)); }
+  & .plate-btn[aria-pressed="true"] { color: var(--pl-accent); box-shadow: var(--gl-shadow-ringed), 0 0 0 1px var(--gl-coral-line); }
+  & .plate-zoom, & .plate-keys-card, & .plate-dock {
+    background: var(--gl-smoke); border-color: var(--gl-hair); box-shadow: var(--gl-shadow-glass), var(--gl-shadow-window);
+    -webkit-backdrop-filter: blur(var(--gl-blur)) saturate(1.5); backdrop-filter: blur(var(--gl-blur)) saturate(1.5);
+  }
+  & .plate-keys-card, & .plate-dock { border-radius: 16px; }
+  & .plate-keys kbd { background: var(--gl-keycap); border: 0; box-shadow: var(--gl-shadow-keycap); border-radius: 6px; color: var(--gl-grey-50); font: 500 11px/1.3 var(--pl-font-mono); margin: 0 2px; }
+  & .plate-keys-group h3 { font: 500 11.5px/1.4 var(--pl-font-mono); letter-spacing: 1.38px; text-transform: uppercase; color: var(--pl-accent); }
+  & .plate-keys-hint { background: rgba(49, 49, 49, 0.1); border-radius: 999px; box-shadow: inset 0 0 0 1px var(--gl-selected); }
+  & .plate-viewport:focus-visible { box-shadow: 0 0 0 3px var(--gl-coral-line); }
+}
+
+/* ------------------------------------------------------------ no backdrop blur, or less transparency asked for:
+   the same surfaces, opaque */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"] {
+    & .plate-zoom, & .plate-keys-card, & .plate-dock { background: var(--gl-raised); }
+  }
+  :root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"] {
+    & .plate-zoom, & .plate-keys-card, & .plate-dock { background: linear-gradient(137deg, var(--gl-raised-700), var(--gl-raised-800)); }
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root:is([data-plate-theme="adenine"], [data-plate-theme="fresh"]) .plate, .plate:is([data-plate-theme="adenine"], [data-plate-theme="fresh"]) {
+    & .plate-zoom, & .plate-keys-card, & .plate-dock, & .plate-keys { -webkit-backdrop-filter: none; backdrop-filter: none; }
+  }
+  :root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"] {
+    & .plate-zoom, & .plate-keys-card, & .plate-dock { background: var(--gl-raised); }
+  }
+  :root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"] {
+    & .plate-zoom, & .plate-keys-card, & .plate-dock { background: linear-gradient(137deg, var(--gl-raised-700), var(--gl-raised-800)); }
+  }
+}

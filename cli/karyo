@@ -1,0 +1,44 @@
+#!/bin/sh
+# karyo: the Karyo CLI (cli/karyo.ts, a bun script). The plugin keeps it off PATH (a top-level bin/ would stop
+# claude.ai and Cowork installing the plugin), so its skills call it by path: "${CLAUDE_PLUGIN_ROOT}/cli/karyo" ….
+# `karyo --help` lists commands.
+self="$0"
+while [ -L "$self" ]; do # follow symlinks to this file, so a link on PATH still finds cli/karyo.ts
+  link=$(readlink "$self")
+  case "$link" in /*) self="$link" ;; *) self="$(dirname "$self")/$link" ;; esac
+done
+here=$(cd "$(dirname "$self")" && pwd -P)
+
+root=$(cd "$here/.." && pwd -P)
+. "$root/scripts/plugin/tools.sh"
+# A read-only plugin folder (Cowork mounts plugins read-only in its sandbox) can't hold Karyo's JS dependencies or
+# caches: run from a copy in Karyo's data dir instead, made once per version of the plugin's files (about 8 MB).
+if [ -z "${KARYO_FROM_COPY:-}" ] && [ ! -e "$root/node_modules" ] && [ ! -w "$root" ]; then
+  data=$(karyo_data_dir "$root")
+  sum=$(cd "$root" && find . -type f ! -path './.git/*' -exec cksum {} + 2>/dev/null | sort | cksum | cut -d' ' -f1)
+  copy="$data/plugin/$sum"
+  if [ ! -f "$copy/.karyo-copy" ]; then
+    echo "karyo: the plugin folder is read-only here: using a copy of it in $data/plugin (once)" >&2
+    rm -rf "$copy.tmp" && mkdir -p "$copy.tmp" && cp -R "$root/." "$copy.tmp/" && chmod -R u+w "$copy.tmp" \
+      && echo "$root" > "$copy.tmp/.karyo-copy" && rm -rf "$copy" && mv "$copy.tmp" "$copy" \
+      || { echo "karyo: couldn't copy the plugin into $data/plugin" >&2; exit 1; }
+  fi
+  KARYO_DATA="$data" KARYO_FROM_COPY="$root" exec "$copy/cli/karyo" "$@"
+fi
+
+# bun: installed, else a pinned copy Karyo fetches once into its data dir (scripts/plugin/tools.sh), so a fresh
+# machine (Claude Desktop, Cowork) needs no terminal step.
+bun=$(karyo_tool bun "$root")
+if [ -z "$bun" ]; then
+  echo "karyo: needs bun, which isn't installed and couldn't be set up automatically. Install it with:" >&2
+  echo "  curl -fsSL https://bun.sh/install | bash      (https://bun.sh)" >&2
+  exit 127
+fi
+# Karyo's own bun keeps its caches in Karyo's data dir too, so a fresh machine ends up with nothing outside it
+case "$bun" in
+  */tools/bun-*/bun) d=$(dirname "$(dirname "$(dirname "$bun")")")
+    export BUN_INSTALL_CACHE_DIR="${BUN_INSTALL_CACHE_DIR:-$d/bun-cache}" BUN_RUNTIME_TRANSPILER_CACHE_PATH="${BUN_RUNTIME_TRANSPILER_CACHE_PATH:-$d/bun-cache/transpiler}" ;;
+esac
+# Not the working directory's bunfig.toml or .env: karyo runs inside projects you may have just cloned, and bun would
+# otherwise load their preload scripts and environment (NODE_OPTIONS, KARYO_HOME …) into Karyo (docs/KITS.md).
+exec "$bun" --no-env-file --config=/dev/null "$here/karyo.ts" "$@"

@@ -1,0 +1,5 @@
+<div class="row{{#if frame}} pl-card framed{{/if}}">
+  {{#if label}}<span class="lbl">{{label}}</span>{{/if}}
+  <div class="sp" data-k-chart="sparkline"></div>
+  {{#has value}}<span class="val">{{prefix}}<span data-k-num="value" data-k-decimals="{{decimals}}" data-k-group="{{#if grouping}}true{{else}}false{{/if}}">{{value}}</span>{{#if unit}}<span class="unit">{{unit}}</span>{{/if}}</span>{{/has}}
+</div>

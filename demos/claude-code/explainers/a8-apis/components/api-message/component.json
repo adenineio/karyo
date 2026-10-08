@@ -1,0 +1,44 @@
+{
+  "name": "api-message",
+  "description": "One API message, request or reply: a status or address line, the fields as labelled boxes, and optionally the raw text (e.g. JSON) as it travels.",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": ["line", "fields"],
+    "additionalProperties": false,
+    "properties": {
+      "kicker": { "type": "string", "description": "small label on top, e.g. `Request · the order form`" },
+      "line": { "type": "string", "description": "the first line in mono: an address (`GET https://…`) or a status (`200 OK`)" },
+      "tone": { "enum": ["plain", "ok", "warn"], "default": "plain", "description": "colours the first line: ok for success, warn for an error" },
+      "fields": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 6,
+        "description": "the labelled boxes",
+        "items": {
+          "type": "object",
+          "required": ["k", "v"],
+          "additionalProperties": false,
+          "properties": {
+            "k": { "type": "string", "minLength": 1, "description": "the label" },
+            "v": { "type": "string", "description": "the value" },
+            "mark": { "type": "boolean", "description": "light this box" },
+            "wide": { "type": "boolean", "description": "the box takes a whole row" }
+          }
+        }
+      },
+      "raw": { "type": "string", "description": "the message as raw text, shown under the boxes in mono" },
+      "rawLabel": { "type": "string", "default": "as raw text", "description": "small label above the raw text" }
+    }
+  },
+  "size": { "w": 400 },
+  "motion": ["appear", "emphasize"],
+  "example": {
+    "kicker": "Reply · the labelled receipt",
+    "line": "200 OK",
+    "tone": "ok",
+    "fields": [{ "k": "city", "v": "Paris" }, { "k": "temp", "v": "21" }],
+    "raw": "{\"city\": \"Paris\", \"temp\": 21}",
+    "rawLabel": "as JSON"
+  }
+}

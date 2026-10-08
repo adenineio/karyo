@@ -1,0 +1,88 @@
+{
+  "name": "pipeline",
+  "description": "A pipeline drawn as an assembly line: stations left to right joined by pipes, each with its command, how many lines come out of it, and a short note on its job. The current station is lit.",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": [
+      "stations"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "title": {
+        "type": "string",
+        "description": "a small label above the line"
+      },
+      "stations": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 8,
+        "items": {
+          "type": "object",
+          "required": [
+            "cmd"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "cmd": {
+              "type": "string",
+              "minLength": 1,
+              "description": "the command at this station, e.g. `sort`"
+            },
+            "count": {
+              "type": "string",
+              "description": "what comes out, e.g. `917 lines`"
+            },
+            "note": {
+              "type": "string",
+              "description": "its job in a few words"
+            },
+            "state": {
+              "enum": [
+                "plain",
+                "now",
+                "dim",
+                "todo"
+              ],
+              "default": "plain",
+              "description": "now: the station this step is about; dim: not relevant now; todo: an empty slot for a station still to come (its text is hidden)"
+            }
+          }
+        }
+      }
+    }
+  },
+  "size": {
+    "w": 1080
+  },
+  "motion": [
+    "appear",
+    "emphasize"
+  ],
+  "example": {
+    "title": "The assembly line",
+    "stations": [
+      {
+        "cmd": "orders.csv",
+        "count": "9,001 lines",
+        "note": "the whole export"
+      },
+      {
+        "cmd": "grep \"Acme\"",
+        "count": "917 lines",
+        "note": "only Acme's orders",
+        "state": "now"
+      },
+      {
+        "cmd": "cut -d, -f3",
+        "count": "917 lines",
+        "note": "just the product",
+        "state": "dim"
+      },
+      {
+        "cmd": "sort",
+        "state": "todo"
+      }
+    ]
+  }
+}

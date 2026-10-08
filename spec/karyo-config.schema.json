@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://karyo.dev/schema/karyo-config-1.json",
+  "title": "Karyo project settings (karyo/config.json)",
+  "description": "Written by `karyo init` (docs/ADOPT.md \"Modes\"), committed with the project: how `karyo refresh` and `karyo record` read its Python code. Other keys are kept as they are.",
+  "type": "object",
+  "required": ["karyo", "mode"],
+  "properties": {
+    "karyo": { "const": "config/1" },
+    "mode": {
+      "enum": ["auto", "directives"],
+      "description": "auto: automatic mode, every class and public function a node with the static call graph, and `# karyo:` directives (or @karyo.node) refining the nodes of the defs they sit on. directives: only what directives declare."
+    },
+    "note": { "type": "string", "description": "What the modes mean, for a reader of the file." }
+  },
+  "additionalProperties": true
+}

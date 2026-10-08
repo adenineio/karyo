@@ -1,0 +1,17 @@
+.box { box-sizing: border-box; height: 100%; display: flex; flex-direction: column; gap: 7px; padding: 13px 16px; }
+.nm { font: 700 16px/1.25 var(--pl-font-mono); color: var(--pl-fg); overflow-wrap: anywhere; }
+.ds { font-size: 14px; line-height: 1.4; color: var(--pl-fg); }
+.ins { display: flex; flex-wrap: wrap; gap: 6px; }
+.in { font: 600 12.5px/1.2 var(--pl-font-mono); padding: 4px 8px; border-radius: 5px; border: 1px solid var(--pl-card-border); color: var(--pl-accent); background: color-mix(in srgb, var(--pl-accent) 7%, var(--pl-card)); }
+.api { margin-top: auto; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--pl-muted); }
+.dot { flex: none; width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--pl-muted); }
+.an { font-weight: 600; }
+.note { margin-left: auto; font: 700 12px/1.2 var(--pl-font); }
+.st-ok .dot { border-color: var(--pl-ok); background: var(--pl-ok); }
+.st-ok .note { color: var(--pl-ok); }
+.st-fail .dot { border-color: var(--pl-accent-2); background: var(--pl-accent-2); }
+.st-fail .note, .st-fail .an { color: var(--pl-accent-2); }
+.st-fail { border-color: color-mix(in srgb, var(--pl-accent-2) 60%, var(--pl-card-border)); }
+.k-outcome { border-width: 2px; border-color: color-mix(in srgb, var(--pl-accent) 55%, var(--pl-card-border)); background: color-mix(in srgb, var(--pl-accent) 6%, var(--pl-card)); }
+.k-outcome .nm { font-size: 18px; color: var(--pl-accent); }
+:host(.is-lit) .box { border-color: var(--pl-accent); }

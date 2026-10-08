@@ -1,0 +1,7 @@
+<div class="pl-card box">
+  <div class="bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="ttl">{{title}}</span>{{#if badge}}<span class="badge">{{badge}}</span>{{/if}}</div>
+  <div class="screen">
+    {{#each lines}}<div class="ln k-{{kind}}{{#if mark}} is-mark{{/if}}"><span class="pr">{{prompt}}</span><span class="tx">{{text}}</span></div>
+    {{/each}}
+  </div>
+</div>

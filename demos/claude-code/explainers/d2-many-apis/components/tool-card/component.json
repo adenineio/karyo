@@ -1,0 +1,31 @@
+{
+  "name": "tool-card",
+  "description": "One MCP tool as a card: what kind it is (thin or outcome), its name, what it does, the form Claude fills in, the API it calls, and how that call went (ok, failed, or not yet).",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": ["name"],
+    "additionalProperties": false,
+    "properties": {
+      "kicker": { "type": "string", "description": "small label above the name, e.g. `thin tool`" },
+      "name": { "type": "string", "minLength": 1, "description": "the tool's name, e.g. `get_account`" },
+      "description": { "type": "string", "description": "what it does, in plain words" },
+      "inputs": { "type": "array", "maxItems": 3, "items": { "type": "string" }, "description": "the filled-in form, one `field: value` per entry" },
+      "api": { "type": "string", "description": "the API it calls, e.g. `CRM API`" },
+      "kind": { "enum": ["thin", "outcome"], "default": "thin", "description": "outcome tools get a heavier frame" },
+      "state": { "enum": ["plain", "ok", "fail"], "default": "plain", "description": "how its API call went" },
+      "note": { "type": "string", "description": "a short status note, e.g. `timed out`" }
+    }
+  },
+  "size": { "w": 320 },
+  "motion": ["appear", "emphasize"],
+  "example": {
+    "kicker": "thin tool",
+    "name": "get_revenue",
+    "description": "Revenue for one account, month by month.",
+    "inputs": ["account: 4471", "months: 12"],
+    "api": "reporting API",
+    "state": "fail",
+    "note": "timed out"
+  }
+}

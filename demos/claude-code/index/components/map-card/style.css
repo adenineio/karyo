@@ -1,0 +1,9 @@
+.box { box-sizing: border-box; height: 100%; display: flex; flex-direction: column; gap: 6px; padding: 11px 14px 12px; }
+.code { font: 800 12px/1 var(--pl-font-mono); color: var(--pl-accent); letter-spacing: 0.04em; }
+.ttl { font: 700 16px/1.25 var(--pl-font-display); color: var(--pl-fg); }
+.aha { font-size: 13.5px; line-height: 1.4; color: color-mix(in srgb, var(--pl-fg) 82%, var(--pl-muted)); }
+.file { margin-top: auto; padding-top: 2px; align-self: flex-start; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 11.5px/1.2 var(--pl-font-mono); color: var(--pl-muted); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--pl-muted) 45%, transparent); text-underline-offset: 2px; }
+.is-compact { gap: 4px; padding: 9px 12px 10px; }
+.is-compact .ttl { font-size: 15px; }
+:host(.is-lit) .box { border-color: var(--pl-accent); }
+:host(.is-lit) .file { color: var(--pl-accent); }

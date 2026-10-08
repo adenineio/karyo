@@ -1,0 +1,471 @@
+/* The main themes, adenine (the default) and fresh, on an explainer (tokens: src/engine/karyo.css; engine surfaces:
+   src/engine/glass.css): its chrome (header, step rail, Play and arrows, narration, legend, foot), the built-in components' cards and the charts.
+   Material only: the DOM, the layout and the components' templates stay as they are. Sizes that the plate measures
+   (an element's box) may change with the type; nothing here moves the chrome's geometry. */
+
+/* ================================================================ adenine */
+:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"] {
+
+  /* ---- an element's card: a hairline that fades toward an open bottom, a frosted fill, light from above */
+  & .kx-el > .pl-card {
+    border: 1px solid transparent;
+    background:
+      radial-gradient(70% 55% at 50% 0%, var(--gl-glow-top) 0%, transparent 100%) padding-box,
+      linear-gradient(180deg, rgba(11, 12, 13, 0.9) 0%, rgba(3, 3, 4, 0.94) 100%) padding-box,
+      linear-gradient(180deg, var(--gl-hair) 0%, rgba(214, 235, 253, 0.1) 55%, rgba(214, 235, 253, 0.02) 100%) border-box;
+    box-shadow: none;
+  }
+  & .kx-el.is-lit > .pl-card {
+    background:
+      radial-gradient(80% 70% at 50% 0%, var(--gl-accent-wash) 0%, transparent 100%) padding-box,
+      linear-gradient(180deg, rgba(14, 15, 16, 0.92) 0%, rgba(3, 3, 4, 0.95) 100%) padding-box,
+      linear-gradient(180deg, var(--gl-accent-line) 0%, rgba(112, 184, 255, 0.14) 60%, rgba(112, 184, 255, 0.03) 100%) border-box;
+  }
+
+  /* ---- header: the one serif headline, a serial above it, the summary as a lead */
+  & .kx-head .pl-label { font: 400 12px/16px var(--pl-font-mono); letter-spacing: 1px; color: var(--gl-secondary); }
+  & .kx-head .pl-title {
+    font: 400 33px/1.08 var(--gl-serif); letter-spacing: -0.01em; padding-bottom: 0.08em;
+    background: linear-gradient(to right bottom, #fff 30%, rgba(255, 255, 255, 0.55)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  & .kx-sum { font-size: 15px; color: var(--gl-text); }
+  & .kx-sum code { font: 13px/1 var(--pl-font-mono); color: var(--pl-fg); }
+
+  /* ---- tools: Play is the glass action; the arrows are quiet framed keys; Reset is a ghost */
+  & .kx-btn {
+    height: 40px; padding: 0 18px; box-sizing: border-box; border-radius: 16px;
+    font: 600 14px/20px var(--pl-font); letter-spacing: 0; text-transform: none; color: #fff;
+    border: 2px solid var(--gl-glass-border);
+    background: linear-gradient(104deg, var(--gl-glass-from) 5%, var(--gl-glass-to) 100%) border-box;
+    -webkit-backdrop-filter: blur(var(--gl-blur)); backdrop-filter: blur(var(--gl-blur));
+    box-shadow: var(--gl-shadow-glass);
+  }
+  & .kx-btn:hover, & .kx-btn.is-on { border-color: var(--gl-glass-border); color: #fff; background: linear-gradient(104deg, var(--gl-glass-from-hover) 5%, var(--gl-glass-to-hover) 100%) border-box; }
+  & #kx-prev, & #kx-next {
+    width: 40px; min-width: 40px; padding: 0; border: 1px solid var(--gl-hair); border-radius: 12px; background: transparent;
+    -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; color: var(--gl-text); font: 400 22px/1 var(--pl-font);
+  }
+  & #kx-prev:hover, & #kx-next:hover { background: var(--gl-hover); color: var(--pl-fg); border-color: var(--gl-hair); }
+  & #kx-reset { background: transparent; border-color: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; color: var(--gl-text); font-weight: 500; }
+  & #kx-reset:hover { color: var(--pl-fg); }
+  & .kx-btn:focus-visible, & .kx-st:focus-visible, & .kx-el:focus-visible { outline: 2px solid var(--pl-accent); outline-offset: 2px; }
+
+  /* ---- step rail: a slider (the fx draws the track and the lit part); a white thumb with a soft halo */
+  & .kx-dot { border: 1px solid var(--gl-hair); background: #000; }
+  & .kx-st.is-past .kx-dot { border-color: var(--gl-faint); background: var(--gl-faint); }
+  & .kx-st.is-cur .kx-dot { border-color: var(--pl-accent); background: var(--pl-accent); }
+  & .kx-stt { font: 500 13px/16px var(--pl-font); color: var(--gl-text); }
+  & .kx-st.is-cur .kx-stt { color: var(--pl-accent); }
+  & .kx-marker { border: 0; background: radial-gradient(circle closest-side, #fff 0 34%, var(--pl-accent) 40% 58%, rgba(112, 184, 255, 0.2) 62% 96%, transparent 100%); }
+
+  /* ---- narration: a section frame (a top hairline with rounded shoulders, light from above) */
+  & .kx-narr {
+    box-sizing: border-box; border-top: 1px solid var(--gl-hair); border-radius: 24px 24px 0 0;
+    background: radial-gradient(60% 45% at 50% 0%, rgba(255, 255, 255, 0.07) 0%, transparent 100%);
+  }
+  & .kx-narr .kx-tx { left: 22px; right: 14px; top: 22px; }
+  & .kx-narr .pl-label { font: 400 12px/16px var(--pl-font-mono); letter-spacing: 1px; color: var(--gl-secondary); }
+  & .kx-h {
+    font: 400 28px/1.15 var(--pl-font-display); letter-spacing: -0.04em; padding-bottom: 0.08em;
+    background: linear-gradient(to right bottom, #fff 30%, rgba(255, 255, 255, 0.55)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  & .kx-prose p, & .kx-prose ul, & .kx-prose ol { color: var(--gl-text); }
+  & .kx-prose strong { color: var(--pl-fg); font-weight: 600; }
+  & .kx-prose code, & .kx-el :where(p code, li code, td code, dd code, .md code, .body code) {
+    font: 0.86em/1 var(--pl-font-mono); color: var(--pl-fg); background: var(--gl-hover); padding: 2px 5px; border-radius: 6px;
+  }
+  & .kx-prose a, & .kx-el :where(a) { color: var(--pl-accent); text-decoration: underline; text-decoration-color: var(--gl-accent-line); text-underline-offset: 3px; }
+  & .kx-prose mark, & .kx-el :where(mark) { background: var(--gl-accent-wash); color: var(--pl-fg); border-radius: 4px; }
+
+  /* ---- the board: groups as section frames, link labels as quiet pills, categories as a lit top edge */
+  & .kx-group { border-color: transparent; border-radius: 24px; background: radial-gradient(50% 40% at 50% 0%, rgba(255, 255, 255, 0.045) 0%, transparent 100%); }
+  & .kx-group::before {
+    content: ''; position: absolute; inset: -1.5px; border-radius: inherit; padding: 1px; pointer-events: none;
+    background: linear-gradient(180deg, var(--gl-hair) 0%, rgba(214, 235, 253, 0.08) 60%, transparent 100%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  }
+  & .kx-glabel { left: 18px; top: 11px; font: 500 12px/14px var(--pl-font); letter-spacing: 0; text-transform: none; color: var(--gl-faint); }
+  & .kx-llabel { font: 500 12px/1 var(--pl-font); padding: 5px 9px; background: #000; color: var(--gl-text); border-color: var(--gl-hair-soft); border-radius: 999px; }
+  & .kx-llabel.is-lit { color: var(--pl-accent); border-color: var(--gl-accent-line); }
+  & .kx-el[data-cat]::before {
+    left: 16px; right: 16px; top: 0; bottom: auto; width: auto; height: 1px; border-radius: 1px;
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--lg-c) 85%, transparent) 30%, color-mix(in srgb, var(--lg-c) 85%, transparent) 70%, transparent);
+    opacity: calc(0.75 + 0.25 * var(--kx-lit, 0));
+  }
+  & .kx-el[data-cat] > .pl-card {
+    background:
+      radial-gradient(70% 55% at 50% 0%, color-mix(in srgb, var(--lg-c) 13%, transparent) 0%, transparent 100%) padding-box,
+      linear-gradient(180deg, rgba(11, 12, 13, 0.9) 0%, rgba(3, 3, 4, 0.94) 100%) padding-box,
+      linear-gradient(180deg, color-mix(in srgb, var(--lg-c) 40%, transparent) 0%, rgba(214, 235, 253, 0.1) 55%, rgba(214, 235, 253, 0.02) 100%) border-box;
+  }
+  & .kx-el[data-cat].is-lit > .pl-card {
+    background:
+      radial-gradient(80% 70% at 50% 0%, var(--gl-accent-wash) 0%, transparent 100%) padding-box,
+      linear-gradient(180deg, rgba(14, 15, 16, 0.92) 0%, rgba(3, 3, 4, 0.95) 100%) padding-box,
+      linear-gradient(180deg, var(--gl-accent-line) 0%, rgba(112, 184, 255, 0.14) 60%, rgba(112, 184, 255, 0.03) 100%) border-box;
+  }
+
+  /* ---- light leak: each card's own colour shows through its glass: its category's colour; a chart's, its first
+     series' colour (data-leak, the series' slot); the accent blue for a card with neither. Lit, the light grows with the
+     element's lighting (--kx-lit, set by the scene through the transition), so it rises and falls with the step instead
+     of switching. A callout leaks its tone. */
+  @supports (color: color-mix(in srgb, red calc(10% * 0.5), blue)) {
+    & .kx-el { --gl-leak: var(--pl-accent); --gl-leak-k: 0.5; }
+    & .kx-el[data-leak] { --gl-leak: var(--pl-cat-other); --gl-leak-k: 1; }
+    & .kx-el[data-leak="1"] { --gl-leak: var(--pl-cat-1); } & .kx-el[data-leak="2"] { --gl-leak: var(--pl-cat-2); }
+    & .kx-el[data-leak="3"] { --gl-leak: var(--pl-cat-3); } & .kx-el[data-leak="4"] { --gl-leak: var(--pl-cat-4); }
+    & .kx-el[data-leak="5"] { --gl-leak: var(--pl-cat-5); } & .kx-el[data-leak="6"] { --gl-leak: var(--pl-cat-6); }
+    & .kx-el[data-leak="7"] { --gl-leak: var(--pl-cat-7); } & .kx-el[data-leak="8"] { --gl-leak: var(--pl-cat-8); }
+    & .kx-el[data-cat] { --gl-leak: var(--lg-c); --gl-leak-k: 1; }
+    & .kx-el:has(> .tone-warn) { --gl-leak: var(--pl-accent-2); }
+    & .kx-el:has(> .tone-ok) { --gl-leak: var(--pl-ok); }
+    & .kx-el:not(.kc-callout, .kc-quote) > .pl-card, & .kx-el[data-cat]:not(.kc-callout, .kc-quote) > .pl-card {
+      --gl-lk: var(--kx-lit, 0);
+      background:
+        radial-gradient(85% 70% at 50% 0%, color-mix(in srgb, var(--gl-leak) calc(var(--gl-leak-rest) * var(--gl-leak-k) + var(--gl-leak-lit) * var(--gl-lk)), transparent) 0%, transparent 100%) padding-box,
+        radial-gradient(70% 55% at 50% 0%, rgba(255, 255, 255, calc((0.06 * (1 - var(--gl-leak-k)) + 0.03) * (1 - var(--gl-lk)))) 0%, transparent 100%) padding-box,
+        linear-gradient(180deg, rgba(11, 12, 13, 0.9) 0%, rgba(3, 3, 4, 0.94) 100%) padding-box,
+        linear-gradient(180deg, color-mix(in srgb, var(--gl-leak) calc(var(--gl-leak-rest) * 1.6 * var(--gl-leak-k) + var(--gl-leak-lit) * 1.6 * var(--gl-lk)), rgba(214, 235, 253, 0.16)) 0%, rgba(214, 235, 253, 0.1) 55%, rgba(214, 235, 253, 0.02) 100%) border-box;
+      box-shadow:
+        0 0 12px -3px color-mix(in srgb, var(--gl-leak) calc(var(--gl-leak-lit) * 1.6 * var(--gl-lk)), transparent),
+        0 0 11px 1px color-mix(in srgb, var(--gl-leak) calc(var(--gl-leak-rest) * 0.37 * var(--gl-leak-k) + var(--gl-leak-lit) * 0.6 * var(--gl-lk)), transparent),
+        0 0 26px 9px color-mix(in srgb, var(--gl-leak) calc(var(--gl-leak-rest) * 0.19 * var(--gl-leak-k) + var(--gl-leak-lit) * 0.3 * var(--gl-lk)), transparent);
+    }
+    /* a card's caption sits in its light: the reading grey keeps it AA there */
+    & .kx-el .pl-label { color: var(--gl-text); }
+    /* callouts and quotes keep their own fills; only their light leaks */
+    & :is(.kc-callout, .kc-quote) > .pl-card {
+      box-shadow:
+        0 0 11px 1px color-mix(in srgb, var(--gl-leak) calc(var(--gl-leak-rest) * 0.37 * var(--gl-leak-k) + var(--gl-leak-lit) * 0.6 * var(--kx-lit, 0)), transparent),
+        0 0 26px 9px color-mix(in srgb, var(--gl-leak) calc(var(--gl-leak-rest) * 0.19 * var(--gl-leak-k) + var(--gl-leak-lit) * 0.3 * var(--kx-lit, 0)), transparent);
+    }
+    /* the narration is chrome: the accent blue leaks through its frame */
+    & .kx-narr {
+      border-top-color: rgba(150, 200, 255, 0.3);
+      background:
+        radial-gradient(60% 45% at 50% 0%, rgba(112, 184, 255, 0.1) 0%, transparent 100%),
+        radial-gradient(40% 30% at 50% 0%, rgba(255, 255, 255, 0.04) 0%, transparent 100%);
+    }
+  }
+
+  /* ---- legend: src/model/glass.css (shared with the boards) */
+
+  /* ---- foot */
+  & .kx-mode { font: 400 12px/1.2 var(--pl-font-mono); letter-spacing: 0.3px; color: var(--gl-faint); }
+  & .kx-note { color: var(--gl-faint); }
+
+  /* ---- components */
+  & .kc-card .icon { width: auto; min-width: 30px; height: 30px; padding: 0 6px; box-sizing: border-box; border-radius: 9px; border: 1px solid var(--gl-hair); background: transparent; color: var(--pl-fg); font-size: 15px; }
+  & .kc-card .body, & .kc-callout .md, & .kc-list :is(ul, ol) { color: var(--gl-text); }
+  & .kc-card .body strong, & .kc-callout .md strong { color: var(--pl-fg); }
+
+  & .kc-metric .num { font: 400 38px/1.05 var(--pl-font); letter-spacing: -0.025em; }
+  & .kc-metric :is(.pre, .unit) { font-weight: 400; color: var(--gl-text); }
+  & .kc-metric .delta { align-self: flex-start; font: 500 12px/16px var(--pl-font); padding: 3px 8px; border-radius: 10px; background: var(--gl-hover); color: var(--gl-text); }
+  & .kc-metric .delta.tone-up { background: var(--gl-ok-bg); color: var(--gl-ok-fg); }
+  & .kc-metric .delta.tone-down { background: var(--gl-warn-bg); color: var(--gl-warn-fg); }
+
+  & .kc-bar .lbl { color: var(--gl-text); }
+  & .kc-bar .val { font: 500 13.5px/1.3 var(--pl-font-mono); color: var(--pl-fg); }
+  & .kc-bar .track { height: 6px; border-radius: 999px; background: var(--gl-hover); overflow: visible; }
+  & .kc-bar .fill { background: linear-gradient(90deg, rgba(112, 184, 255, 0.5), var(--pl-accent)); box-shadow: 0 0 12px rgba(112, 184, 255, 0.4); }
+  & .kc-bar .tone-ok .fill { background: var(--gl-ok-fg); box-shadow: 0 0 12px rgba(70, 254, 165, 0.3); }
+  & .kc-bar .tone-warn .fill { background: var(--gl-warn-fg); box-shadow: 0 0 12px rgba(255, 202, 22, 0.25); }
+  & .kc-bar .tone-muted .fill { background: var(--gl-faint); box-shadow: none; }
+
+  & .kc-callout .mark { display: none; }
+  & .kc-callout .box { padding: 16px 20px; }
+  & .kc-callout .t { font: 400 17px/1.3 var(--pl-font-display); letter-spacing: -0.02em; color: var(--gl-title); }
+  & .kc-callout .tone-note { background: linear-gradient(var(--gl-wash) 0%, transparent 70%) padding-box, linear-gradient(180deg, rgba(14, 15, 16, 0.92), rgba(6, 6, 7, 0.94)) padding-box, linear-gradient(180deg, var(--gl-hair), rgba(214, 235, 253, 0.03)) border-box; }
+  & .kc-callout .tone-warn { background: linear-gradient(var(--gl-warn-bg), transparent 85%) padding-box, linear-gradient(180deg, #0f0d06, #070604) padding-box, linear-gradient(180deg, rgba(255, 202, 22, 0.4), rgba(255, 202, 22, 0.05)) border-box; }
+  & .kc-callout .tone-warn .t { color: var(--gl-warn-fg); }
+  & .kc-callout .tone-ok { background: linear-gradient(var(--gl-ok-bg), transparent 85%) padding-box, linear-gradient(180deg, #06100b, #040705) padding-box, linear-gradient(180deg, rgba(70, 254, 165, 0.35), rgba(70, 254, 165, 0.04)) border-box; }
+  & .kc-callout .tone-ok .t { color: var(--gl-ok-fg); }
+
+  & .kc-chip .tone-accent { background: var(--pl-accent); border-color: var(--pl-accent); color: #000; font-weight: 600; }
+  & .kc-chip .tone-warn { background: var(--gl-warn-bg); border-color: transparent; color: var(--gl-warn-fg); border-radius: 10px; }
+  & .kc-chip .tone-ok { background: var(--gl-ok-bg); border-color: transparent; color: var(--gl-ok-fg); border-radius: 10px; }
+  & .kc-chip.is-lit .chip { background: var(--pl-accent); border-color: var(--pl-accent); color: #000; }
+
+  & .kc-code .box { border-radius: 16px; }
+  & .kc-code .head { padding: 12px 18px; border-bottom-color: var(--gl-hair-soft); font: 400 13px/1 var(--pl-font-mono); color: var(--gl-text); }
+  & .kc-code .lang { font: 400 12px/1 var(--pl-font); letter-spacing: 0; text-transform: none; color: var(--pl-fg); padding: 5px 9px; border: 1px solid var(--gl-hair); border-radius: 8px; background: rgba(217, 237, 254, 0.06); }
+  & .kc-code .src .no { color: #52595b; opacity: 1; }
+  & .kc-code .src .ln.is-lit { box-shadow: none; background: var(--gl-accent-wash); }
+  & .kc-code .src .ln.is-lit .no { color: var(--pl-accent); }
+
+  & .kc-table table { border-collapse: separate; border-spacing: 0; }
+  & .kc-table th { font: 600 12px/1.2 var(--pl-font); letter-spacing: 0; text-transform: none; color: var(--gl-text); background: var(--gl-panel); border-top: 1px solid var(--gl-hair); border-bottom: 1px solid var(--gl-hair); }
+  & .kc-table th:first-child { border-left: 1px solid var(--gl-hair); border-radius: 8px 0 0 8px; }
+  & .kc-table th:last-child { border-right: 1px solid var(--gl-hair); border-radius: 0 8px 8px 0; }
+  & .kc-table td { border-bottom-color: var(--gl-hair-subtle); }
+  & .kc-table .cap { color: var(--gl-faint); }
+
+  & .kc-quote .box {
+    padding: 18px 22px 20px; border: 1px solid var(--gl-hair-soft); border-bottom-color: transparent; border-radius: 16px;
+    background: linear-gradient(var(--gl-wash) 0%, transparent 70%);
+  }
+  & .kc-quote .q {
+    font: 400 22px/1.3 var(--pl-font-display); letter-spacing: -0.03em;
+    background: linear-gradient(to right bottom, #fff 30%, rgba(255, 255, 255, 0.6)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  & .kc-quote.is-lit .box { border-color: var(--gl-accent-line); border-bottom-color: transparent; }
+  & .kc-quote .cite { color: var(--gl-text); }
+
+  & .kc-text .size-sm { color: var(--gl-faint); }
+  & .kc-text :is(.size-lg, .size-xl) { font-weight: 400; letter-spacing: -0.04em; }
+  & .kc-text .size-xl {
+    font-family: var(--gl-serif); letter-spacing: -0.01em; padding-bottom: 0.08em;
+    background: linear-gradient(to right bottom, #fff 30%, rgba(255, 255, 255, 0.55)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  & .kc-list li::marker { color: var(--gl-faint); }
+  & .kc-kv dt { color: var(--gl-text); }
+  & .kc-kv dd { font-weight: 500; }
+  & :is(.kc-figure, .kc-image) img { border-radius: 10px; }
+  & :is(.kc-figure, .kc-image) figcaption { color: var(--gl-faint); }
+  & .kc-sparkline .lbl, & .kc-sparkline .unit { color: var(--gl-text); }
+  & .kc-sparkline .val { font-weight: 500; }
+  & :is(.kc-bars, .kc-line, .kc-donut) .ttl { font: 400 16px/1.25 var(--pl-font-display); letter-spacing: -0.02em; color: var(--gl-title); }
+  & :is(.kc-bars, .kc-line, .kc-donut) .cap { color: var(--gl-faint); }
+
+  /* ---- charts: hairline grid, light on the lines, a frosted tooltip */
+  & .kch-g { stroke: rgba(221, 234, 248, 0.1); stroke-opacity: 1; }
+  & .kch-base { stroke: var(--gl-hair); stroke-opacity: 1; }
+  & :is(.kch-tk, .kch-ax, .kch-note) { fill: var(--gl-faint); }
+  & .kch-lg { fill: var(--gl-text); }
+  & :is(.kch-val, .kch-cl, .kch-hx) { font-weight: 500; }
+  & .kch-big { font-weight: 400; letter-spacing: -0.03em; }
+  & .kch-line { stroke-width: 1.75; filter: drop-shadow(0 0 3px color-mix(in srgb, var(--c) 55%, transparent)); }
+  & .kch-area { fill-opacity: 0.1; }
+  & .kch-ref { stroke-opacity: 0.4; }
+  & .kch-col { fill: var(--pl-accent); fill-opacity: 0.1; }
+  & .kch-box { fill: var(--gl-raised); stroke: var(--gl-hair); stroke-width: 1; }
+  & .kch-tip {
+    padding: 8px 11px; border-radius: 12px; background: var(--gl-menu); border-color: var(--gl-hair-soft); box-shadow: var(--gl-shadow-menu);
+    -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); font: 12.5px/1.4 var(--pl-font);
+  }
+  & .kch-tip b { font: 600 12px/1.3 var(--pl-font); letter-spacing: 0; color: var(--gl-text); }
+}
+
+/* ================================================================ fresh */
+:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"] {
+
+  /* ---- an element's card: graphite lit from the top left; lit, an ember haze around it */
+  & .kx-el > .pl-card { background: var(--gl-graphite); border-color: var(--gl-hair); box-shadow: inset 0 1px 0 0 var(--gl-highlight); }
+  & .kx-el.is-lit > .pl-card {
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 1px 0 0 rgba(255, 190, 190, 0.2), 0 0 20px 3px rgba(255, 99, 99, 0.06), 0 0 40px 20px rgba(255, 99, 99, 0.03);
+  }
+
+  /* ---- header: a coral eyebrow over a chrome-text title */
+  & .kx-head .pl-label { color: var(--pl-accent); }
+  & .kx-head .pl-title {
+    font: 600 30px/1.1 var(--pl-font-display); letter-spacing: -0.5px; padding-bottom: 0.06em;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.8), #fff 50%, rgba(255, 255, 255, 0.81)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  & .kx-sum { font-size: 15px; color: var(--gl-text); }
+  & .kx-sum code { font: 13px/1 var(--pl-font-mono); color: var(--pl-fg); }
+
+  /* ---- tools: a smoked-glass bar; Play is porcelain with its key; the arrows are ringed */
+  & .kx-tools:has(> :not([hidden])) {
+    margin: -5px; padding: 5px; gap: 6px; border-radius: 14px; border: 1px solid var(--gl-hair);
+    background: var(--gl-smoke); box-shadow: var(--gl-shadow-glass);
+    -webkit-backdrop-filter: blur(var(--gl-blur)) saturate(1.5); backdrop-filter: blur(var(--gl-blur)) saturate(1.5);
+  }
+  & .kx-btn {
+    height: 32px; padding: 0 12px; box-sizing: border-box; border: 0; border-radius: 8px;
+    font: 500 13px/1 var(--pl-font); letter-spacing: 0.2px; text-transform: none; color: var(--pl-fg);
+    background: linear-gradient(rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.1)); box-shadow: var(--gl-shadow-ringed);
+  }
+  & .kx-btn:hover { background: linear-gradient(rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.14)); }
+  & #kx-play { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: var(--gl-grey-50); color: var(--gl-grey-500); box-shadow: var(--gl-shadow-porcelain); font-weight: 600; }
+  & #kx-play::after {
+    content: 'P'; display: inline-grid; place-items: center; min-width: 17px; height: 17px; padding: 0 3px; box-sizing: border-box; border-radius: 4px;
+    font: 500 10.5px/1 var(--pl-font-mono); color: var(--gl-grey-500); background: rgba(0, 0, 0, 0.07); box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.3);
+  }
+  & #kx-play:hover { background: #f2f2f2; }
+  & #kx-play.is-on { background: #cdcece; color: var(--gl-grey-500); }
+  & #kx-prev, & #kx-next { width: 32px; min-width: 32px; padding: 0; font: 400 18px/1 var(--pl-font); }
+  & #kx-reset { background: transparent; box-shadow: none; color: var(--gl-text); }
+  & #kx-reset:hover { background: var(--gl-hover); color: var(--pl-fg); }
+  & .kx-btn:focus-visible, & .kx-st:focus-visible, & .kx-el:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--gl-coral-line); }
+  & #kx-play:focus-visible { box-shadow: var(--gl-shadow-porcelain), 0 0 0 4px var(--gl-coral-line); }
+
+  /* ---- step rail: graphite studs, the current one an ember */
+  & .kx-dot { border: 0; background: radial-gradient(circle closest-side, #434345 0 66%, transparent 74%); }
+  & .kx-st.is-past .kx-dot { background: radial-gradient(circle closest-side, #9c9c9d 0 66%, transparent 74%); }
+  & .kx-st.is-cur .kx-dot { background: radial-gradient(circle closest-side, #ff6363 0 66%, transparent 74%); }
+  & .kx-stt { font: 500 13px/16px var(--pl-font); letter-spacing: 0.2px; color: var(--gl-text); }
+  & .kx-st.is-cur .kx-stt { color: var(--pl-fg); }
+  & .kx-marker {
+    border: 1px solid var(--gl-coral-line);
+    background: radial-gradient(circle closest-side, #ff6363 0 40%, rgba(255, 60, 60, 0.28) 46% 100%);
+    box-shadow: 0 0 18px 2px rgba(255, 60, 60, 0.45);
+  }
+
+  /* ---- narration: chrome, so it floats on smoked glass over the lit canvas */
+  & .kx-narr {
+    box-sizing: border-box; border-radius: 16px;
+    background: linear-gradient(180deg, rgba(17, 18, 20, 0.72) 0%, rgba(12, 13, 15, 0.42) 32%, transparent 70%);
+    -webkit-backdrop-filter: blur(var(--gl-blur)) saturate(1.5); backdrop-filter: blur(var(--gl-blur)) saturate(1.5);
+  }
+  /* its edge is light that fades downward (the gradient edge), not a box */
+  & .kx-narr::before {
+    content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.06) 22%, transparent 55%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  }
+  & .kx-narr .kx-tx { left: 22px; right: 20px; top: 20px; }
+  & .kx-narr .pl-label { color: var(--pl-accent); }
+  & .kx-h { font: 500 26px/1.2 var(--pl-font-display); letter-spacing: -0.6px; color: var(--pl-fg); }
+  & .kx-prose p, & .kx-prose ul, & .kx-prose ol { font-weight: 400; color: var(--gl-text); }
+  & .kx-prose strong { color: var(--pl-fg); font-weight: 500; }
+  & .kx-prose code, & .kx-el :where(p code, li code, td code, dd code, .md code, .body code) {
+    font: 0.86em/1 var(--pl-font-mono); color: var(--pl-fg); background: var(--gl-grey-600); padding: 2px 5px; border-radius: 4px;
+  }
+  & .kx-prose a, & .kx-el :where(a) { color: var(--pl-ok); }
+  & .kx-prose mark, & .kx-el :where(mark) { background: var(--gl-coral-wash); color: var(--pl-fg); border-radius: 4px; }
+
+  /* ---- the board: groups in a gradient edge, link labels as mono tags, categories tint their cards */
+  & .kx-group { border-color: transparent; border-radius: 20px; }
+  & .kx-group::before {
+    content: ''; position: absolute; inset: -1.5px; border-radius: inherit; padding: 1px; pointer-events: none;
+    background: linear-gradient(150deg, rgba(255, 255, 255, 0.23), rgba(255, 255, 255, 0.05));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  }
+  & .kx-glabel { left: 18px; top: 11px; font: 500 11px/14px var(--pl-font-mono); letter-spacing: 1.3px; color: var(--gl-text); }
+  & .kx-llabel { font: 500 11.5px/1 var(--pl-font-mono); padding: 5px 8px; background: var(--gl-grey-800); color: var(--gl-text); border-color: var(--gl-hair); border-radius: 999px; }
+  & .kx-llabel.is-lit { color: var(--pl-accent); border-color: var(--gl-coral-line); }
+  & .kx-el[data-cat]::before { left: auto; right: 11px; top: 11px; bottom: auto; width: 6px; height: 6px; border-radius: 50%; z-index: 1; box-shadow: 0 0 8px var(--lg-c); }
+  & .kx-el[data-cat] > .pl-card { background: radial-gradient(100% 80% at 50% 0%, color-mix(in srgb, var(--lg-c) 13%, transparent) 0%, transparent 70%), var(--gl-graphite); }
+  /* lit, a card with a category leaks its own colour (the coral ring still marks it lit) */
+  & .kx-el[data-cat].is-lit > .pl-card {
+    box-shadow: inset 0 1px 0 0 color-mix(in srgb, var(--lg-c) 30%, rgba(255, 255, 255, 0.12)), 0 0 20px 3px color-mix(in srgb, var(--lg-c) 9%, transparent), 0 0 40px 20px color-mix(in srgb, var(--lg-c) 4.5%, transparent);
+  }
+
+  /* ---- legend: src/model/glass.css */
+
+  /* ---- foot: mono meta */
+  & .kx-mode { font: 500 11.5px/1.2 var(--pl-font-mono); letter-spacing: 0.3px; color: var(--gl-text); }
+  & .kx-note { color: var(--gl-text); }
+
+  /* ---- components. Lit text stays white: the coral is the light around it (its outline and ember), not a fill */
+  & .kx-el.is-lit :is(.pl-title, .v, .val, .md, .q) { color: var(--pl-fg); }
+  & .kc-card .icon {
+    width: auto; min-width: 30px; height: 30px; padding: 0 6px; box-sizing: border-box; border-radius: 8px; color: #ffd0d0; font-size: 14px;
+    background: radial-gradient(75% 75% at 50% 90%, #3a0e10, #150607); box-shadow: inset 0 1px 1px rgba(255, 150, 150, 0.45), 0 0 12px rgba(255, 60, 60, 0.4);
+  }
+  & .kc-card .body, & .kc-list :is(ul, ol) { font-weight: 400; color: var(--gl-text); }
+  & .kc-card .body strong { color: var(--pl-fg); font-weight: 500; }
+
+  & .kc-metric .num { font: 500 36px/1.08 var(--pl-font-mono); letter-spacing: -1px; }
+  & .kc-metric :is(.pre, .unit) { font: 500 20px/1 var(--pl-font-mono); color: var(--gl-text); }
+  & .kc-metric .delta { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; font: 500 12px/1 var(--pl-font-mono); padding: 5px 9px; border-radius: 999px; background: var(--gl-hover); color: var(--gl-text); }
+  & .kc-metric .delta::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  & .kc-metric .delta.tone-up { background: var(--gl-mint-wash); color: var(--pl-ok); }
+  & .kc-metric .delta.tone-down { background: var(--gl-amber-wash); color: var(--pl-accent-2); }
+
+  & .kc-bar .lbl { color: var(--gl-text); }
+  & .kc-bar .val { font: 500 13.5px/1.3 var(--pl-font-mono); color: var(--pl-fg); }
+  & .kc-bar .track { height: 8px; border-radius: 999px; background: var(--gl-grey-800); box-shadow: inset 0 0 0 1px var(--gl-hair); overflow: visible; }
+  & .kc-bar .fill { background: linear-gradient(90deg, rgba(255, 99, 99, 0.5), #ff6363); box-shadow: 0 0 12px rgba(255, 60, 60, 0.45); }
+  & .kc-bar .tone-ok .fill { background: linear-gradient(90deg, rgba(89, 212, 153, 0.5), #59d499); box-shadow: 0 0 12px rgba(89, 212, 153, 0.35); }
+  & .kc-bar .tone-warn .fill { background: linear-gradient(90deg, rgba(255, 197, 51, 0.5), #ffc533); box-shadow: 0 0 12px rgba(255, 197, 51, 0.3); }
+  & .kc-bar .tone-muted .fill { background: #434345; box-shadow: none; }
+
+  /* callouts are tinted cards: the colour of their subject, lit from inside, with a haze */
+  & .kc-callout .box { border-radius: 20px; border-color: transparent; box-shadow: var(--gl-shadow-tinted), 0 0 20px 3px rgba(32, 35, 91, 0.1), 0 0 40px 20px rgba(32, 35, 91, 0.05); }
+  & .kc-callout .tone-note { background: linear-gradient(138deg, rgba(32, 35, 91, 0.7) 22%, rgba(7, 9, 33, 0.7) 82%), var(--pl-bg); }
+  & .kc-callout .tone-warn { background: radial-gradient(100% 100% at 50% 0%, rgba(74, 21, 75, 0.7), rgba(29, 5, 29, 0.42)), var(--pl-bg); box-shadow: var(--gl-shadow-tinted), 0 0 20px 3px rgba(74, 21, 75, 0.1), 0 0 40px 20px rgba(74, 21, 75, 0.05); }
+  & .kc-callout .tone-ok { background: radial-gradient(90% 90% at 50% 10%, rgba(13, 110, 48, 0.6), rgba(8, 53, 24, 0.4)), var(--pl-bg); box-shadow: var(--gl-shadow-tinted), 0 0 20px 3px rgba(13, 110, 48, 0.1), 0 0 40px 20px rgba(13, 110, 48, 0.05); }
+  & .kc-callout .mark { align-self: flex-start; width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--gl-sky); box-shadow: 0 0 10px var(--gl-sky); }
+  & .kc-callout .tone-warn .mark { background: var(--pl-accent-2); box-shadow: 0 0 10px var(--pl-accent-2); }
+  & .kc-callout .tone-ok .mark { background: var(--pl-ok); box-shadow: 0 0 10px var(--pl-ok); }
+  & .kc-callout .t { font: 500 17px/1.3 var(--pl-font); color: #fff; }
+  & .kc-callout .tone-warn .t { color: #fff; }
+  & .kc-callout .md { font-weight: 400; color: rgba(255, 255, 255, 0.72); }
+  & .kc-callout.is-lit .box { border-color: var(--gl-coral-line); }
+
+  & .kc-chip .tone-accent, & .kc-chip .tone-ok, & .kc-chip .tone-warn { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; border-color: transparent; }
+  & .kc-chip :is(.tone-accent, .tone-ok, .tone-warn)::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  & .kc-chip .tone-accent { background: var(--gl-coral-wash); color: var(--pl-accent); }
+  & .kc-chip .tone-ok { background: var(--gl-mint-wash); color: var(--pl-ok); }
+  & .kc-chip .tone-warn { background: var(--gl-amber-wash); color: var(--pl-accent-2); }
+  & .kc-chip.is-lit .chip { background: var(--gl-coral-wash); border-color: var(--gl-coral-line); color: var(--pl-accent); }
+
+  & .kc-code .box { border-radius: 16px; background: linear-gradient(137deg, var(--gl-raised-700), var(--gl-raised-800)); box-shadow: var(--gl-shadow-window), inset 0 1px 0 var(--gl-highlight); }
+  & .kc-code .head { padding: 11px 16px; border-bottom-color: var(--gl-hair); background: rgba(255, 255, 255, 0.02); font: 500 12.5px/1 var(--pl-font-mono); color: var(--gl-text); }
+  & .kc-code .lang { font: 500 10.5px/1 var(--pl-font-mono); letter-spacing: 1.2px; color: var(--gl-text); padding: 4px 7px; border-radius: 4px; background: var(--gl-grey-600); }
+  & .kc-code .src.pl-code { box-shadow: none; background: transparent; }
+  & .kc-code .src .no { color: var(--gl-dim); opacity: 1; }
+  & .kc-code .src .ln.is-lit { box-shadow: none; background: var(--gl-coral-wash); }
+  & .kc-code .src .ln.is-lit .no { color: var(--pl-accent); }
+
+  & .kc-table th { letter-spacing: 1.2px; color: var(--gl-text); border-bottom-color: var(--gl-hair); }
+  & .kc-table td { font-weight: 400; border-bottom-color: var(--gl-hair-subtle); }
+  & .kc-table .cap { color: var(--gl-text); }
+
+  & .kc-quote .box { padding: 18px 22px 20px; border: 1px solid var(--gl-hair); border-left-width: 1px; border-radius: 16px; background: var(--gl-graphite); box-shadow: inset 0 1px 0 var(--gl-highlight); }
+  & .kc-quote .q { font: 500 21px/1.35 var(--pl-font); letter-spacing: -0.2px; color: #fff; }
+  & .kc-quote .cite { font: 500 12px/1.3 var(--pl-font-mono); letter-spacing: 0.3px; color: var(--gl-text); }
+  & .kc-quote.is-lit .box { border-color: var(--gl-coral-line); }
+  & .kc-quote.is-lit .q { color: #fff; }
+
+  & .kc-text .size-sm { color: var(--gl-text); }
+  & .kc-text .size-lg { font-weight: 500; letter-spacing: -0.3px; }
+  & .kc-text .size-xl {
+    font-weight: 600; letter-spacing: -0.5px; padding-bottom: 0.06em;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.8), #fff 50%, rgba(255, 255, 255, 0.81)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  & .kc-list li::marker { color: var(--pl-accent); }
+  & .kc-kv dt { color: var(--gl-text); }
+  & .kc-kv dd { font: 500 13.5px/1.35 var(--pl-font-mono); }
+  & :is(.kc-figure, .kc-image) img { border-radius: 8px; }
+  & :is(.kc-figure, .kc-image) figcaption { color: var(--gl-text); }
+  & .kc-sparkline .lbl, & .kc-sparkline .unit { color: var(--gl-text); }
+  & .kc-sparkline .val { font: 500 15px/1.2 var(--pl-font-mono); }
+  & :is(.kc-bars, .kc-line, .kc-donut) .ttl { font: 500 15.5px/1.25 var(--pl-font); letter-spacing: 0.2px; }
+  & :is(.kc-bars, .kc-line, .kc-donut) .cap { color: var(--gl-text); }
+
+  /* ---- charts: hairline grid, coral for the dashed reference, glowing lines, a smoked-glass tooltip.
+     No tracking inside a chart: its layout measures label widths without it. */
+  & .kch-svg { letter-spacing: 0; }
+  & .kch-g { stroke: rgba(255, 255, 255, 0.07); stroke-opacity: 1; }
+  & .kch-base { stroke: rgba(255, 255, 255, 0.2); stroke-opacity: 1; }
+  & :is(.kch-tk, .kch-ax, .kch-note) { fill: var(--gl-text); }
+  & .kch-lg { fill: var(--gl-secondary); }
+  & :is(.kch-val, .kch-cl, .kch-hx) { font-weight: 500; }
+  & .kch-big { font-weight: 600; letter-spacing: -0.5px; }
+  & .kch-line { filter: drop-shadow(0 0 4px color-mix(in srgb, var(--c) 60%, transparent)); }
+  & .kch-area { fill-opacity: 0.12; }
+  & .kch-ref { stroke: var(--pl-accent); stroke-opacity: 0.85; }
+  & .kch-box { fill: var(--gl-raised-800); stroke: var(--gl-coral-line); }
+  & .kch-tip {
+    padding: 8px 11px; border-radius: 10px; background: var(--gl-smoke); border-color: var(--gl-hair); box-shadow: var(--gl-shadow-glass), 0 12px 32px rgba(0, 0, 0, 0.6);
+    -webkit-backdrop-filter: blur(var(--gl-blur)) saturate(1.5); backdrop-filter: blur(var(--gl-blur)) saturate(1.5); font: 12.5px/1.4 var(--pl-font);
+  }
+  & .kch-tip b { font: 500 10.5px/1.3 var(--pl-font-mono); letter-spacing: 1.2px; text-transform: uppercase; color: var(--gl-text); }
+}
+
+/* ---- no backdrop blur, or less transparency asked for: the glass chrome turns opaque */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"] {
+    & .kx-btn:not(#kx-prev, #kx-next, #kx-reset) { background: linear-gradient(104deg, #131314 5%, #1d1d1b 100%) border-box; }
+    & .kch-tip { background: var(--gl-raised); }
+  }
+  :root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"] {
+    & .kx-tools:has(> :not([hidden])), & .kx-narr, & .kch-tip { background: linear-gradient(137deg, #151619, #0c0d0f); }
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root:is([data-plate-theme="adenine"], [data-plate-theme="fresh"]) .plate, .plate:is([data-plate-theme="adenine"], [data-plate-theme="fresh"]) {
+    & .kx-btn, & .kx-tools, & .kx-narr, & .kch-tip { -webkit-backdrop-filter: none; backdrop-filter: none; }
+  }
+  :root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"] {
+    & .kx-btn:not(#kx-prev, #kx-next, #kx-reset) { background: linear-gradient(104deg, #131314 5%, #1d1d1b 100%) border-box; }
+    & .kch-tip { background: var(--gl-raised); }
+  }
+  :root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"] {
+    & .kx-tools:has(> :not([hidden])), & .kx-narr, & .kch-tip { background: linear-gradient(137deg, #151619, #0c0d0f); }
+  }
+}

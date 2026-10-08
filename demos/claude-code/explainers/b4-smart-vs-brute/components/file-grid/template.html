@@ -1,0 +1,12 @@
+<div class="pl-card box">
+  <div class="pl-label head">{{title}}</div>
+  <div class="grid" style="--cols: {{cols}}; --rows: {{rows}}">
+    <div class="layer base"></div>
+    <div class="layer read" data-k-scale="read/total"></div>
+    <div class="layer faded" data-k-scale="faded/total"></div>
+    {{#each hits}}<span class="hit st-{{state}}" style="--c: {{c}}; --r: {{r}}"></span>{{/each}}
+  </div>
+  {{#if stat}}<div class="stat"><b data-k-num="read" data-k-decimals="0" data-k-group="true">{{read}}</b> {{stat}}</div>{{/if}}
+  {{#if legend}}<ul class="key">{{#each legend}}<li class="k t-{{tone}}"><span class="sw" aria-hidden="true"></span>{{label}}</li>{{/each}}</ul>{{/if}}
+  {{#if note}}<div class="note">{{{note}}}</div>{{/if}}
+</div>

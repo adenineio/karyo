@@ -1,0 +1,39 @@
+{
+  "name": "undo-ledger",
+  "description": "A ledger of things Claude did in a session and whether a checkpoint rewind undoes each one: a yes or a no, with the reason.",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "required": ["rows"],
+    "additionalProperties": false,
+    "properties": {
+      "title": { "type": "string", "default": "What Claude did" },
+      "head": { "type": "string", "default": "/rewind undoes it?", "description": "the right-hand column's heading" },
+      "rows": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 6,
+        "items": {
+          "type": "object",
+          "required": ["what", "undo"],
+          "additionalProperties": false,
+          "properties": {
+            "what": { "type": "string", "description": "markdown-lite: the action" },
+            "via": { "type": "string", "description": "how it was done, e.g. `its edit tool` or `a command (Bash)`" },
+            "undo": { "enum": ["yes", "no"] },
+            "why": { "type": "string", "description": "a short reason under the verdict" },
+            "mark": { "type": "boolean", "description": "light this row" }
+          }
+        }
+      }
+    }
+  },
+  "size": { "w": 440 },
+  "motion": ["appear", "emphasize"],
+  "example": {
+    "rows": [
+      { "what": "Edited `report.md`", "via": "its file-editing tool", "undo": "yes" },
+      { "what": "Ran `mv notes.txt archive/`", "via": "a command (Bash)", "undo": "no", "why": "commands aren't tracked", "mark": true }
+    ]
+  }
+}

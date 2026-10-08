@@ -1,0 +1,11 @@
+{
+  "description": "Karyo: keep explainers published as Claude artifacts current (docs/ARTIFACTS.md). Both hooks exit at once in a project without karyo/artifacts.json.",
+  "hooks": {
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/plugin/artifact-hook.sh\" stop", "timeout": 120 }] }
+    ],
+    "SessionStart": [
+      { "matcher": "startup|resume|clear|compact", "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/plugin/artifact-hook.sh\" session-start", "timeout": 120 }] }
+    ]
+  }
+}

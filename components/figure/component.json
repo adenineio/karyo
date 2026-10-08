@@ -1,0 +1,19 @@
+{
+  "name": "figure",
+  "description": "An inline SVG (sanitized; paths marked data-k-draw draw on when it appears) or an image, with a caption.",
+  "version": "1.0.0",
+  "props": {
+    "type": "object",
+    "additionalProperties": false,
+    "anyOf": [{ "required": ["svg"] }, { "required": ["src"] }],
+    "properties": {
+      "svg": { "type": "string", "description": "an <svg>…</svg> string; use currentColor or var(--pl-*) for colours" },
+      "src": { "type": "string", "format": "image", "description": "data: URI, or a path relative to the spec file" },
+      "alt": { "type": "string" },
+      "caption": { "type": "string" }
+    }
+  },
+  "size": { "w": 360 },
+  "motion": ["appear", "emphasize", "draw"],
+  "example": { "svg": "<svg viewBox='0 0 100 40'><path data-k-draw d='M4 36 C 40 36, 60 30, 96 4' fill='none' stroke='currentColor' stroke-width='3'/></svg>", "caption": "Growth curve" }
+}

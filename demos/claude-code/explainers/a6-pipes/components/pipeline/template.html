@@ -1,0 +1,4 @@
+<div class="box">
+  {{#if title}}<div class="pl-label head">{{title}}</div>{{/if}}
+  <ol class="line">{{#each stations}}<li class="st st-{{state}}"><div class="cmd">{{cmd}}</div>{{#if count}}<div class="cnt">{{count}}</div>{{/if}}{{#if note}}<div class="note">{{note}}</div>{{/if}}</li>{{/each}}</ol>
+</div>

@@ -1,0 +1,4 @@
+<div class="box{{#if frame}} pl-card framed{{/if}}">
+  {{#if title}}<div class="pl-label">{{title}}</div>{{/if}}
+  {{#if ordered}}<ol>{{#each items}}<li>{{{this}}}</li>{{/each}}</ol>{{else}}<ul>{{#each items}}<li>{{{this}}}</li>{{/each}}</ul>{{/if}}
+</div>

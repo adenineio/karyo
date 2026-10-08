@@ -1,0 +1,486 @@
+{
+  "karyo": "explainer/1",
+  "id": "c1-claude-md",
+  "title": "CLAUDE.md, the briefing note",
+  "summary": "Every session starts with a clear desk. CLAUDE.md is the note Claude reads first: your standing instructions, every time.",
+  "note": "Names, companies and files here are **made-up examples**.",
+  "narration": "side",
+  "uses": [
+    "brief-note",
+    "file-tree",
+    "context-meter",
+    "chat-turn",
+    "try-it"
+  ],
+  "layout": {
+    "kind": "free"
+  },
+  "categories": [
+    {
+      "id": "files",
+      "label": "your files"
+    },
+    {
+      "id": "desk",
+      "label": "Claude's desk"
+    },
+    {
+      "id": "you",
+      "label": "you"
+    },
+    {
+      "id": "claude",
+      "label": "Claude"
+    }
+  ],
+  "elements": [
+    {
+      "id": "tree",
+      "type": "file-tree",
+      "category": "files",
+      "label": "Project folder",
+      "props": {
+        "title": "~/Acme-reports",
+        "items": [
+          {
+            "name": "CLAUDE.md",
+            "depth": 0,
+            "state": "plain"
+          },
+          {
+            "name": "README.md",
+            "depth": 0
+          },
+          {
+            "name": "data",
+            "kind": "folder",
+            "depth": 0
+          },
+          {
+            "name": "scripts",
+            "kind": "folder",
+            "depth": 0
+          },
+          {
+            "name": "reports",
+            "kind": "folder",
+            "depth": 0
+          }
+        ]
+      },
+      "at": {
+        "x": 0,
+        "y": 0,
+        "w": 340
+      }
+    },
+    {
+      "id": "meter",
+      "type": "context-meter",
+      "category": "desk",
+      "label": "Context window",
+      "props": {
+        "title": "Context window (the desk)",
+        "used": 1,
+        "caption": "a new session; illustrative"
+      },
+      "at": {
+        "x": 0,
+        "y": 230,
+        "w": 340
+      }
+    },
+    {
+      "id": "note",
+      "type": "brief-note",
+      "category": "files",
+      "label": "CLAUDE.md",
+      "props": {
+        "h1": "Acme monthly reports",
+        "sections": [
+          {
+            "heading": "What this folder is",
+            "lines": [
+              "Monthly sales reports for Acme, built from CSV exports."
+            ]
+          },
+          {
+            "heading": "How to run things",
+            "lines": [
+              "`bash scripts/monthly.sh` rebuilds every report."
+            ]
+          },
+          {
+            "heading": "Words we use",
+            "lines": [
+              "**customer**: a company that buys from Acme. Never \"client\"."
+            ]
+          },
+          {
+            "heading": "Preferences",
+            "lines": [
+              "British spelling. Dates as `2026-03-31`.",
+              "Never edit files in `data/raw`."
+            ]
+          }
+        ]
+      },
+      "at": {
+        "x": 370,
+        "y": 0,
+        "w": 440
+      }
+    },
+    {
+      "id": "you",
+      "type": "chat-turn",
+      "category": "you",
+      "label": "You type /init",
+      "props": {
+        "who": "you",
+        "text": "`/init`"
+      },
+      "at": {
+        "x": 840,
+        "y": 0,
+        "w": 380
+      }
+    },
+    {
+      "id": "claude",
+      "type": "chat-turn",
+      "category": "claude",
+      "label": "Claude drafts CLAUDE.md",
+      "props": {
+        "who": "claude",
+        "text": "I looked through this folder and drafted **CLAUDE.md**: what it's for, how to run things and the conventions I found.",
+        "actions": [
+          "Bash: ls",
+          "Read: README.md",
+          "Write: CLAUDE.md"
+        ]
+      },
+      "at": {
+        "x": 840,
+        "y": 90,
+        "w": 380
+      }
+    },
+    {
+      "id": "advisory",
+      "type": "callout",
+      "props": {
+        "tone": "warn",
+        "title": "A request, not a rule",
+        "md": "\"Claude reads it and tries to follow it, but there's no guarantee of strict compliance, especially for vague or conflicting instructions.\" (Claude Code docs)"
+      },
+      "at": {
+        "x": 370,
+        "y": 445,
+        "w": 440
+      }
+    },
+    {
+      "id": "try",
+      "type": "try-it",
+      "props": {
+        "title": "Get a first draft",
+        "ask": "Read this folder and draft a short CLAUDE.md for it. Don't save it until I've read it.",
+        "expect": "Claude looks around, then shows you a draft. Cut anything vague, add what it couldn't know, then let it save."
+      },
+      "at": {
+        "x": 840,
+        "y": 340,
+        "w": 380
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "title": "A clear desk",
+      "text": "Each Claude Code **session** starts with a fresh context window, without the conversation from last time. Think of a temp who starts fresh every morning: capable, but new to your project.",
+      "show": [
+        "tree",
+        "meter"
+      ],
+      "emphasize": [
+        "meter"
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "The note, read first",
+      "text": "**CLAUDE.md** is a plain text file in your project folder. Claude Code reads it at the start of every session, before your first message, like a handover note left on the temp's desk.",
+      "add": [
+        "note"
+      ],
+      "emphasize": [
+        "note"
+      ],
+      "set": {
+        "tree": {
+          "items": [
+            {
+              "name": "CLAUDE.md",
+              "depth": 0,
+              "state": "hit",
+              "note": "read at the start"
+            },
+            {
+              "name": "README.md",
+              "depth": 0
+            },
+            {
+              "name": "data",
+              "kind": "folder",
+              "depth": 0
+            },
+            {
+              "name": "scripts",
+              "kind": "folder",
+              "depth": 0
+            },
+            {
+              "name": "reports",
+              "kind": "folder",
+              "depth": 0
+            }
+          ]
+        },
+        "meter": {
+          "used": 3,
+          "caption": "illustrative",
+          "items": [
+            {
+              "label": "CLAUDE.md",
+              "share": "2%",
+              "tone": "brief"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s3",
+      "title": "What goes in",
+      "text": "Write down what you'd otherwise explain every time: what the folder is, how to run things, the words you use, your preferences. Be concrete: \"never edit files in data/raw\" works better than \"be careful with the data\".",
+      "emphasize": [
+        "note"
+      ],
+      "dim": [
+        "tree",
+        "meter"
+      ],
+      "set": {
+        "note": {
+          "sections": [
+            {
+              "heading": "What this folder is",
+              "lines": [
+                "Monthly sales reports for Acme, built from CSV exports."
+              ],
+              "state": "lit"
+            },
+            {
+              "heading": "How to run things",
+              "lines": [
+                "`bash scripts/monthly.sh` rebuilds every report."
+              ],
+              "state": "lit"
+            },
+            {
+              "heading": "Words we use",
+              "lines": [
+                "**customer**: a company that buys from Acme. Never \"client\"."
+              ],
+              "state": "lit"
+            },
+            {
+              "heading": "Preferences",
+              "lines": [
+                "British spelling. Dates as `2026-03-31`.",
+                "Never edit files in `data/raw`."
+              ],
+              "state": "lit"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s4",
+      "title": "Keep it short",
+      "text": "The note stays on the desk all session, so every line takes room. Claude Code's docs suggest under 200 lines: longer files take more space and are followed less reliably. Keep a long manual in its own file and mention it by name: Claude opens it only when it decides a task needs it.",
+      "emphasize": [
+        "note",
+        "meter"
+      ],
+      "dim": [
+        "tree"
+      ],
+      "set": {
+        "note": {
+          "sections": [
+            {
+              "heading": "What this folder is",
+              "lines": [
+                "Monthly sales reports for Acme, built from CSV exports."
+              ]
+            },
+            {
+              "heading": "How to run things",
+              "lines": [
+                "`bash scripts/monthly.sh` rebuilds every report."
+              ]
+            },
+            {
+              "heading": "Words we use",
+              "lines": [
+                "**customer**: a company that buys from Acme. Never \"client\"."
+              ]
+            },
+            {
+              "heading": "Preferences",
+              "lines": [
+                "British spelling. Dates as `2026-03-31`.",
+                "Never edit files in `data/raw`."
+              ]
+            },
+            {
+              "heading": "The whole brand manual",
+              "lines": [
+                "40 pages, pasted in, read every session."
+              ],
+              "state": "waste",
+              "note": "doesn't belong"
+            }
+          ]
+        },
+        "meter": {
+          "used": 24,
+          "items": [
+            {
+              "label": "CLAUDE.md with the manual",
+              "share": "22%",
+              "tone": "waste"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s5",
+      "title": "It survives compaction",
+      "text": "When the desk fills, older conversation is boiled down into a summary: **compaction**. Instructions you only gave in chat can get lost, but the project's CLAUDE.md is re-read from disk and put back whole.",
+      "emphasize": [
+        "meter",
+        "note"
+      ],
+      "dim": [
+        "tree"
+      ],
+      "set": {
+        "note": {
+          "badge": "re-read from disk",
+          "sections": [
+            {
+              "heading": "What this folder is",
+              "lines": [
+                "Monthly sales reports for Acme, built from CSV exports."
+              ]
+            },
+            {
+              "heading": "How to run things",
+              "lines": [
+                "`bash scripts/monthly.sh` rebuilds every report."
+              ]
+            },
+            {
+              "heading": "Words we use",
+              "lines": [
+                "**customer**: a company that buys from Acme. Never \"client\"."
+              ]
+            },
+            {
+              "heading": "Preferences",
+              "lines": [
+                "British spelling. Dates as `2026-03-31`.",
+                "Never edit files in `data/raw`."
+              ]
+            }
+          ]
+        },
+        "meter": {
+          "used": 34,
+          "items": [
+            {
+              "label": "CLAUDE.md (re-read)",
+              "share": "2%",
+              "tone": "brief"
+            },
+            {
+              "label": "summary of earlier work",
+              "share": "8%",
+              "tone": "summary"
+            },
+            {
+              "label": "your latest messages",
+              "share": "24%",
+              "tone": "chat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s6",
+      "title": "/init writes a draft",
+      "text": "Type `/init` in Claude Code: Claude looks through the folder and writes a starting CLAUDE.md. If one already exists, it suggests improvements instead of overwriting it. Then add what Claude couldn't discover on its own.",
+      "add": [
+        "you",
+        "claude"
+      ],
+      "emphasize": [
+        "claude"
+      ],
+      "dim": [
+        "tree",
+        "meter"
+      ],
+      "set": {
+        "note": {
+          "badge": "draft"
+        }
+      }
+    },
+    {
+      "id": "s7",
+      "title": "A request, not a rule",
+      "text": "Claude treats CLAUDE.md as context, not enforced settings: it usually follows it, which is probabilistic, not certain. When something must happen every time, a **hook** turns the request into a rule (see C5, *Hooks*).",
+      "add": [
+        "advisory"
+      ],
+      "emphasize": [
+        "advisory"
+      ],
+      "dim": [
+        "tree",
+        "meter",
+        "you",
+        "claude"
+      ]
+    },
+    {
+      "id": "s8",
+      "title": "The whole picture",
+      "text": "A short note, read at the start of every session and again after compaction, carries your standing instructions from one clear desk to the next. Keep it brief and concrete, and let hooks handle what must be certain.",
+      "show": "*",
+      "set": {
+        "note": {
+          "badge": ""
+        }
+      }
+    }
+  ]
+}

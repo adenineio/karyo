@@ -1,0 +1,390 @@
+/* karyo — stage structure, themes and a small set of HTML building blocks (the engine classes).
+   Themes are CSS custom properties on .plate; the GL fx layers read the same tokens. */
+
+/* ------------------------------------------------------------ the built-in neutral tokens (light; dark below)
+   No menu offers them: they are what a plate draws in with no plate theme, which a page asks for with `&mode=light` or
+   `&mode=dark` (light-mode stills, a print or light page) or by not setting a theme at all. The themes are adenine and fresh. */
+.plate {
+  --pl-theme-name: neutral;
+  --pl-bg: #f5f6f8;
+  --pl-fg: #14171c;
+  --pl-muted: #5a6371;
+  --pl-line: #b9c0ca;
+  --pl-accent: #3552d6;
+  --pl-accent-2: #d9480f;
+  --pl-ok: #1f9d55;
+  --pl-card: #ffffff;
+  --pl-card-border: #dde1e7;
+  --pl-radius: 10px;
+  --pl-shadow: 0 1px 2px rgb(20 23 28 / 0.06), 0 6px 20px -8px rgb(20 23 28 / 0.18);
+  --pl-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --pl-font-display: var(--pl-font);
+  --pl-font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --pl-glow: 0.35;
+  --pl-grain: 0;
+  /* categorical palette (legend categories, card edges): a fixed order, validated for colour-blind
+     separation (adjacent OKLab ΔE ≥ 9 under protan/deutan) and for normal vision (≥ 19) on the card
+     surface in both modes. Categories past the eighth fold into "other" (--pl-cat-other). The
+     -fill tokens are a pattern cue laid over the colour (a background-image, e.g. a hatch, for a theme
+     whose categories share colours; none in neutral). */
+  --pl-cat-1: #008300; --pl-cat-2: #e87ba4; --pl-cat-3: #eda100; --pl-cat-4: #4a3aa7;
+  --pl-cat-5: #e34948; --pl-cat-6: #2a78d6; --pl-cat-7: #1baf7a; --pl-cat-8: #eb6834;
+  --pl-cat-other: var(--pl-muted);
+  --pl-cat-1-fill: none; --pl-cat-2-fill: none; --pl-cat-3-fill: none; --pl-cat-4-fill: none;
+  --pl-cat-5-fill: none; --pl-cat-6-fill: none; --pl-cat-7-fill: none; --pl-cat-8-fill: none;
+  color-scheme: light;
+}
+/* neutral (dark): follows the OS unless a page forces light; never over a plate theme */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-plate-theme^="adenine"]):not([data-plate-theme="fresh"]) .plate:not([data-theme="light"]):not([data-plate-theme^="adenine"]):not([data-plate-theme="fresh"]) {
+    --pl-bg: #0f1217;
+    --pl-fg: #e7eaee;
+    --pl-muted: #8c96a4;
+    --pl-line: #3a424e;
+    --pl-accent: #7390ff;
+    --pl-accent-2: #ff8a4c;
+    --pl-ok: #3fb871;
+    --pl-card: #171b22;
+    --pl-card-border: #29303a;
+    --pl-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 10px 30px -12px rgb(0 0 0 / 0.6);
+    --pl-glow: 0.8;
+    --pl-cat-1: #008300; --pl-cat-2: #d55181; --pl-cat-3: #c98500; --pl-cat-4: #9085e9;
+    --pl-cat-5: #e66767; --pl-cat-6: #3987e5; --pl-cat-7: #199e70; --pl-cat-8: #d95926;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]:not([data-plate-theme^="adenine"]):not([data-plate-theme="fresh"]) .plate:not([data-theme="light"]):not([data-plate-theme^="adenine"]):not([data-plate-theme="fresh"]),
+.plate[data-theme="dark"]:not([data-plate-theme^="adenine"]):not([data-plate-theme="fresh"]) {
+  --pl-bg: #0f1217;
+  --pl-fg: #e7eaee;
+  --pl-muted: #8c96a4;
+  --pl-line: #3a424e;
+  --pl-accent: #7390ff;
+  --pl-accent-2: #ff8a4c;
+  --pl-ok: #3fb871;
+  --pl-card: #171b22;
+  --pl-card-border: #29303a;
+  --pl-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 10px 30px -12px rgb(0 0 0 / 0.6);
+  --pl-glow: 0.8;
+  --pl-cat-1: #008300; --pl-cat-2: #d55181; --pl-cat-3: #c98500; --pl-cat-4: #9085e9;
+  --pl-cat-5: #e66767; --pl-cat-6: #3987e5; --pl-cat-7: #199e70; --pl-cat-8: #d95926;
+  color-scheme: dark;
+}
+
+/* ------------------------------------------------------------ the main themes: adenine (the default) and fresh
+   Two looks taken from design systems kept outside this repo: the same structure, a different material. Dark only
+   (both systems define one theme). Their surfaces (frosted fills, fading hairlines, light from above, the controls)
+   live in glass.css, read from the --gl-* tokens below; the --pl-* tokens are the systems' values mapped onto Karyo's.
+   Fonts: the stacks name the systems' faces first, then their open stand-ins, which ship with Karyo (src/engine/fonts:
+   declared by fonts.css on live pages, inlined in a standalone explainer), then system fonts. */
+:root:is([data-plate-theme="adenine"], [data-plate-theme="fresh"]) .plate, .plate:is([data-plate-theme="adenine"], [data-plate-theme="fresh"]) {
+  --pl-shadow: none;
+  --pl-cat-ring: 0%;
+  --pl-cat-kind: 0%;
+  --gl-blur: 24px;
+  color-scheme: dark;
+}
+/* adenine ("Adenine", the default): a black canvas, frosted controls, cool hairlines that fade, a serif for the title.
+   Glass surfaces in greys; colour with intent: the accent is the system's info blue (wires, sparks and flow light, lit
+   and selected states, progress, links, the current step), categories are its status colours at two lightnesses, kept
+   apart from the accent and with the warm, alarm-like hues (red, orange) out of the first four; the third, a raspberry,
+   keeps the first three in three different hues. Labels adjacent OKLab ΔE ≥ 16.5 under protan/deutan (19.2 normal
+   vision), any two ≥ 9.1, the first three mutually ≥ 16.5. */
+:root[data-plate-theme="adenine"] .plate, .plate[data-plate-theme="adenine"] {
+  --pl-theme-name: adenine;
+  --pl-bg: #000000;
+  --pl-fg: #f0f0f0;
+  --pl-muted: #a1a4a5;
+  --pl-line: #3b4345;
+  --pl-accent: #70b8ff;
+  --pl-accent-2: #ffca16;
+  --pl-ok: #3ad389;
+  --pl-card: #0e0f10;
+  --pl-card-border: rgba(214, 235, 253, 0.19);
+  --pl-radius: 16px;
+  --pl-font: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --pl-font-display: "ABC Favorit", Geist, Inter, ui-sans-serif, system-ui, sans-serif;
+  --pl-font-mono: "Commit Mono", "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --pl-glow: 0.6;
+  --pl-grain: 0;
+  --pl-light: 0.75;   /* pools of accent light on a black canvas: a little under full strength */
+  --pl-cat-1: #3ad389; --pl-cat-2: #8354fe; --pl-cat-3: #b85a95; --pl-cat-4: #ffca16;
+  --pl-cat-5: #12b5ad; --pl-cat-6: #e07b10; --pl-cat-7: #baa7ff; --pl-cat-8: #e5293f;
+  --gl-accent-wash: rgba(112, 184, 255, 0.14); --gl-accent-line: rgba(112, 184, 255, 0.45);
+  /* the light leak (glass.css): how much of a card's colour shows through it at rest, and how much more when lit (a card
+     with a category; one without takes half the rest). The haze around a card and its top edge follow these two. */
+  --gl-leak-rest: 16%; --gl-leak-lit: 17%;
+  --gl-serif: "Domaine Display", Newsreader, Georgia, "Times New Roman", serif;
+  --gl-title: rgba(252, 253, 255, 0.937);
+  --gl-text: #a1a4a5;
+  --gl-faint: #878d8f;
+  --gl-code: #ebeced;
+  --gl-secondary: rgba(241, 247, 254, 0.71);
+  --gl-hair: rgba(214, 235, 253, 0.19);
+  --gl-hair-soft: rgba(217, 237, 254, 0.145);
+  --gl-hair-subtle: rgba(221, 234, 248, 0.08);
+  --gl-raised: #141517;
+  --gl-panel: #191b1e;
+  --gl-field: rgba(24, 25, 28, 0.88);
+  --gl-hover: rgba(176, 199, 217, 0.145);
+  --gl-menu: rgba(14, 15, 16, 0.92);
+  --gl-glass-from: rgba(253, 253, 253, 0.05);
+  --gl-glass-to: rgba(240, 240, 228, 0.1);
+  --gl-glass-from-hover: rgba(253, 253, 253, 0.09);
+  --gl-glass-to-hover: rgba(240, 240, 228, 0.16);
+  --gl-glass-border: rgba(255, 255, 255, 0.05);
+  --gl-glow-top: rgba(255, 255, 255, 0.1);
+  --gl-wash: rgba(80, 80, 80, 0.15);
+  --gl-shadow-glass: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --gl-shadow-menu: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --gl-blur: 25px;
+  --gl-ok-bg: rgba(34, 255, 153, 0.118); --gl-ok-fg: rgba(70, 254, 165, 0.83);
+  --gl-warn-bg: rgba(250, 130, 0, 0.133); --gl-warn-fg: #ffca16;
+  --gl-info-bg: rgba(0, 119, 255, 0.227); --gl-info-fg: #70b8ff;
+  --gl-danger-bg: rgba(255, 23, 63, 0.176); --gl-danger-fg: #ff9592;
+}
+/* fresh ("Fresh"): ink and graphite, smoked glass, one light source from the top left (137°), film grain.
+   The accent is its coral; categories are its signal and tint colours with coral left out and amber (its warning)
+   after the first four. Labels adjacent ΔE ≥ 15.8 under protan/deutan (17.0 normal vision), any two ≥ 7.0. */
+:root[data-plate-theme="fresh"] .plate, .plate[data-plate-theme="fresh"] {
+  --pl-theme-name: fresh;
+  --pl-bg: #07080a;
+  --pl-fg: #ffffff;
+  --pl-muted: #9c9c9d;
+  --pl-line: #434345;
+  --pl-accent: #ff6363;
+  --pl-accent-2: #ffc533;
+  --pl-ok: #59d499;
+  --pl-card: #111214;
+  --pl-card-border: rgba(255, 255, 255, 0.06);
+  --pl-radius: 12px;
+  --pl-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+  --pl-font: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --pl-font-display: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --pl-font-mono: "Geist Mono", "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --pl-glow: 0.65;
+  --pl-grain: 0.2;
+  --pl-light: 0.8;
+  --pl-cat-1: #56c2ff; --pl-cat-2: #59d499; --pl-cat-3: #9b4dff; --pl-cat-4: #14a8b0;
+  --pl-cat-5: #ffc533; --pl-cat-6: #aae1ff; --pl-cat-7: #3f73d0; --pl-cat-8: #1f9d55;
+  --gl-title: #ffffff;
+  --gl-text: #9c9c9d;
+  --gl-faint: #9c9c9d;
+  --gl-dim: #6a6b6c;
+  --gl-code: #e6e6e6;
+  --gl-secondary: #cdcece;
+  --gl-hair: rgba(255, 255, 255, 0.06);
+  --gl-hair-soft: rgba(255, 255, 255, 0.06);
+  --gl-hair-subtle: rgba(255, 255, 255, 0.04);
+  --gl-highlight: rgba(255, 255, 255, 0.1);
+  --gl-grey-50: #e6e6e6; --gl-grey-500: #2f3031; --gl-grey-600: #1b1c1e; --gl-grey-700: #111214; --gl-grey-800: #0c0d0f;
+  --gl-raised-700: #222326; --gl-raised-800: #151619;
+  --gl-hover: rgba(255, 255, 255, 0.05);
+  --gl-selected: rgba(255, 255, 255, 0.1);
+  --gl-smoke: linear-gradient(137deg, rgba(17, 18, 20, 0.75), rgba(12, 13, 15, 0.9));
+  --gl-graphite: linear-gradient(137deg, #111214 4.87%, #0c0d0f 75.88%);
+  --gl-coral-wash: rgba(255, 99, 99, 0.15); --gl-coral-line: rgba(255, 99, 99, 0.31);
+  --gl-sky: #56c2ff; --gl-sky-wash: rgba(86, 194, 255, 0.15); --gl-sky-line: rgba(86, 194, 255, 0.31);
+  --gl-mint-wash: rgba(89, 212, 153, 0.15); --gl-amber-wash: rgba(255, 197, 51, 0.15);
+  --gl-shadow-glass: inset 0 1px 1px 0 rgba(255, 255, 255, 0.15);
+  --gl-shadow-porcelain: 0 0 0 2px rgba(0, 0, 0, 0.5), 0 0 14px 0 rgba(255, 255, 255, 0.19), inset 0 -1px 0.4px 0 rgba(0, 0, 0, 0.2), inset 0 1px 0.4px 0 #ffffff;
+  --gl-shadow-ringed: inset 0 1px 0 0 rgba(255, 255, 255, 0.05), 0 0 0 1px rgba(255, 255, 255, 0.25), inset 0 -1px 0 0 rgba(0, 0, 0, 0.2);
+  --gl-shadow-window: 0 16px 48px 8px rgba(0, 0, 0, 0.2), 0 0 0 0.5px rgba(0, 0, 0, 0.75), 0 4px 8px 0 rgba(0, 0, 0, 0.4), 0 12px 32px 0 rgba(0, 0, 0, 0.8);
+  --gl-shadow-keycap: 0 1.5px 0.5px 2.5px rgba(0, 0, 0, 0.4), 0 0 0.5px 1px #000000, inset 0 2px 1px 1px rgba(0, 0, 0, 0.25), inset 0 1px 1px 1px rgba(255, 255, 255, 0.2);
+  --gl-shadow-tinted: inset 0 1px 0 0 rgba(255, 255, 255, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.06), 0 30px 50px 0 rgba(0, 0, 0, 0.4);
+  --gl-keycap: radial-gradient(75% 75% at 50% 91.9%, #121212 0%, #0d0d0d 100%);
+  --gl-blur: 24px;
+}
+
+/* ------------------------------------------------------------ stage structure */
+.plate { display: grid; gap: 8px; width: 100%; min-width: 0; color: var(--pl-fg); font-family: var(--pl-font);  --pl-card-border-base: var(--pl-card-border); }
+.plate-viewport {
+  position: relative; width: 100%; max-width: 100%; overflow: hidden;
+  background: var(--pl-bg); border-radius: min(var(--pl-radius), 12px); outline: none;
+}
+.plate-viewport:focus-visible { box-shadow: 0 0 0 2px var(--pl-accent); }
+.plate-frame { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.plate-fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.plate-fx-under { z-index: 0; }
+.plate-dom { position: absolute; inset: 0; z-index: 1; font-size: 16px; line-height: 1.4; }
+.plate-fx-over { z-index: 2; }
+/* determinism: the engine owns every change over time; CSS transitions/animations would lag behind scrubbing */
+.plate-dom, .plate-dom * { transition: none !important; animation: none !important; }
+.plate-3d { pointer-events: none; }
+.plate-3d > div > * { pointer-events: auto; }
+
+/* zoom and pan (src/engine/viewport.ts; docs/ENGINE.md "Zoom and pan"): the grab cursor only over blank space while
+   zoomed in, grabbing while a pan moves, and a small − 100% + control in the viewport's corner (on hover and focus, and
+   always while zoomed in). Page chrome outside the scaled stage: it keeps its size at any zoom. */
+.plate-viewport.pl-grab .plate-dom { cursor: grab; }
+.plate-viewport.pl-space, .plate-viewport.pl-space * { cursor: grab !important; }
+.plate-viewport.is-panning, .plate-viewport.is-panning * { cursor: grabbing !important; user-select: none; }
+/* a chrome band's backdrop while zoomed in (src/engine/chrome.ts): the content pans under it */
+.plate-chrome-bg { position: absolute; background: var(--pl-bg); box-shadow: 0 0 12px 4px var(--pl-bg); pointer-events: auto; }
+.plate-zoom {
+  position: absolute; right: 8px; bottom: 8px; z-index: 6; display: none; align-items: center; gap: 1px; padding: 2px;
+  background: var(--pl-card); border: 1px solid var(--pl-line); border-radius: min(var(--pl-radius), 6px);
+  font: 500 11px/1 var(--pl-font-mono); color: var(--pl-muted);
+}
+.plate-viewport:hover > .plate-zoom, .plate-viewport:focus-within > .plate-zoom, .plate-viewport.is-zoomed > .plate-zoom { display: flex; }
+/* a plate hosted inside this one that zooms on its own shows its own control instead */
+.plate-viewport:has(.plate-viewport.pl-zoomable) > .plate-zoom { display: none; }
+.plate-zoom button {
+  font: inherit; color: inherit; background: transparent; border: 0; border-radius: min(var(--pl-radius), 4px);
+  min-width: 24px; padding: 5px 6px; cursor: pointer; font-variant-numeric: tabular-nums;
+}
+.plate-zoom .plate-zoom-pct { min-width: 5ch; }
+.plate-zoom button:hover:not(:disabled) { color: var(--pl-fg); background: color-mix(in srgb, var(--pl-fg) 8%, transparent); }
+.plate-zoom button:disabled { opacity: 0.4; cursor: default; }
+.plate-zoom button:focus-visible { outline: 1px solid var(--pl-accent); outline-offset: 0; }
+
+/* transport */
+.plate-controls { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; font: 12px/1 var(--pl-font-mono); color: var(--pl-muted); }
+.plate-btn {
+  font: 500 11px/1 var(--pl-font-mono); letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--pl-fg); background: transparent; border: 1px solid var(--pl-line); border-radius: min(var(--pl-radius), 6px);
+  padding: 7px 10px; min-width: 64px; cursor: pointer;
+}
+.plate-btn:hover { border-color: var(--pl-fg); }
+.plate-btn:focus-visible, .plate-scrub:focus-visible { outline: 2px solid var(--pl-accent); outline-offset: 2px; }
+.plate-scrub { width: 100%; min-width: 0; margin: 0; accent-color: var(--pl-accent); }
+.plate-time { font-variant-numeric: tabular-nums; min-width: 12ch; text-align: right; }
+.plate-controls:has(.plate-theater-btn) { grid-template-columns: auto 1fr auto auto; }
+
+/* theater: one plate lifted out of the page to fill the window (Stage.theater(), `f`, Esc) */
+.plate-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.plate.is-theater, .plate.is-fill {
+  position: fixed; inset: 0; z-index: 2147483000; box-sizing: border-box; overflow: hidden;
+  padding: 16px; background: var(--pl-bg); align-content: center; justify-items: center;
+}
+.plate.is-fill { z-index: 1000; }
+.plate.is-theater > .plate-controls, .plate.is-theater > .plate-actions,
+.plate.is-fill > .plate-controls, .plate.is-fill > .plate-actions { width: var(--plate-w, 100%); }
+.plate.is-theater .plate-viewport, .plate.is-fill .plate-viewport { box-shadow: 0 0 0 1px var(--pl-line); }
+html.plate-theater-open, html.plate-fill-open { overflow: hidden; }
+
+/* the pinned inspector (Stage.dock, `i`; docs/ENGINE.md "Pinned inspector"): page chrome beside the plate, outside
+   the scaled stage, so its text is native size. In the theater / fill overlay it sits on its side of the window and
+   the plate's padding makes room; a host page (Jarvis) places it itself. No transitions: pin, unpin and resize snap. */
+.plate-dock {
+  position: absolute; top: 16px; bottom: 16px; width: var(--dock-w, 540px); z-index: 5; box-sizing: border-box;
+  display: flex; flex-direction: column; min-height: 0;
+  background: var(--pl-card); color: var(--pl-fg); border: 1px solid var(--pl-card-border); border-radius: min(var(--pl-radius), 10px);
+  box-shadow: var(--pl-shadow); font: 16px/1.4 var(--pl-font); text-align: left;
+}
+.plate-dock[hidden] { display: none; }
+.plate-dock[data-side="right"] { right: 16px; }
+.plate-dock[data-side="left"] { left: 16px; }
+.plate-dock-head { flex: none; display: flex; align-items: center; gap: 6px; padding: 8px 10px 8px 16px; border-bottom: 1px solid var(--pl-card-border); }
+.plate-dock-title { flex: 1; min-width: 0; font: 500 11px/1.2 var(--pl-font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--pl-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plate-dock.is-locked .plate-dock-title { color: var(--pl-accent); }
+.plate-dock-btn {
+  flex: none; display: inline-grid; place-items: center; width: 30px; height: 28px; padding: 0; cursor: pointer;
+  color: var(--pl-muted); background: transparent; border: 1px solid var(--pl-line); border-radius: min(var(--pl-radius), 6px);
+}
+.plate-dock-btn:hover:not(:disabled) { color: var(--pl-fg); border-color: var(--pl-fg); }
+.plate-dock-btn[aria-pressed="true"] { color: var(--pl-accent); border-color: var(--pl-accent); }
+.plate-dock-btn:disabled { opacity: 0.4; cursor: default; }
+.plate-dock button:focus-visible, .plate-dock [tabindex]:focus-visible { outline: 2px solid var(--pl-accent); outline-offset: 2px; }
+.plate-dock-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.plate-dock-hint { margin: auto; padding: 24px; max-width: 28ch; text-align: center; font: 13px/1.5 var(--pl-font-mono); color: var(--pl-muted); }
+.plate-dock-grip { position: absolute; top: 0; bottom: 0; width: 10px; z-index: 1; cursor: col-resize; touch-action: none; }
+.plate-dock[data-side="right"] .plate-dock-grip { left: -6px; }
+.plate-dock[data-side="left"] .plate-dock-grip { right: -6px; }
+.plate-dock-grip::after { content: ''; position: absolute; top: 0; bottom: 0; left: 4px; width: 2px; background: transparent; }
+.plate-dock-grip:hover::after, .plate-dock.is-resizing .plate-dock-grip::after, .plate-dock-grip:focus-visible::after { background: var(--pl-accent); }
+.plate-dock.is-resizing { user-select: none; }
+.plate-dock, .plate-dock * { transition: none !important; animation: none !important; }
+
+/* bench: a plate you can rearrange (Stage.bench(), `b`); the button sits beside Theater */
+.plate-bench-btn[aria-pressed="true"] { border-color: var(--pl-accent); color: var(--pl-accent); }
+
+/* key help (src/engine/keyhelp.ts, `?`; docs/ENGINE.md "Key help"): a quiet `? keys` hint in the viewport's corner at
+   rest; on hover and focus (and zoomed) the zoom control shows there instead, with the same `? keys` at its right end.
+   A card of the keys that work now covers the plate. Page chrome in the viewport, outside the zoomed frame: native size
+   at any zoom. No transitions. */
+.plate-zoom .plate-keys-btn { border-left: 1px solid var(--pl-line); border-radius: 0; margin-left: 1px; }
+.plate-keys-btn { display: inline-flex; align-items: center; gap: 4px; }
+.plate-keys-btn kbd { font: inherit; color: var(--pl-fg); }
+.plate-keys-hint {
+  position: absolute; right: 8px; bottom: 8px; z-index: 6; padding: 7px 8px; cursor: pointer;
+  font: 500 11px/1 var(--pl-font-mono); color: var(--pl-muted); background: color-mix(in srgb, var(--pl-card) 70%, transparent);
+  border: 1px solid transparent; border-radius: min(var(--pl-radius), 6px);
+}
+.plate-keys-hint:hover { color: var(--pl-fg); }
+.plate-keys-hint:focus-visible { outline: 1px solid var(--pl-accent); }
+.plate-viewport:has(> .plate-zoom):is(:hover, :focus-within, .is-zoomed) > .plate-keys-hint,
+.plate-viewport.has-keys-open > .plate-keys-hint, .plate-viewport.has-keys-open > .plate-zoom { display: none; }
+.plate-keys {
+  position: absolute; inset: 0; z-index: 7; display: grid; place-items: center; padding: 12px; box-sizing: border-box;
+  background: color-mix(in srgb, var(--pl-bg) 62%, transparent); cursor: default;
+}
+.plate-keys[hidden] { display: none; }
+.plate-keys-card {
+  box-sizing: border-box; width: min(760px, 100%); max-height: 100%; display: flex; flex-direction: column; min-height: 0;
+  background: var(--pl-card); color: var(--pl-fg); border: 1px solid var(--pl-card-border); border-radius: min(var(--pl-radius), 10px);
+  box-shadow: var(--pl-shadow), 0 0 0 1px color-mix(in srgb, var(--pl-fg) 6%, transparent); font: 13px/1.4 var(--pl-font); text-align: left; outline: none;
+}
+.plate-keys-head { flex: none; display: flex; align-items: baseline; gap: 10px; padding: 10px 10px 10px 16px; border-bottom: 1px solid var(--pl-card-border); }
+.plate-keys-title { margin: 0; font: 500 11px/1.2 var(--pl-font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--pl-fg); white-space: nowrap; }
+.plate-keys-sub { flex: 1; min-width: 0; font-size: 12px; color: var(--pl-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plate-keys-close {
+  flex: none; align-self: center; width: 28px; height: 26px; padding: 0; cursor: pointer; font: 13px/1 var(--pl-font);
+  color: var(--pl-muted); background: transparent; border: 1px solid var(--pl-line); border-radius: min(var(--pl-radius), 6px);
+}
+.plate-keys-close:hover { color: var(--pl-fg); border-color: var(--pl-fg); }
+.plate-keys-body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 4px 16px 10px; columns: 2 300px; column-gap: 28px; outline: none; }
+.plate-keys-group { break-inside: avoid; padding-top: 10px; }
+.plate-keys-group h3 { margin: 0 0 6px; font: 500 10.5px/1.2 var(--pl-font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--pl-accent); }
+.plate-keys-group ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: fit-content(48%) 1fr; gap: 5px 12px; }
+.plate-keys-row { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: baseline; }
+.plate-keys-caps { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px; }
+.plate-keys-or { color: var(--pl-muted); font-size: 11px; }
+.plate-keys kbd {
+  display: inline-block; box-sizing: border-box; min-width: 22px; padding: 3px 6px 2px; text-align: center; white-space: nowrap;
+  font: 500 11.5px/1.2 var(--pl-font-mono); color: var(--pl-fg);
+  background: color-mix(in srgb, var(--pl-fg) 6%, var(--pl-card)); border: 1px solid var(--pl-line); border-bottom-width: 2px;
+  border-radius: min(var(--pl-radius), 5px);
+}
+.plate-keys-gesture { font-size: 12.5px; line-height: 1.3; color: var(--pl-fg); white-space: nowrap; }
+.plate-keys-does { color: var(--pl-fg); }
+.plate-keys-when { color: var(--pl-muted); font-size: 12px; }
+.plate-keys-when::before { content: '· '; }
+.plate-keys-row.is-off .plate-keys-caps, .plate-keys-row.is-off .plate-keys-does { opacity: 0.5; }
+.plate-keys-row.is-off .plate-keys-when { opacity: 1; font-style: italic; }
+.plate-keys-foot { flex: none; padding: 8px 16px; border-top: 1px solid var(--pl-card-border); font-size: 12px; color: var(--pl-muted); }
+.plate-keys-foot kbd { padding: 1px 5px; font-size: 11px; }
+.plate-keys-close:focus-visible, .plate-keys-body:focus-visible { outline: 2px solid var(--pl-accent); outline-offset: -2px; }
+.plate-keys, .plate-keys * { transition: none !important; animation: none !important; }
+
+/* ------------------------------------------------------------ engine classes: building blocks for scenes */
+.pl-card {
+  box-sizing: border-box; background: var(--pl-card); color: var(--pl-fg);
+  border: 1px solid var(--pl-card-border); border-radius: var(--pl-radius); box-shadow: var(--pl-shadow);
+  padding: 14px 16px;
+}
+.pl-card.is-lit { border-color: var(--pl-accent); }
+.pl-label { font: 500 11px/1.2 var(--pl-font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--pl-muted); }
+.pl-title { font: 700 22px/1.15 var(--pl-font-display); letter-spacing: -0.01em; margin: 0; }
+.pl-h1 { font: 800 44px/1.05 var(--pl-font-display); letter-spacing: -0.02em; margin: 0; }
+.pl-body { font-size: 15px; line-height: 1.45; color: var(--pl-fg); }
+.pl-muted { color: var(--pl-muted); }
+.pl-accent { color: var(--pl-accent); }
+.pl-mono { font-family: var(--pl-font-mono); }
+.pl-chip {
+  display: inline-block; font: 500 12px/1 var(--pl-font-mono); padding: 5px 8px;
+  border: 1px solid var(--pl-card-border); border-radius: min(var(--pl-radius), 999px); background: var(--pl-card); color: var(--pl-fg);
+}
+.pl-chip.is-lit { border-color: var(--pl-accent); color: var(--pl-accent); }
+.pl-code {
+  font: 14px/1.6 var(--pl-font-mono); background: var(--pl-card); color: var(--pl-fg);
+  border: 1px solid var(--pl-card-border); border-radius: var(--pl-radius); padding: 14px 18px; margin: 0; white-space: pre; tab-size: 2;
+}
+.pl-code .ln { display: block; padding: 0 8px; margin: 0 -8px; border-radius: 4px; }
+.pl-code .ln.is-lit { background: color-mix(in srgb, var(--pl-accent) 16%, transparent); }
+.pl-code .tok-k { color: var(--pl-accent); }
+.pl-code .tok-s { color: var(--pl-accent-2); }
+.pl-code .tok-c { color: var(--pl-muted); }
+.pl-code .tok-v { color: var(--pl-accent-2); font-weight: 600; }
+.pl-caret { display: inline-block; width: 0.55em; height: 1.1em; vertical-align: -0.2em; background: var(--pl-accent); margin-left: 1px; }
+.pl-w, .pl-c { display: inline-block; white-space: pre; }

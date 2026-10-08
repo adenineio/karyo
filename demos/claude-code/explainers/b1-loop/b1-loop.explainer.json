@@ -1,0 +1,367 @@
+{
+  "karyo": "explainer/1",
+  "id": "b1-loop",
+  "title": "The loop",
+  "summary": "Claude Code works in a loop: gather context, take action, check the result, and repeat until the job is done. You can step in at any point. Builds on: the terminal (A1).",
+  "note": "Names, companies and files here are **made-up examples**.",
+  "narration": "side",
+  "uses": [
+    "chat-turn",
+    "try-it"
+  ],
+  "layout": {
+    "kind": "free"
+  },
+  "categories": [
+    {
+      "id": "loop",
+      "label": "the loop"
+    },
+    {
+      "id": "claude",
+      "label": "Claude"
+    },
+    {
+      "id": "you",
+      "label": "you"
+    }
+  ],
+  "elements": [
+    {
+      "id": "gather",
+      "type": "card",
+      "category": "loop",
+      "props": {
+        "kicker": "1 · Look it over",
+        "title": "Gather context",
+        "body": "Search for the files involved and read them. Nothing changes yet."
+      },
+      "at": {
+        "x": 0,
+        "y": 0,
+        "w": 280
+      }
+    },
+    {
+      "id": "act",
+      "type": "card",
+      "category": "loop",
+      "props": {
+        "kicker": "2 · Try a fix",
+        "title": "Take action",
+        "body": "Edit a file or run a command that changes something."
+      },
+      "at": {
+        "x": 360,
+        "y": 0,
+        "w": 280
+      }
+    },
+    {
+      "id": "verify",
+      "type": "card",
+      "category": "loop",
+      "props": {
+        "kicker": "3 · Test drive",
+        "title": "Verify results",
+        "body": "Run the check and read what comes back."
+      },
+      "at": {
+        "x": 360,
+        "y": 230,
+        "w": 280
+      }
+    },
+    {
+      "id": "again",
+      "type": "chip",
+      "category": "loop",
+      "label": "Right yet?",
+      "props": {
+        "text": "Right yet?",
+        "tone": "accent"
+      },
+      "at": {
+        "x": 82,
+        "y": 283
+      }
+    },
+    {
+      "id": "request",
+      "type": "chat-turn",
+      "category": "you",
+      "label": "Your request",
+      "props": {
+        "who": "you",
+        "text": "The March total in the sales report looks far too low. Find out why and fix it."
+      },
+      "at": {
+        "x": 700,
+        "y": 0,
+        "w": 440
+      }
+    },
+    {
+      "id": "claude",
+      "type": "chat-turn",
+      "category": "claude",
+      "label": "Claude's work",
+      "props": {
+        "who": "claude",
+        "text": "The total comes from **scripts/totals.sh**, which adds up column 3 of march.csv. Column 3 is *tax*; the amounts are in column 4.",
+        "actions": [
+          "Bash: find . -name \"*march*\"",
+          "Read: reports/march-summary.md",
+          "Read: scripts/totals.sh",
+          "Bash: head -3 data/march.csv"
+        ]
+      },
+      "at": {
+        "x": 700,
+        "y": 110,
+        "w": 440
+      }
+    },
+    {
+      "id": "steer",
+      "type": "chat-turn",
+      "category": "you",
+      "label": "You step in",
+      "props": {
+        "who": "you",
+        "name": "You (after pressing Esc)",
+        "text": "Stop. Refunds should be subtracted, not left out."
+      },
+      "at": {
+        "x": 700,
+        "y": 380,
+        "w": 440
+      }
+    },
+    {
+      "id": "try",
+      "type": "try-it",
+      "props": {
+        "title": "Watch the loop",
+        "ask": "What's in this folder and what do you think it's for? Don't change anything.",
+        "expect": "Watch the tool calls Claude shows as it works: mostly *gather* (listing, searching, reading), with no action step, because you asked for none."
+      },
+      "at": {
+        "x": 0,
+        "y": 420,
+        "w": 620
+      }
+    }
+  ],
+  "links": [
+    {
+      "id": "g-a",
+      "from": "gather",
+      "to": "act",
+      "label": "then"
+    },
+    {
+      "id": "a-v",
+      "from": "act",
+      "to": "verify",
+      "label": "then"
+    },
+    {
+      "id": "v-q",
+      "from": "verify",
+      "to": "again"
+    },
+    {
+      "id": "q-g",
+      "from": "again",
+      "to": "gather",
+      "label": "not yet: again"
+    }
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "title": "Your request",
+      "text": "You ask in plain words. Claude Code doesn't just answer from what it already knows: it works on the problem in a **loop** of small steps, using tools (reading files, running commands) as it goes.",
+      "show": [
+        "request"
+      ],
+      "emphasize": [
+        "request"
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "Gather context",
+      "text": "First it looks: it searches for the files involved and reads them. On a Mac, its searches are `find` and `grep`, the same commands you could type yourself.",
+      "add": [
+        "gather",
+        "claude"
+      ],
+      "emphasize": [
+        "gather",
+        "claude"
+      ],
+      "dim": [
+        "request"
+      ]
+    },
+    {
+      "id": "s3",
+      "title": "Take action",
+      "text": "Then it acts. Here that's a small edit to the script: add up column 4, not column 3.",
+      "add": [
+        "act"
+      ],
+      "emphasize": [
+        "act",
+        "claude"
+      ],
+      "dim": [
+        "request",
+        "gather"
+      ],
+      "connect": [
+        "g-a"
+      ],
+      "set": {
+        "claude": {
+          "text": "Changing the script to add up column 4, the amounts.",
+          "actions": [
+            "Edit: scripts/totals.sh"
+          ]
+        }
+      }
+    },
+    {
+      "id": "s4",
+      "title": "Verify results",
+      "text": "Then it checks: it runs the script again and reads the output. That exact, repeatable answer (deterministic) is what lets Claude (probabilistic) test its own fix. And this check finds something new.",
+      "add": [
+        "verify",
+        "again"
+      ],
+      "emphasize": [
+        "verify",
+        "again",
+        "claude"
+      ],
+      "dim": [
+        "request",
+        "gather",
+        "act"
+      ],
+      "connect": [
+        "g-a",
+        "a-v",
+        "v-q"
+      ],
+      "set": {
+        "claude": {
+          "text": "The total is now **48,645**. But 3 rows are refunds, and the script adds them as sales. Not right yet.",
+          "actions": [
+            "Bash: bash scripts/totals.sh data/march.csv",
+            "Bash: grep -c \"refund\" data/march.csv"
+          ]
+        }
+      }
+    },
+    {
+      "id": "s5",
+      "title": "Round again",
+      "text": "Not right yet, so it goes round again. Each result decides the next step. Unlike a mechanic's set routine, the phases blend: a question may need only looking; a fix may take many rounds.",
+      "emphasize": [
+        "gather",
+        "act",
+        "claude"
+      ],
+      "dim": [
+        "request",
+        "verify"
+      ],
+      "connect": [
+        "g-a",
+        "a-v",
+        "v-q",
+        "q-g"
+      ],
+      "set": {
+        "claude": {
+          "text": "Going round again: I'll leave the refunds out of the total.",
+          "actions": [
+            "Read: scripts/totals.sh",
+            "Edit: scripts/totals.sh"
+          ]
+        }
+      }
+    },
+    {
+      "id": "s6",
+      "title": "You step in",
+      "text": "You're part of the loop. Press **Esc** to stop Claude at once, or type a correction and press Return while it works: it reads it before its next step.",
+      "add": [
+        "steer"
+      ],
+      "emphasize": [
+        "steer"
+      ],
+      "dim": [
+        "request",
+        "gather",
+        "act",
+        "verify",
+        "again",
+        "claude"
+      ],
+      "connect": [
+        "g-a",
+        "a-v",
+        "v-q",
+        "q-g"
+      ]
+    },
+    {
+      "id": "s7",
+      "title": "Done, and what it did",
+      "text": "With your correction it acts and checks once more. This time the check passes, so the loop ends and Claude gives its reply. Its tool calls show as it works, so you can see how it got there.",
+      "emphasize": [
+        "claude",
+        "verify",
+        "again"
+      ],
+      "dim": [
+        "request",
+        "steer",
+        "gather",
+        "act"
+      ],
+      "connect": [
+        "g-a",
+        "a-v",
+        "v-q",
+        "q-g"
+      ],
+      "set": {
+        "claude": {
+          "text": "Done. **scripts/totals.sh** now adds the *amount* column and subtracts the 3 refunds. March total: **47,315** (the report said 4,864). One file changed.",
+          "actions": [
+            "Edit: scripts/totals.sh",
+            "Bash: bash scripts/totals.sh data/march.csv"
+          ]
+        }
+      }
+    },
+    {
+      "id": "s8",
+      "title": "The whole picture",
+      "text": "Look, try, test, repeat, like a mechanic, until it's right. Claude brings the judgment; commands bring exact answers to check against. And you can lean in at any point.",
+      "show": "*",
+      "connect": [
+        "g-a",
+        "a-v",
+        "v-q",
+        "q-g"
+      ]
+    }
+  ]
+}

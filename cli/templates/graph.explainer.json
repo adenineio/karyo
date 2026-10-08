@@ -1,0 +1,24 @@
+{
+  "karyo": "explainer/1",
+  "id": "graph",
+  "title": "Graph",
+  "summary": "Parts and how they connect, built up one link at a time.",
+  "layout": { "kind": "graph", "direction": "right", "gap": 56 },
+  "elements": [
+    { "id": "user", "type": "card", "props": { "title": "User", "body": "Starts the request." } },
+    { "id": "api", "type": "card", "props": { "title": "API", "body": "Checks and routes it." } },
+    { "id": "db", "type": "card", "props": { "title": "Database", "body": "Keeps the data." } },
+    { "id": "cache", "type": "card", "props": { "title": "Cache", "body": "Answers repeats fast." } }
+  ],
+  "links": [
+    { "id": "user-api", "from": "user", "to": "api", "label": "request" },
+    { "id": "api-cache", "from": "api", "to": "cache", "label": "look up", "style": "dashed" },
+    { "id": "api-db", "from": "api", "to": "db", "label": "query", "style": "accent" }
+  ],
+  "steps": [
+    { "title": "A request arrives", "text": "The user sends a request to the API.", "show": ["user", "api"] },
+    { "title": "Try the cache first", "text": "Most answers are already in the cache.", "add": ["cache"], "emphasize": ["cache"] },
+    { "title": "Fall back to the database", "text": "On a miss, the API asks the database.", "add": ["db"], "emphasize": ["db"] },
+    { "title": "The whole system", "text": "Every part and every link.", "show": "*" }
+  ]
+}
